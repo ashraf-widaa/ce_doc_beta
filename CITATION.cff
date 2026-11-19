@@ -1,0 +1,69 @@
+# This CITATION.cff file was generated with cffinit.
+# Visit https://bit.ly/cffinit to generate yours today!
+
+cff-version: 1.2.0
+title: Calibrated Explanations
+message: >-
+  calibrated-explanations is a Python package for the local
+  feature importance explanation method called Calibrated
+  Explanations, supporting both classification and
+  regression.
+type: software
+authors:
+  - given-names: Helena
+    family-names: Löfström
+    email: helena.lofstrom@ju.se
+    orcid: 'https://orcid.org/0000-0001-9633-0423'
+    affiliation: Jönköping University
+  - given-names: Tuwe
+    family-names: Löfström
+    email: tuwe.lofstrom@ju.se
+    affiliation: 'Jönköping AI Lab, Jönköping University'
+    orcid: 'https://orcid.org/0000-0003-0274-9026'
+  - given-names: Ulf
+    family-names: Johansson
+    email: ulf.johansson@ju.se
+    affiliation: 'Jönköping AI Lab, Jönköping University'
+  - given-names: Cecilia
+    family-names: Sönströd
+    email: cecilia.sonstrod@ju.se
+    affiliation: 'Jönköping AI Lab, Jönköping University'
+  - given-names: Rudy
+    family-names: Matela
+    email: rudy.matela@ju.se
+    affiliation: 'Jönköping AI Lab, Jönköping University'
+identifiers:
+  - type: doi
+    value: 10.1016/j.eswa.2024.123154
+    description: >-
+      Introductory paper: Calibrated Explanations: with
+      Uncertainty Information and Counterfactuals
+repository-code: 'https://github.com/Moffran/calibrated_explanations'
+abstract: >-
+  `calibrated-explanations` is a Python package for the local feature importance explanation method called Calibrated Explanations, supporting both [classification](https://doi.org/10.1016/j.eswa.2024.123154) and [regression](https://doi.org/10.1007/s10994-024-06642-8).
+  The proposed method calibrates the underlying model before explaining it:
+  Venn-Abers for classification, Conformal Predictive Systems (CPS) for regression intervals, and CPS-derived threshold-event scores combined with Venn-Abers for probabilistic regression (the probability that the target exceeds a user-defined threshold). It has the following characteristics:
+  * Feature importance explanations, each accompanied by a calibrated uncertainty interval, for:
+    - Binary classification models ([read paper](https://doi.org/10.1016/j.eswa.2024.123154))
+    - Multi-class classification models ([read paper](https://raw.githubusercontent.com/mlresearch/v230/main/assets/lofstrom24a/lofstrom24a.pdf))
+    - Regression models ([read paper](https://doi.org/10.1007/s10994-024-06642-8))
+      * Including probabilistic explanations of the probability that the target exceeds a user-defined threshold
+      * With normalization by a learned difficulty (heteroscedasticity) estimate to adapt interval width per instance
+  * Calibration of the underlying model's outputs against a held-out calibration set.
+  * Uncertainty quantification of the prediction from the underlying model and the feature importance weights.
+  * Rules with straightforward interpretation in relation to instance values and feature weights.
+  * Possibility to generate alternative rules with uncertainty quantification of the expected predictions.
+  * Conjunctional rules conveying feature importance for the interaction of included features.
+  * Conditional rules, allowing users the ability to create contextual explanations to handle e.g. bias and fairness constraints ([read paper](https://doi.org/10.1007/978-3-031-63787-2_17)).
+keywords:
+  - Calibrated Explanations
+  - Feature Importance
+  - Explainable AI
+  - Uncertainty Quantification
+  - Alternative Explanations
+  - Classification
+  - Regression
+  - Probabilistic Regression
+license: BSD-3-Clause
+version: v1.0.2
+date-released: '2026-10-20'

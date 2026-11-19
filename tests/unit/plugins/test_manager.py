@@ -1,0 +1,426 @@
+"""Unit tests for PluginManager.
+
+Tests for the PluginManager class which centralizes plugin state,
+override configuration, and instance caching.
+"""
+
+import copy
+import types
+from unittest.mock import Mock
+
+import pytest
+
+from calibrated_explanations.core.config_manager import ConfigManager
+from calibrated_explanations.plugins.manager import PluginManager
+from calibrated_explanations.utils.exceptions import ConfigurationError
+
+
+class TestPluginManagerInitialization:
+    """Tests for PluginManager initialization."""
+
+    def test_property_deleters_clear_optional_state(self):
+        """should_clear_optional_plugin_state_when_property_deleters_are_used."""
+        manager = PluginManager(Mock())
+
+        manager.explanation_plugin_fallbacks = {"factual": ("a",)}
+        manager.plot_plugin_fallbacks = {"plot": ("legacy",)}
+        manager.explanation_preferred_identifier = {"factual": "a"}
+        manager.interval_context_metadata = {"default": {"source": "test"}}
+
+        del manager.explanation_plugin_fallbacks
+        del manager.plot_plugin_fallbacks
+        del manager.explanation_preferred_identifier
+        del manager.interval_context_metadata
+
+        assert manager.explanation_plugin_fallbacks == {}
+        assert manager.plot_plugin_fallbacks == {}
+        assert manager.explanation_preferred_identifier == {}
+        assert manager.interval_context_metadata == {}
+
+
+class TestPluginManagerInitializeFromKwargs:
+    """Tests for initialize_from_kwargs method."""
+
+
+class TestCoercePluginOverride:
+    """Tests for coerce_plugin_override method."""
+
+    def test_coerce_callable_calls_and_returns_result(self):
+        """should_coerce_callable_by_invoking_and_returning_result."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        def factory():
+            return {"plugin": True}
+
+        result = manager.coerce_plugin_override(factory)
+        assert result == {"plugin": True}
+
+    def test_coerce_callable_raising_raises_configuration_error(self):
+        """should_raise_configuration_error_when_callable_raises."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        def bad_factory():
+            raise RuntimeError("boom")
+
+        with pytest.raises(ConfigurationError):
+            manager.coerce_plugin_override(bad_factory)
+
+
+class TestBridgeMonitorManagement:
+    """Tests for bridge monitor caching."""
+
+    def test_clear_bridge_monitors_empties_cache(self):
+        """should_empty_bridge_monitor_cache_on_clear."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        _ = manager.get_bridge_monitor("my_plugin")
+        assert len(manager.bridge_monitors) == 1
+
+        manager.clear_bridge_monitors()
+        assert len(manager.bridge_monitors) == 0
+
+
+class TestExplanationPluginInstanceManagement:
+    """Tests for explanation plugin instance caching."""
+
+    def test_set_and_get_explanation_plugin_instance(self):
+        """should_cache_and_retrieve_explanation_plugin_instance."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        instance = Mock()
+        manager.set_explanation_plugin_instance("my_id", instance)
+
+        result = manager.get_explanation_plugin_instance("my_id")
+        assert result is instance
+
+    def test_clear_explanation_plugin_instances(self):
+        """should_clear_all_cached_explanation_plugin_instances."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        manager.set_explanation_plugin_instance("id1", Mock())
+        manager.set_explanation_plugin_instance("id2", Mock())
+        assert len(manager.explanation_plugin_instances) == 2
+
+        manager.clear_explanation_plugin_instances()
+        assert len(manager.explanation_plugin_instances) == 0
+
+    def test_should_evict_oldest_plugin_instance_when_cache_exceeds_capacity(self):
+        """should_evict_lru_plugin_instance_when_cache_size_exceeds_limit."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        for index in range(17):
+            manager.set_explanation_plugin_instance(f"id-{index}", Mock())
+
+        assert len(manager.explanation_plugin_instances) == 16
+        assert "id-0" not in manager.explanation_plugin_instances
+        assert "id-16" in manager.explanation_plugin_instances
+
+    def test_should_refresh_lru_order_when_instance_is_read(self):
+        """should_keep_recently_read_instance_when_cache_evicts."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        for index in range(16):
+            manager.set_explanation_plugin_instance(f"id-{index}", Mock())
+
+        _ = manager.get_explanation_plugin_instance("id-0")
+        manager.set_explanation_plugin_instance("id-16", Mock())
+
+        assert "id-0" in manager.explanation_plugin_instances
+        assert "id-1" not in manager.explanation_plugin_instances
+        assert "id-16" in manager.explanation_plugin_instances
+
+
+class TestExplanationPluginIdentifierManagement:
+    """Tests for explanation plugin identifier caching."""
+
+    def test_set_and_get_explanation_plugin_identifier(self):
+        """should_cache_and_retrieve_explanation_plugin_identifier."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        manager.set_explanation_plugin_identifier("factual", "core.explanation.factual")
+
+        result = manager.get_explanation_plugin_identifier("factual")
+        assert result == "core.explanation.factual"
+
+    def test_clear_explanation_plugin_identifiers(self):
+        """should_clear_all_cached_explanation_plugin_identifiers."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        manager.set_explanation_plugin_identifier("factual", "id1")
+        manager.set_explanation_plugin_identifier("alternative", "id2")
+        assert len(manager.explanation_plugin_identifiers) == 2
+
+        manager.clear_explanation_plugin_identifiers()
+        assert len(manager.explanation_plugin_identifiers) == 0
+
+
+class TestPluginConfigBinding:
+    """Tests for provisional plugin config binding."""
+
+    def test_bind_plugin_config_validates_after_trusted_metadata_resolution(self):
+        """should_validate_selected_trusted_plugin_config_with_plugin_schema."""
+        config_manager = ConfigManager(
+            env_snapshot={},
+            pyproject_snapshot={
+                "plugins": {},
+                "explanations": {},
+                "intervals": {},
+                "plots": {},
+                "telemetry": {},
+                "plugin_configs": {"test.plugin": {"labels": ["x", "y"]}},
+            },
+        )
+        manager = PluginManager(Mock(), config_manager=config_manager)
+        plugin = Mock()
+        plugin.plugin_meta = {
+            "name": "test.plugin",
+            "trusted": True,
+            "config_schema": {
+                "version": 1,
+                "keys": {
+                    "mode": {"type": "str", "default": "balanced"},
+                    "labels": {"type": "list[str]", "default": []},
+                },
+            },
+        }
+
+        resolved = manager.bind_plugin_config("test.plugin", plugin)
+
+        assert resolved["mode"] == "balanced"
+        assert resolved["labels"] == ("x", "y")
+        with pytest.raises(TypeError):
+            resolved["labels"] = ("bad",)  # type: ignore[index]
+
+    def test_bind_plugin_config_does_not_deliver_config_to_untrusted_plugin(self):
+        """should_return_empty_config_when_selected_plugin_metadata_is_untrusted."""
+        config_manager = ConfigManager(
+            env_snapshot={},
+            pyproject_snapshot={
+                "plugins": {},
+                "explanations": {},
+                "intervals": {},
+                "plots": {},
+                "telemetry": {},
+                "plugin_configs": {"test.plugin": {"enabled": True}},
+            },
+        )
+        manager = PluginManager(Mock(), config_manager=config_manager)
+        plugin = Mock()
+        plugin.plugin_meta = {"name": "test.plugin", "trusted": False}
+
+        assert manager.bind_plugin_config("test.plugin", plugin) == {}
+
+    def test_bind_plugin_config_respects_legacy_nested_untrusted_metadata(self):
+        """should_not_treat_legacy_nested_false_trust_mapping_as_truthy."""
+        config_manager = ConfigManager(
+            env_snapshot={},
+            pyproject_snapshot={
+                "plugins": {},
+                "explanations": {},
+                "intervals": {},
+                "plots": {},
+                "telemetry": {},
+                "plugin_configs": {"test.plugin": {"enabled": True}},
+            },
+        )
+        manager = PluginManager(Mock(), config_manager=config_manager)
+        plugin = Mock()
+        plugin.plugin_meta = {"name": "test.plugin", "trust": {"trusted": False}}
+
+        assert manager.bind_plugin_config("test.plugin", plugin) == {}
+
+    def test_bind_plugin_config_raises_clear_error_for_invalid_selected_config(self):
+        """should_raise_configuration_error_when_selected_trusted_config_is_invalid."""
+        config_manager = ConfigManager(
+            env_snapshot={},
+            pyproject_snapshot={
+                "plugins": {},
+                "explanations": {},
+                "intervals": {},
+                "plots": {},
+                "telemetry": {},
+                "plugin_configs": {"test.plugin": {"enabled": "yes"}},
+            },
+        )
+        manager = PluginManager(Mock(), config_manager=config_manager)
+        plugin = Mock()
+        plugin.plugin_meta = {
+            "name": "test.plugin",
+            "trusted": True,
+            "config_schema": {
+                "version": 1,
+                "keys": {"enabled": {"type": "bool", "required": True}},
+            },
+        }
+
+        with pytest.raises(ConfigurationError, match="Invalid config"):
+            manager.bind_plugin_config("test.plugin", plugin)
+
+
+class TestIntervalPluginState:
+    """Tests for interval plugin state management."""
+
+    def test_resolve_interval_plugin_returns_object_override(self):
+        """should_return_non_string_override_directly_for_interval_resolution."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+        override = Mock()
+        override.plugin_meta = {"name": "custom.interval"}
+        manager.interval_plugin_override = override
+
+        plugin, identifier = manager.resolve_interval_plugin(fast=False)
+
+        assert plugin is override
+        assert identifier == "custom.interval"
+
+
+class TestPlotResolution:
+    """Tests for plot style and plugin resolution."""
+
+    def test_resolve_plot_style_chain_includes_explicit_and_mode_fallbacks(self):
+        """should_merge_explicit_style_manager_chain_and_mode_hints."""
+        mock_explainer = Mock()
+        mock_explainer.last_explanation_mode = "factual"
+        manager = PluginManager(mock_explainer)
+        manager.plot_plugin_fallbacks = {"factual": ("mode.one",)}
+        manager.build_plot_chain = Mock(return_value=("env.style", "legacy"))
+
+        chain = manager.resolve_plot_style_chain(explicit_style="explicit.style")
+
+        assert chain[0] == "explicit.style"
+        assert "env.style" in chain
+        assert "mode.one" in chain
+        assert "plot_spec.default" in chain
+        assert "legacy" in chain
+        assert chain.index("legacy") < chain.index("plot_spec.default")
+
+    def test_resolve_plot_plugin_raises_when_no_candidates(self, monkeypatch):
+        """should_raise_configuration_error_when_plot_plugins_missing."""
+        import calibrated_explanations.plugins.manager as manager_module
+
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+        manager.build_plot_chain = Mock(return_value=("missing.style", "legacy"))
+
+        monkeypatch.setattr(manager_module, "ensure_builtin_plugins", lambda: None)
+        monkeypatch.setattr(manager_module, "find_plot_plugin_trusted", lambda _ident: None)
+        monkeypatch.setattr(manager_module, "find_plot_plugin", lambda _ident: None)
+
+        with pytest.raises(ConfigurationError, match="Unable to resolve plot plugin"):
+            manager.resolve_plot_plugin(explicit_style="missing.style")
+
+
+class TestPluginManagerDeepCopy:
+    """Tests for PluginManager deepcopy behavior."""
+
+    def test_deepcopy_handles_mappingproxy(self):
+        """should_handle_mappingproxy_when_deepcopied."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        # Simulate the state that causes issues (mappingproxy in a dict)
+        unpicklable_dict = types.MappingProxyType({"a": 1})
+        manager.explanation_contexts = {"test_context": unpicklable_dict}
+
+        # This should not raise TypeError
+        copied_manager = copy.deepcopy(manager)
+
+        # Verify the copy has the data (shallow copied or reference)
+        assert copied_manager.explanation_contexts["test_context"] == unpicklable_dict
+        assert isinstance(
+            copied_manager.explanation_contexts["test_context"], types.MappingProxyType
+        )
+
+        # Verify it's a different manager instance
+        assert copied_manager is not manager
+        assert manager.interval_context_metadata["fast"] == {}
+
+    def test_deepcopy_preserves_mappingproxy_attribute(self):
+        """should_preserve_mappingproxy_attribute_when_deepcopied."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        proxy = types.MappingProxyType({"a": 1})
+        manager.test_proxy = proxy
+
+        copied_manager = copy.deepcopy(manager)
+
+        assert isinstance(copied_manager.test_proxy, types.MappingProxyType)
+        assert copied_manager.test_proxy is not proxy
+        assert dict(copied_manager.test_proxy) == dict(proxy)
+
+    def test_deepcopy_mappingproxy_failure_raises_typeerror(self, monkeypatch):
+        """should_raise_typeerror_when_mappingproxy_recreation_fails."""
+        import calibrated_explanations.plugins.manager as manager_module
+
+        class FakeProxy:
+            fail_on_init = False
+
+            def __init__(self, data):
+                if self.__class__.fail_on_init:
+                    raise TypeError("boom")
+                self.data = dict(data)
+
+            def __iter__(self):
+                return iter(self.data.items())
+
+            def __len__(self):
+                return len(self.data)
+
+            def __getitem__(self, key):
+                return self.data[key]
+
+            def items(self):
+                return self.data.items()
+
+        monkeypatch.setattr(manager_module, "MappingProxyType", FakeProxy)
+
+        mock_explainer = Mock()
+        manager = manager_module.PluginManager(mock_explainer)
+
+        fake_proxy = FakeProxy({"a": 1})
+        manager.test_proxy = fake_proxy
+        FakeProxy.fail_on_init = True
+
+        with pytest.raises(TypeError, match="boom"):
+            copy.deepcopy(manager)
+
+    def test_deepcopy_dict_preserve_failure_raises_typeerror(self):
+        """should_raise_typeerror_when_nested_value_deepcopy_fails."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        class BadDeepcopy:
+            def __deepcopy__(self, memo):
+                raise TypeError("boom")
+
+        bad_value = BadDeepcopy()
+        manager.test_dict = {"bad": bad_value}
+
+        with pytest.raises(TypeError, match="boom"):
+            copy.deepcopy(manager)
+
+    def test_deepcopy_typeerror_for_list_and_object_values_raises(self):
+        """should_raise_typeerror_for_list_and_object_values_when_deepcopy_fails."""
+        mock_explainer = Mock()
+        manager = PluginManager(mock_explainer)
+
+        class BadDeepcopy:
+            def __deepcopy__(self, memo):
+                raise TypeError("boom")
+
+        bad_value = BadDeepcopy()
+        manager.test_list = [bad_value]
+        manager.test_obj = bad_value
+
+        with pytest.raises(TypeError, match="boom"):
+            copy.deepcopy(manager)

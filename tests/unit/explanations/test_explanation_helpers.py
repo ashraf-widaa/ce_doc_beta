@@ -1,0 +1,635 @@
+from __future__ import annotations
+
+import numpy as np
+import pytest
+from pandas import Categorical
+
+from calibrated_explanations.explanations import explanation as explanation_module
+
+import math
+import warnings
+
+
+from calibrated_explanations.explanations.explanation import (
+    CalibratedExplanation,
+)
+
+
+class DummyExplainer:
+    def __init__(self):
+        self.feature_names = ["feat"]
+        self.categorical_features = []
+        self.categorical_labels = None
+        # calibration matrix with two calibration rows for feature 0
+        self.x_cal = np.array([[6.0], [7.0]])
+        self.sample_percentiles = [25, 75]
+        self.num_features = 1
+
+    def discretize(self, x):
+        return x  # dummy passthrough
+
+
+class DummyCalibrated:
+    def __init__(self):
+        self.low_high_percentiles = (0.05, 0.95)
+        self.features_to_ignore = set()
+        self.explainer = DummyExplainer()
+
+    def get_explainer(self):
+        return self.explainer
+
+
+class DummyExplanation(CalibratedExplanation):
+    def __init__(self):
+        # do not call super; just provide attributes used by helpers
+        self.calibrated_explanations = DummyCalibrated()
+        self.explainer = self.calibrated_explanations.get_explainer()
+        self.x_test = np.array([5.0])
+        self.binned = {"rule_values": {0: [[1.0, 2.0, 3.0]]}}
+        self.prediction = {"classes": 1, "predict": 0.5, "low": 0.4, "high": 0.6}
+        self.y_threshold = None
+        self.has_rules = False
+        self.has_conjunctive_rules = False
+        self.rules = None
+        self.conjunctive_rules = None
+        self.bin = None
+        self.has_rules_flag = False
+        self.has_conjunctive_rules_flag = False
+
+    def get_explainer(self):
+        return self.explainer
+
+    def _check_preconditions(self):
+        return None
+
+    def get_rules(self):
+        return {"rule": []}
+
+    def _is_lesser(self, rule_boundary, instance_value):
+        return rule_boundary < instance_value
+
+    # Implement abstract methods from CalibratedExplanation so tests can
+    # instantiate this dummy subclass without triggering TypeError.
+    def __repr__(self):
+        return "DummyExplanation"
+
+    def add_conjunctions(self, n_top_features=5, max_rule_size=2):
+        return self
+
+    def build_rules_payload(self):
+        return {"core": {}, "metadata": {}}
+
+    def plot(self, *args, **kwargs):
+        return None
+
+
+def testto_python_number_and_normalize_compute_confidence():
+    # numpy scalar
+    assert CalibratedExplanation.to_python_number(np.int32(3)) == 3
+    assert CalibratedExplanation.to_python_number(np.float64(2.5)) == 2.5
+    # numpy array -> list
+    assert CalibratedExplanation.to_python_number(np.array([1, 2])) == [1, 2]
+    # nan becomes None
+    assert CalibratedExplanation.to_python_number(np.nan) is None
+
+    # normalize percentiles: >1 becomes fraction
+    inst = DummyExplanation()
+    assert inst.normalize_percentile_value(95) == 0.95
+    # values in [0,1] unchanged
+    assert inst.normalize_percentile_value(0.05) == 0.05
+    # inf preserved
+    assert math.isinf(inst.normalize_percentile_value(math.inf))
+    # non-numeric returns None
+    assert inst.normalize_percentile_value("bad") is None
+
+    # compute confidence
+    assert CalibratedExplanation.compute_confidence_level((0.05, 0.95)) == pytest.approx(0.9)
+    # missing percentiles
+    assert CalibratedExplanation.compute_confidence_level(None) is None
+    # -inf handling
+    assert CalibratedExplanation.compute_confidence_level((-math.inf, 0.5)) == 0.5
+    # inf handling
+    assert CalibratedExplanation.compute_confidence_level((0.1, math.inf)) == pytest.approx(0.9)
+
+
+def test_build_uncertainty_payload_and_interval():
+    inst = DummyExplanation()
+    payload = inst.build_uncertainty_payload(
+        value=0.7,
+        low=0.6,
+        high=0.8,
+        representation="percentile",
+        percentiles=(0.05, 0.95),
+        include_percentiles=True,
+    )
+    assert payload["representation"] == "percentile"
+    assert payload["calibrated_value"] == 0.7
+    assert payload["lower_bound"] == 0.6
+    assert payload["upper_bound"] == 0.8
+    assert payload["raw_percentiles"] == [0.05, 0.95]
+    assert payload["confidence_level"] == pytest.approx(0.9)
+
+    interval = CalibratedExplanation.build_interval(0.2, 0.4)
+    assert interval == {"lower": 0.2, "upper": 0.4}
+
+
+def test_convert_and_parse_condition_and_build_payload():
+    inst = DummyExplanation()
+    # parse equality with single =
+    op, val = inst.parse_condition("feat", "feat = 3")
+    assert op == "=="
+    assert val == "3"
+    # convert numeric
+    assert inst.convert_condition_value("3", 0) == 3.0
+    # convert infinities and text
+    assert inst.convert_condition_value("-inf", 0) == float("-inf")
+    assert inst.convert_condition_value("inf", 0) == float("inf")
+    assert inst.convert_condition_value("foo", 0) == "foo"
+
+    payload = inst.build_condition_payload(0, "feat = 4", 2.0, 4.0)
+    assert payload["feature"] == "feat"
+    assert payload["operator"] == "=="
+    assert payload["value"] == 4.0
+
+
+def test_add_new_rule_condition_warns_when_no_lower_values():
+    inst = DummyExplanation()
+    # prepare explainer x_cal such that no values are < rule_boundary
+    inst.explainer.x_cal = np.array([[6.0], [7.0]])
+    inst.x_test = np.array([5.0])
+    with warnings.catch_warnings(record=True) as w:
+        warnings.simplefilter("always")
+        result = inst.add_new_rule_condition(0, 4.0)
+        assert result is inst
+        assert any("Lowest feature value" in str(x.message) for x in w)
+
+
+class DiscretizerStub:
+    def __init__(self):
+        self.names = [
+            ["f0 <= 0.2", "f0 > 0.2"],
+            ["f1 <= 0.2", "f1 > 0.2"],
+            ["f2 <= 0.2", "f2 > 0.2"],
+        ]
+
+    def discretize(self, x):  # pragma: no cover - simple passthrough
+        # mimic the discretizer contract where each column maps to a bin index
+        return np.arange(x.shape[-1], dtype=int)
+
+
+class ExplainerStub:
+    def __init__(self, mode="regression", y_cal=None):
+        self.y_cal = np.array([0.1, 0.9]) if y_cal is None else y_cal
+        self.mode = mode
+        self.class_labels = None
+        self.feature_names = ["f0", "f1", "f2"]
+        self.categorical_features: list[int] = []
+        self.categorical_labels = None
+        self.feature_values = [np.array([0, 1]), np.array([0, 1]), np.array([0, 1])]
+        self.sample_percentiles = [25, 75]
+        self.num_features = 2
+        self.discretizer = DiscretizerStub()
+        self.x_cal = np.array([[0.1, 0.3], [0.2, 0.4]])
+        self.rule_boundaries = lambda _instance: []
+
+        class PredOrch:
+            def __init__(self, outer):
+                self.outer = outer
+
+            def predict_internal(self, x, **kwargs):
+                return self.outer.predict(x, **kwargs)
+
+        self.prediction_orchestrator = PredOrch(self)
+
+    def discretize(self, x):
+        return self.discretizer.discretize(x)
+
+    def is_multiclass(self):  # pragma: no cover - not exercised here
+        return False
+
+    def predict(self, data, **_kwargs):
+        rows = data.shape[0]
+        predict = np.ones((rows, 1))
+        low = np.full((rows, 1), 0.5)
+        high = np.full((rows, 1), 1.5)
+        return predict, low, high, np.zeros(rows)
+
+
+class ContainerStub:
+    def __init__(self, *, mode="regression", y_cal=None):
+        self.low_high_percentiles = (5, 95)
+        self.explainer = ExplainerStub(mode=mode, y_cal=y_cal)
+        self.features_to_ignore = []
+        self.explanations = []
+
+    def get_explainer(self):
+        return self.explainer
+
+    def get_low_percentile(self):
+        low = self.low_high_percentiles[0]
+        if low == -np.inf:
+            return -np.inf
+        return low / 100.0
+
+    def get_high_percentile(self):
+        high = self.low_high_percentiles[1]
+        if high == np.inf:
+            return np.inf
+        return high / 100.0
+
+
+class SimpleExplanation(explanation_module.CalibratedExplanation):
+    def __repr__(self):  # pragma: no cover - trivial
+        return "simple"
+
+    def plot(self, filter_top=None, **kwargs):  # pragma: no cover - not needed in tests
+        return None
+
+    def add_conjunctions(self, n_top_features=5, max_rule_size=2):  # pragma: no cover - stub
+        return self
+
+    def _check_preconditions(self):  # pragma: no cover - stub
+        return None
+
+    def get_rules(self):
+        if not hasattr(self, "mock_rules"):
+            self.mock_rules = {"rule": ["r1", "r2"]}
+        return self.mock_rules
+
+    def _is_lesser(self, other):  # pragma: no cover - stub
+        return False
+
+    def build_rules_payload(self):
+        rules = getattr(self, "rules", None) or getattr(self, "mock_rules", None) or {}
+        if isinstance(rules, dict) and "feature" in rules:
+            return explanation_module.FactualExplanation.build_rules_payload(self)
+        prediction_interval = explanation_module.CalibratedExplanation.build_interval(
+            self.prediction.get("low"),
+            self.prediction.get("high"),
+        )
+        return {
+            "core": {
+                "kind": "simple",
+                "prediction": {
+                    "value": explanation_module.CalibratedExplanation.to_python_number(
+                        self.prediction.get("predict")
+                    ),
+                    "uncertainty_interval": prediction_interval,
+                },
+                "feature_rules": [],
+            },
+            "metadata": {"feature_rules": []},
+        }
+
+
+def make_explanation(
+    *,
+    cls=SimpleExplanation,
+    mode: str = "regression",
+    threshold=None,
+    y_cal=None,
+):
+    container = ContainerStub(mode=mode, y_cal=y_cal)
+    x = np.array([[0.1, 0.2], [0.3, 0.4]])
+    rule_values = np.empty((2, 2), dtype=object)
+    rule_values[0, 0] = np.array([[0.1]])
+    rule_values[0, 1] = np.array([[0.2]])
+    rule_values[1, 0] = np.array([[0.3]])
+    rule_values[1, 1] = np.array([[0.4]])
+    binned = {
+        "predict": np.array([[0.2, 0.3], [0.4, 0.5]]),
+        "low": np.array([[0.1, 0.2], [0.3, 0.4]]),
+        "high": np.array([[0.3, 0.4], [0.5, 0.6]]),
+        "rule_values": rule_values,
+    }
+    feature_weights = {
+        "predict": np.array([[0.1, 0.2], [0.3, 0.4]]),
+        "low": np.array([[0.05, 0.1], [0.15, 0.2]]),
+        "high": np.array([[0.15, 0.25], [0.35, 0.45]]),
+    }
+    feature_predict = {
+        "predict": np.array([[0.5, 0.6], [0.7, 0.8]]),
+        "low": np.array([[0.4, 0.5], [0.6, 0.7]]),
+        "high": np.array([[0.6, 0.7], [0.8, 0.9]]),
+    }
+    prediction = {
+        "predict": np.array([0.2, 0.6]),
+        "low": np.array([0.1, 0.5]),
+        "high": np.array([0.4, 0.9]),
+        "classes": np.array([1, 1]),
+    }
+    return cls(
+        container,
+        index=1,
+        x=x,
+        binned=binned,
+        feature_weights=feature_weights,
+        feature_predict=feature_predict,
+        prediction=prediction,
+        y_threshold=threshold,
+        instance_bin=0,
+    )
+
+
+@pytest.fixture
+def simple_explanation():
+    return make_explanation()
+
+
+def build_rules_fixture(explanation):
+    return {
+        "rule": ["f0 <= 0.2", "f1 > 0.3"],
+        "feature": [0, 1],
+        "sampled_values": [np.array([0.1]), np.array([0.4])],
+        "feature_value": [0.1, 0.4],
+        "value": ["0.10", "0.30"],
+        "weight": [0.2, -0.1],
+        "weight_low": [0.1, -0.2],
+        "weight_high": [0.3, 0.0],
+        "predict": [0.62, 0.48],
+        "predict_low": [0.5, 0.4],
+        "predict_high": [0.7, 0.55],
+        "base_predict": [explanation.prediction["predict"]],
+        "base_predict_low": [explanation.prediction["low"]],
+        "base_predict_high": [explanation.prediction["high"]],
+        "is_conjunctive": [False, False],
+        "classes": explanation.prediction["classes"],
+    }
+
+
+@pytest.fixture
+def telemetry_explanation():
+    explanation = make_explanation()
+    rules = build_rules_fixture(explanation)
+    explanation.mock_rules = rules
+    explanation.rules = rules
+    explanation.has_rules_flag = True
+    return explanation
+
+
+class StubAlternative(explanation_module.AlternativeExplanation):
+    def _check_preconditions(self):  # pragma: no cover - simple stub
+        return None
+
+    def get_rules(self):
+        if not hasattr(self, "mock_rules"):
+            self.mock_rules = {
+                "rule": ["f0 <= 0.2"],
+                "feature": [0],
+                "sampled_values": [np.array([0.1, 0.2])],
+                "feature_value": [0.1],
+                "value": ["0.10"],
+                "weight": [0.2],
+                "weight_low": [0.1],
+                "weight_high": [0.3],
+                "predict": [0.75],
+                "predict_low": [0.7],
+                "predict_high": [0.8],
+                "base_predict": [self.prediction["predict"]],
+                "base_predict_low": [self.prediction["low"]],
+                "base_predict_high": [self.prediction["high"]],
+                "is_conjunctive": [False],
+                "classes": self.prediction["classes"],
+            }
+        return self.mock_rules
+
+    def add_conjunctions(self, n_top_features=5, max_rule_size=2):
+        return self
+
+    def plot(self, filter_top=None, **kwargs):
+        return None
+
+
+@pytest.fixture
+def alternative_explanation():
+    return make_explanation(cls=StubAlternative)
+
+
+def test_prediction_interval(simple_explanation):
+    assert simple_explanation.prediction_interval == (0.5, 0.9)
+    assert simple_explanation.predict == pytest.approx(0.6)
+
+
+def test_categorical_target_uses_default_minmax():
+    categorical = Categorical(["a", "b"])
+    explanation = SimpleExplanation(
+        ContainerStub(y_cal=categorical),
+        index=1,
+        x=np.array([[0.1, 0.2], [0.3, 0.4]]),
+        binned={"weights": np.array([[1, 2], [3, 4]])},
+        feature_weights={"weights": np.array([[0.1, 0.2], [0.3, 0.4]])},
+        feature_predict={"weights": np.array([[0.5, 0.6], [0.7, 0.8]])},
+        prediction={
+            "predict": np.array([0.2, 0.6]),
+            "low": np.array([0.1, 0.5]),
+            "high": np.array([0.4, 0.9]),
+        },
+        y_threshold=None,
+        instance_bin=0,
+    )
+    assert explanation.y_minmax == [0, 0]
+
+
+def test_length_and_metadata_helpers(simple_explanation):
+    explainer = simple_explanation.get_explainer()
+    explainer.class_labels = ["negative", "positive"]
+    assert len(simple_explanation) == 2
+    assert simple_explanation.get_mode() == "regression"
+    assert simple_explanation.get_class_labels() == ["negative", "positive"]
+    assert simple_explanation.is_thresholded() is False
+    assert simple_explanation.is_probabilistic() is False
+
+
+def testrank_features_requires_input(simple_explanation):
+    from calibrated_explanations.utils.exceptions import ValidationError
+
+    with pytest.raises(ValidationError):
+        simple_explanation.rank_features()
+
+
+def testrank_features_orders_by_width_and_weight(simple_explanation):
+    weights = np.array([0.4, -0.1, 0.2])
+    widths = np.array([0.3, 0.5, 0.1])
+    ranked = simple_explanation.rank_features(feature_weights=weights, width=widths)
+    assert set(ranked) == {0, 1, 2}
+    assert ranked[-1] == 0  # highest absolute weight retained last
+    limited = simple_explanation.rank_features(feature_weights=weights, num_to_show=2)
+    assert len(limited) == 2
+    width_only = simple_explanation.rank_features(width=widths)
+    assert set(width_only) == {0, 1, 2}
+
+
+def test_percentile_helpers():
+    assert explanation_module.CalibratedExplanation.normalize_percentile_value(95) == pytest.approx(
+        0.95
+    )
+    assert explanation_module.CalibratedExplanation.normalize_percentile_value(-np.inf) == -np.inf
+    assert explanation_module.CalibratedExplanation.normalize_percentile_value("invalid") is None
+    assert explanation_module.CalibratedExplanation.normalize_percentile_value(None) is None
+
+    percentiles = (0.05, 0.95)
+    assert explanation_module.CalibratedExplanation.compute_confidence_level(
+        percentiles
+    ) == pytest.approx(0.9)
+    assert explanation_module.CalibratedExplanation.compute_confidence_level(
+        (-np.inf, 0.9)
+    ) == pytest.approx(0.9)
+    assert explanation_module.CalibratedExplanation.compute_confidence_level(
+        (0.1, np.inf)
+    ) == pytest.approx(0.9)
+
+
+def test_get_percentiles_and_one_sided(simple_explanation):
+    assert simple_explanation.get_percentiles() == (0.05, 0.95)
+    assert not simple_explanation.is_one_sided()
+
+    simple_explanation.calibrated_explanations.low_high_percentiles = (-np.inf, 95)
+    assert simple_explanation.is_one_sided()
+
+
+def testto_python_number_handles_nested_arrays():
+    arr = np.array([np.array([1.0]), np.array([np.nan])])
+    result = explanation_module.CalibratedExplanation.to_python_number(arr)
+    assert result == [[1.0], [None]]
+
+
+def testnormalize_threshold_value_handles_sequences():
+    explanation = make_explanation()
+    explanation.y_threshold = None
+    assert explanation.normalize_threshold_value() is None
+
+    explanation.y_threshold = np.array([0.4, 0.6])
+    assert explanation.normalize_threshold_value() == [0.4, 0.6]
+
+    explanation.y_threshold = (0.2, 0.8)
+    assert explanation.normalize_threshold_value() == [0.2, 0.8]
+
+    explanation.y_threshold = []
+    assert explanation.normalize_threshold_value() is None
+
+    explanation.y_threshold = 0.75
+    assert explanation.normalize_threshold_value() == pytest.approx(0.75)
+
+
+def test_build_instance_uncertainty_for_modes():
+    base = make_explanation()
+    payload = base.build_instance_uncertainty()
+    assert payload["representation"] == "percentile"
+    assert payload["raw_percentiles"] == [0.05, 0.95]
+
+    thresholded = make_explanation(threshold=(0.2, 0.8))
+    rules = build_rules_fixture(thresholded)
+    thresholded.mock_rules = rules
+    thresholded.rules = rules
+    thresholded.has_rules_flag = True
+    threshold_payload = thresholded.build_instance_uncertainty()
+    assert threshold_payload["representation"] == "threshold"
+    assert threshold_payload["threshold"] == [0.2, 0.8]
+    assert threshold_payload["raw_percentiles"] is None
+
+    probabilistic = make_explanation(mode="classification")
+    probabilistic_payload = probabilistic.build_instance_uncertainty()
+    assert probabilistic_payload["representation"] == "venn_abers"
+    assert probabilistic_payload["raw_percentiles"] is None
+
+
+def test_safe_feature_name_conversion():
+    explanation = make_explanation()
+    explainer = explanation.get_explainer()
+    explainer.feature_names = ["age", "height", "weight"]
+    assert explanation.safe_feature_name(1) == "height"
+    assert explanation.safe_feature_name(5) == "5"
+    assert explanation.safe_feature_name("custom") == "custom"
+
+
+def test_convert_condition_value_special_tokens():
+    assert explanation_module.CalibratedExplanation.convert_condition_value(
+        None, 1.2
+    ) == pytest.approx(1.2)
+    assert explanation_module.CalibratedExplanation.convert_condition_value("-inf", 0.0) == float(
+        "-inf"
+    )
+    assert explanation_module.CalibratedExplanation.convert_condition_value(
+        "infinity", 0.0
+    ) == float("inf")
+    assert explanation_module.CalibratedExplanation.convert_condition_value(
+        "7.5", 0.0
+    ) == pytest.approx(7.5)
+    assert explanation_module.CalibratedExplanation.convert_condition_value("foo", 0.0) == "foo"
+
+
+def test_build_condition_payload_parses_rules(telemetry_explanation):
+    payload = telemetry_explanation.build_condition_payload(
+        feature_index=0,
+        rule_text="f0 >= 0.4",
+        feature_value=np.array([0.1]),
+        display_value=0.1,
+    )
+    assert payload["feature"] == "f0"
+    assert payload["operator"] == ">="
+    assert payload["value"] == pytest.approx(0.4)
+
+    raw_payload = telemetry_explanation.build_condition_payload(
+        feature_index="custom",
+        rule_text="",
+        feature_value=None,
+        display_value=0.7,
+    )
+    assert raw_payload["operator"] == "raw"
+    assert raw_payload["value"] == pytest.approx(0.7)
+
+
+def test_predict_conjunctive_average():
+    explanation = make_explanation()
+    perturbed = np.array(explanation.x_test[1], copy=True)
+    predict, low, high = explanation.predict_conjunctive(
+        [np.array([0.1, 0.2]), np.array([0.3, 0.4])],
+        [0, 1],
+        perturbed,
+        threshold=None,
+        predicted_class=explanation.prediction["classes"],
+    )
+    assert predict == pytest.approx(1.0)
+    assert low == pytest.approx(0.5)
+    assert high == pytest.approx(1.5)
+
+
+def test_predict_conjunctive_average_three_features():
+    explanation = make_explanation()
+    perturbed = np.array([0.3, 0.4, 0.5], copy=True)
+    predict, low, high = explanation.predict_conjunctive(
+        [np.array([0.1, 0.2]), np.array([0.3, 0.4]), np.array([0.5, 0.6])],
+        [0, 1, 2],
+        perturbed,
+        threshold=None,
+        predicted_class=explanation.prediction["classes"],
+    )
+    assert predict == pytest.approx(1.0)
+    assert low == pytest.approx(0.5)
+    assert high == pytest.approx(1.5)
+    assert np.allclose(perturbed, np.array([0.3, 0.4, 0.5]))
+
+
+def test_predict_conjunctive_requires_multiple_features():
+    from calibrated_explanations.utils.exceptions import ValidationError
+
+    explanation = make_explanation()
+    with pytest.raises(ValidationError):
+        explanation.predict_conjunctive(
+            [np.array([0.1])],
+            [0],
+            np.array(explanation.x_test[1], copy=True),
+            threshold=None,
+            predicted_class=explanation.prediction["classes"],
+        )
+
+
+def test_define_conditions_handles_categorical_labels():
+    explanation = make_explanation()
+    explanation.calibrated_explanations.features_to_ignore = [1]
+    explainer = explanation.get_explainer()
+    explainer.categorical_features = [0]
+    explainer.categorical_labels = [[], []]
+    conditions = explanation.define_conditions()
+    assert conditions[0] == "f0 = 0"
+    assert conditions[1] == ""

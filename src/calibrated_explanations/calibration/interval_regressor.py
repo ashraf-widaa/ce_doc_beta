@@ -1,0 +1,825 @@
+# pylint: disable=invalid-name, line-too-long, too-many-instance-attributes
+"""Interval regression helpers built on conformal calibration.
+
+Exposes `IntervalRegressor`, which combines conformal predictive systems
+and Venn-Abers scaling to deliver calibrated probabilities and intervals.
+
+Part of ADR-001: Core Decomposition Boundaries (Stage 1a).
+"""
+
+import inspect
+import numbers
+from functools import singledispatchmethod
+from typing import Any, Mapping
+
+import crepes
+import numpy as np
+
+from ..utils import assert_threshold, safe_first_element
+from ..utils.exceptions import ConfigurationError, DataShapeError, ValidationError
+from .primitive_checksum import primitive_checksums, verify_primitive_checksum
+from .venn_abers import _ThresholdVennAbers as VennAbers
+
+
+class IntervalRegressor:
+    """Estimate predictive intervals using calibrated explanations."""
+
+    def __init__(self, calibrated_explainer):
+        """Initialize the interval regressor with a calibrated explainer.
+
+        Parameters
+        ----------
+        calibrated_explainer : CalibratedExplainer
+            A fitted and calibrated explainer instance. The regressor extracts calibration
+            data (features, targets, predictions, bins) from this explainer and builds
+            conformal predictive systems for interval and probability estimation.
+
+        Notes
+        -----
+        This initializer:
+        - Extracts calibration predictions and computes residuals
+        - Fits a conformal predictive system using the calibration data
+        - Pre-splits calibration data for probabilistic (thresholded) regression
+        - Initializes Venn-Abers calibrator for probability refinement
+        """
+        self.ce = calibrated_explainer
+        self._bins_storage = None
+        self._bins_size = 0
+
+        # Normalize bins to 1D if provided
+        initial_bins = calibrated_explainer.bins
+        if initial_bins is not None:
+            initial_bins = np.asarray(initial_bins)
+            if initial_bins.ndim != 1:
+                initial_bins = initial_bins.reshape(-1)
+            self.bins = np.array(initial_bins, copy=True)
+        else:
+            self.bins = None
+
+        self.model = self
+
+        initial_y_cal_hat = np.asarray(self.ce.predict_calibration())
+        if initial_y_cal_hat.ndim != 1:
+            initial_y_cal_hat = initial_y_cal_hat.reshape(-1)
+        self._y_cal_hat_storage = np.array(initial_y_cal_hat, copy=True)
+        self._y_cal_hat_size = self._y_cal_hat_storage.shape[0]
+
+        initial_residuals = np.asarray(self.ce.y_cal)
+        if initial_residuals.ndim != 1:
+            initial_residuals = initial_residuals.reshape(-1)
+        initial_residuals = initial_residuals - self.y_cal_hat
+        self._residual_cal_storage = np.array(initial_residuals, copy=True)
+        self._residual_cal_size = self._residual_cal_storage.shape[0]
+
+        sigma_cal = np.asarray(self.ce.get_sigma_test(x=self.ce.x_cal))
+        if sigma_cal.ndim != 1:
+            sigma_cal = sigma_cal.reshape(-1)
+        self._sigma_cal_storage = np.array(sigma_cal, copy=True)
+        self._sigma_cal_size = self._sigma_cal_storage.shape[0]
+        cps = crepes.ConformalPredictiveSystem()
+        if self.ce.difficulty_estimator is not None:
+            cps.fit(
+                residuals=self.residual_cal,
+                sigmas=self.sigma_cal,
+                bins=self.bins,
+                seed=self.ce.seed,
+            )
+        else:
+            cps.fit(residuals=self.residual_cal, bins=self.bins, seed=self.ce.seed)
+        self.cps = cps
+        self.venn_abers = None
+        self.proba_cal = None
+        self.y_threshold = None
+        self.current_y_threshold = None
+        self.split = {}
+        self.pre_fit_for_probabilistic()
+
+    def _append_calibration_buffer(self, name, values):
+        """Append new calibration values to the dynamic storage backing ``name``."""
+        values = np.asarray(values)
+        if values.size == 0:
+            return
+        if values.ndim != 1:
+            values = values.reshape(-1)
+
+        storage_attr = f"_{name}_storage"
+        size_attr = f"_{name}_size"
+
+        storage = getattr(self, storage_attr)
+        size = getattr(self, size_attr)
+        values = values.astype(storage.dtype, copy=False)
+
+        storage = self._ensure_capacity(storage, size, values.size)
+        storage[size : size + values.size] = values
+
+        setattr(self, storage_attr, storage)
+        setattr(self, size_attr, size + values.size)
+
+    # Backwards-compatible public wrapper
+    def append_calibration_buffer(self, name, values, sigma=None):
+        """Public compatibility wrapper for older call sites/tests.
+
+        Older tests call `append_calibration_buffer(name, values)` (two args).
+        Keep a tolerant signature that accepts an optional third `sigma`
+        parameter and forwards to the internal implementation.
+        """
+        return self._append_calibration_buffer(name, values)
+
+    def _append_bins(self, values):
+        """Append Mondrian bin assignments while reusing allocated storage."""
+        values = np.asarray(values)
+        if values.size == 0:
+            return
+        if values.ndim != 1:
+            values = values.reshape(-1)
+
+        if self._bins_storage is None:
+            self._bins_storage = np.array(values, copy=True)
+            self._bins_size = values.size
+            return
+
+        values = values.astype(self._bins_storage.dtype, copy=False)
+        storage = self._ensure_capacity(self._bins_storage, self._bins_size, values.size)
+        storage[self._bins_size : self._bins_size + values.size] = values
+        self._bins_storage = storage
+        self._bins_size += values.size
+
+    @staticmethod
+    def _ensure_capacity(storage, size, additional):
+        """Grow ``storage`` so that ``size + additional`` entries fit without reallocation."""
+        required = size + additional
+        capacity = storage.shape[0]
+        if capacity >= required:
+            return storage
+
+        new_capacity = max(required, max(1, capacity * 2))
+        new_storage = np.empty(new_capacity, dtype=storage.dtype)
+        if size:
+            new_storage[:size] = storage[:size]
+        return new_storage
+
+    # pylint: disable=too-many-locals
+    def predict_probability(self, x, y_threshold, bins=None, interval_summary=None):
+        """Predict probabilistic regression probabilities with confidence intervals.
+
+        Probabilistic regression (also called thresholded regression in the architecture layer)
+        converts regression predictions into calibrated probabilities for a threshold event.
+        This method returns the calibrated probability that y <= y_threshold, along with
+        confidence intervals around that probability.
+
+        Parameters
+        ----------
+        x
+            x is a numpy.ndarray containing the instance objects for which we want to predict the
+            probability.
+        y_threshold
+            The threshold value to evaluate. Returns the probability P(y <= y_threshold).
+            ``y_threshold`` is the internal alias for the user-facing ``threshold`` parameter
+            (matches the crepes API convention). Callers at the CE public boundary pass
+            ``threshold``; it is forwarded here as ``y_threshold``.
+        bins
+            array-like of shape (n_samples,), default=None
+            Mondrian categories
+        interval_summary
+            Strategy for selecting the point estimate from interval bounds.
+
+        Returns
+        -------
+            four values: proba (y <= y_threshold), lower bound, upper bound, and None.
+        """
+        if bins is not None and self.bins is None:
+            raise ConfigurationError(
+                "Calibration bins must be assigned.",
+                details={
+                    "context": "predict",
+                    "requirement": "calibration with bins or no test bins",
+                },
+            )
+
+        n_samples = x.shape[0]
+        normalized_bins = None
+        if bins is not None:
+            candidate = np.asarray(bins)
+            if candidate.ndim == 0:
+                candidate = np.repeat(candidate, n_samples)
+            elif candidate.ndim > 1:
+                candidate = candidate.reshape(-1)
+            if candidate.shape[0] != n_samples:
+                raise DataShapeError(
+                    f"length of test bins ({candidate.shape[0]}) does not match number of test instances ({n_samples}).",
+                    details={"bins_length": candidate.shape[0], "n_samples": n_samples},
+                )  # pylint: disable=line-too-long
+            normalized_bins = candidate.tolist()
+
+        iter_bins = normalized_bins if normalized_bins is not None else [None] * n_samples
+
+        self.y_threshold = y_threshold
+        if np.isscalar(self.y_threshold) or isinstance(self.y_threshold, tuple):
+            self.current_y_threshold = self.y_threshold
+            self.compute_proba_cal(self.y_threshold)
+            # Call predict_proba defensively: pass only supported kwargs
+            predict_fn = self.split["va"].predict_proba
+            sig = inspect.signature(predict_fn)
+            call_kwargs = {}
+            if "output_interval" in sig.parameters:
+                call_kwargs["output_interval"] = True
+            if "bins" in sig.parameters:
+                call_kwargs["bins"] = normalized_bins if normalized_bins is not None else None
+            if "interval_summary" in sig.parameters:
+                call_kwargs["interval_summary"] = interval_summary
+            proba, low, high = predict_fn(x, **call_kwargs)
+            return proba[:, 1], low, high, None
+
+        bins = iter_bins
+        interval = np.zeros((x.shape[0], 2))
+        proba = np.zeros(x.shape[0])
+        for i, _ in enumerate(proba):
+            self.current_y_threshold = self.y_threshold[i]
+            self.compute_proba_cal(self.y_threshold[i])
+            predict_fn = self.split["va"].predict_proba
+            sig = inspect.signature(predict_fn)
+            call_kwargs = {}
+            if "output_interval" in sig.parameters:
+                call_kwargs["output_interval"] = True
+            if "bins" in sig.parameters:
+                call_kwargs["bins"] = [bins[i]]
+            if "interval_summary" in sig.parameters:
+                call_kwargs["interval_summary"] = interval_summary
+            p, low, high = predict_fn(x[i, :].reshape(1, -1), **call_kwargs)
+            p = safe_first_element(p, col=1)
+            low = safe_first_element(low)
+            high = safe_first_element(high)
+            proba[i] = p
+            interval[i, :] = np.array([low, high])
+        return proba, interval[:, 0], interval[:, 1], None
+
+    def predict_uncertainty(self, x, low_high_percentiles, bins=None):
+        """Predict the uncertainty of a given set of instances using a `ConformalPredictiveSystem`.
+
+        Parameters
+        ----------
+        x
+            x is a numpy array containing the instance objects for which we want to predict the
+            uncertainty.
+        low_high_percentiles
+            The `low_high_percentiles` parameter is a list containing two values. The first value
+            represents the lower percentile and the second value represents the higher percentile. These
+            percentiles are used to calculate the prediction interval for the uncertainty estimation. If the
+            first value is set to -np.inf (negative infinity), the interval will be one-sided and upper-bounded
+            and if the second value is np.inf (infinity), the interval will be one-sided and lower-bounded.
+            The open endpoint is reported as the minimum or maximum of the calibration targets. That
+            value is a placeholder, not a calibrated bound, so the median may lie outside it, and an
+            interval below the 50th percentile may exclude the median (ADR-021).
+        bins
+            array-like of shape (n_samples,), default=None
+            Mondrian categories
+
+        Returns
+        -------
+            four values: median, lower bound, upper bound, and None.
+        """
+        y_test_hat = self.ce.predict_function(x).reshape(-1, 1)
+
+        if bins is not None and len(bins) != len(y_test_hat):
+            raise DataShapeError(
+                f"Length of test bins ({len(bins)}) does not match number of test instances ({len(y_test_hat)})."
+            )
+
+        sigma_test = self.ce.get_sigma_test(x=x)
+        low = [low_high_percentiles[0], 50] if low_high_percentiles[0] != -np.inf else [50, 50]
+        high = [low_high_percentiles[1], 50] if low_high_percentiles[1] != np.inf else [50, 50]
+
+        interval = self.cps.predict(
+            y_hat=y_test_hat,
+            sigmas=sigma_test,
+            lower_percentiles=low,
+            higher_percentiles=high,
+            bins=bins,
+        )
+        y_test_hat = (interval[:, 1] + interval[:, 3]) / 2  # The median
+        return (
+            y_test_hat,
+            interval[:, 0]
+            if low_high_percentiles[0] != -np.inf
+            else np.tile(np.array([np.min(self.ce.y_cal)]), len(interval)),
+            interval[:, 2]
+            if low_high_percentiles[1] != np.inf
+            else np.tile(np.array([np.max(self.ce.y_cal)]), len(interval)),
+            None,
+        )
+
+    def predict_proba(self, x, bins=None):
+        """Predict calibrated event probabilities for the active threshold.
+
+        Parameters
+        ----------
+        x
+            The x parameter is the input data for which you want to predict the probabilities. It
+            should be a numpy array or a pandas DataFrame containing the features of the test data.
+        bins
+            array-like of shape (n_samples,), default=None
+            Mondrian categories
+
+        Returns
+        -------
+            a numpy array of shape (n_samples, 2), where each row represents the predicted probabilities
+            for the complement event and the active threshold event. For scalar thresholds the
+            positive class is ``P(y <= threshold)``. For tuple thresholds the positive class is
+            ``P(low < y <= high)``. The first column represents ``1 - proba`` and the second
+            column represents ``proba``.
+
+        Notes
+        -----
+        These are the uncalibrated Venn-Abers input scores. Each row depends only on
+        that row's input and the frozen calibration state, never on other rows.
+        """
+        y_test_hat = self.ce.predict_function(x).reshape(-1, 1)
+
+        sigma_test = self.ce.get_sigma_test(x=x)
+        # Venn-Abers scores must come from one deterministic function shared with
+        # compute_proba_cal: the split CPS (fitted on parts[0], not on the Venn-Abers
+        # calibration part) evaluated without smoothing. crepes draws the smoothing
+        # variable per *row* after reseeding, so smoothing=True would make an object's
+        # calibrated probability depend on its position in the batch.
+        cps = self.split["cps"]
+        if isinstance(self.current_y_threshold, tuple):
+            proba_lower = cps.predict(
+                y_hat=y_test_hat,
+                sigmas=sigma_test,
+                y=self.current_y_threshold[0],
+                bins=bins,
+                smoothing=False,
+            )
+            proba_upper = cps.predict(
+                y_hat=y_test_hat,
+                sigmas=sigma_test,
+                y=self.current_y_threshold[1],
+                bins=bins,
+                smoothing=False,
+            )
+            proba = proba_upper - proba_lower
+        else:
+            proba = cps.predict(
+                y_hat=y_test_hat,
+                sigmas=sigma_test,
+                y=self.current_y_threshold,
+                bins=bins,
+                smoothing=False,
+            )
+        return np.array([[1 - proba[i], proba[i]] for i in range(len(proba))])
+
+    def is_multiclass(self) -> bool:
+        """Return ``False`` for regression calibrators."""
+        return False
+
+    def is_mondrian(self) -> bool:
+        """Return ``True`` when Mondrian binning is enabled."""
+        return self.bins is not None
+
+    def pre_fit_for_probabilistic(self):
+        """Split the calibration set into two parts.
+
+        The first part is used to fit the `ConformalPredictiveSystem` and the second part is used to
+        calculate the probability calibration for a given threshold (at prediction time).
+        """
+        n = len(self.ce.y_cal)
+        rng = np.random.default_rng(self.ce.seed)
+        cal_parts = rng.permutation(n).tolist()
+        self.split["parts"] = [cal_parts[: n // 2], cal_parts[n // 2 :]]
+        cal_cps = self.split["parts"][0]
+        self.split["cps"] = crepes.ConformalPredictiveSystem()
+        if self.bins is None:
+            self.split["cps"].fit(
+                residuals=self.residual_cal[cal_cps],
+                sigmas=self.sigma_cal[cal_cps],
+                seed=self.ce.seed,
+            )
+        else:
+            self.split["cps"].fit(
+                residuals=self.residual_cal[cal_cps],
+                sigmas=self.sigma_cal[cal_cps],
+                bins=self.bins[cal_cps],
+                seed=self.ce.seed,
+            )
+
+    @singledispatchmethod
+    def compute_proba_cal(self, y_threshold):
+        """Validate threshold types before computing probability calibration.
+
+        Parameters
+        ----------
+            y_threshold : float or tuple
+                Threshold defining the calibration target event.
+        """
+        raise ValidationError("y_threshold must be a float or a tuple.")
+
+    @compute_proba_cal.register(numbers.Real)
+    def _(self, y_threshold: numbers.Real):
+        """Compute the probability calibration for a scalar threshold.
+
+        Calibration scores use the deterministic (unsmoothed) CPD value of the split
+        CPS, the same score function :meth:`predict_proba` applies to test objects, so
+        the Venn-Abers output for an object is independent of the rest of its batch.
+
+        Parameters
+        ----------
+            y_threshold : float
+                Threshold value that defines the calibration target.
+        """
+        cal_va = self.split["parts"][1]
+        bins = None if self.bins is None else self.bins[cal_va]
+        proba = self.split["cps"].predict(
+            y_hat=self.y_cal_hat[cal_va],
+            y=y_threshold,
+            sigmas=self.sigma_cal[cal_va],
+            bins=bins,
+            smoothing=False,
+        )
+        self.split["proba"] = np.array([[1 - proba[i], proba[i]] for i in range(len(proba))])
+        self.split["va"] = VennAbers(
+            None,
+            (self.ce.y_cal[cal_va] <= y_threshold).astype(int),
+            self,
+            bins=bins,
+            cprobs=self.split["proba"],
+        )
+
+    @compute_proba_cal.register(tuple)
+    def _(self, y_threshold: tuple):
+        """Compute the probability calibration for an interval threshold.
+
+        Uses the same deterministic split-CPS score function as the scalar case,
+        so the event ``low < y <= high`` is scored identically for calibration and
+        test objects.
+
+        Parameters
+        ----------
+            y_threshold : tuple
+                Lower and upper bounds that define the calibration target interval.
+        """
+        assert_threshold(y_threshold, [0])
+        cal_va = self.split["parts"][1]
+        bins = None if self.bins is None else self.bins[cal_va]
+        proba_lower = self.split["cps"].predict(
+            y_hat=self.y_cal_hat[cal_va],
+            y=y_threshold[0],
+            sigmas=self.sigma_cal[cal_va],
+            bins=bins,
+            smoothing=False,
+        )
+        proba_upper = self.split["cps"].predict(
+            y_hat=self.y_cal_hat[cal_va],
+            y=y_threshold[1],
+            sigmas=self.sigma_cal[cal_va],
+            bins=bins,
+            smoothing=False,
+        )
+        proba = proba_upper - proba_lower
+        self.split["proba"] = np.array([[1 - proba[i], proba[i]] for i in range(len(proba))])
+        self.split["va"] = VennAbers(
+            None,
+            (
+                (y_threshold[0] < self.ce.y_cal[cal_va]) & (self.ce.y_cal[cal_va] <= y_threshold[1])
+            ).astype(int),
+            self,
+            bins=bins,
+            cprobs=self.split["proba"],
+        )
+
+    def insert_calibration(self, xs, ys, bins=None):
+        """Insert calibration instances while preserving the conformal splits.
+
+        Parameters
+        ----------
+            xs : ndarray
+                New calibration features.
+            ys : ndarray
+                New calibration targets.
+            bins : array-like, optional
+                Mondrian categories associated with the new instances.
+        """
+        num_add = len(ys)  # number of new instances
+        if num_add % 2 != 0:  # is odd?
+            parts = self.split["parts"]
+            small_part = int(np.argmin([len(parts[0]), len(parts[1])]))
+            large_part = int(np.argmax([len(parts[0]), len(parts[1])]))
+            large_part = 1 if small_part == large_part else large_part
+        else:  # divide equally
+            small_part = 0
+            large_part = 1
+        small_idx = list(range(0, num_add, 2))  # if odd, one more to the smaller part
+        large_idx = list(range(1, num_add, 2))
+
+        # Update split indices
+        if len(small_idx) > 0:
+            self.split["parts"][small_part].extend(
+                [len(self.residual_cal) - 1 + i for i in small_idx]
+            )
+        if len(large_idx) > 0:
+            self.split["parts"][large_part].extend(
+                [len(self.residual_cal) - 1 + i for i in large_idx]
+            )
+
+        # Update y_hat, residuals, and sigma
+        y_cal_hat = self.ce.predict_function(xs)
+        residuals = ys - y_cal_hat
+        sigmas = self.ce.get_sigma_test(x=xs)
+        self._append_calibration_buffer("y_cal_hat", y_cal_hat)
+        self._append_calibration_buffer("residual_cal", residuals)
+        self._append_calibration_buffer("sigma_cal", sigmas)
+
+        # Update bins
+        if bins is not None:
+            if self.bins is None:
+                raise ConfigurationError(
+                    "Cannot mix calibration instances with and without bins.",
+                    details={
+                        "context": "add_calibration_instances",
+                        "requirement": "consistent bin usage",
+                    },
+                )
+            if len(bins) != len(ys):
+                raise DataShapeError(
+                    f"length of bins ({len(bins)}) does not match number of added instances ({len(ys)}).",
+                    details={"bins_length": len(bins), "n_instances": len(ys)},
+                )  # pylint: disable=line-too-long
+            self._append_bins(bins)
+
+        if small_part == 0 or len(large_idx) > 0:  # add to cps calibration
+            cps_idx = small_idx if small_part == 0 else large_idx
+            # Update split cps
+            if bins is None:
+                alphas = self.split["cps"].alphas
+                indices = np.searchsorted(alphas, residuals[cps_idx])
+                self.split["cps"].alphas = np.insert(alphas, indices, residuals[cps_idx])
+            else:
+                # Support both legacy stubs and crepes 0.9.0+
+                if hasattr(self.split["cps"], "binned_alphas"):
+                    bin_values = self.split["cps"].binned_alphas[0]
+                    alpha_list = self.split["cps"].binned_alphas[1]
+                else:
+                    bin_values = self.split["cps"].alphas[0]
+                    alpha_list = self.split["cps"].alphas[1]
+                for b in np.unique(bins):
+                    if b not in bin_values:
+                        continue
+                    idx = np.where(bin_values == b)[0][0]
+                    alphas = alpha_list[idx]
+                    res = residuals[cps_idx]
+                    subset_mask = bins[cps_idx] == b
+                    indices = np.searchsorted(alphas, res[subset_mask])
+                    alpha_list[idx] = np.insert(alphas, indices, res[subset_mask])
+
+        # Update cps
+        if bins is None:
+            alphas = self.cps.alphas
+            indices = np.searchsorted(alphas, residuals)
+            self.cps.alphas = np.insert(alphas, indices, residuals)
+        else:
+            # Support both legacy stubs and crepes 0.9.0+
+            if hasattr(self.cps, "binned_alphas"):
+                bin_values = self.cps.binned_alphas[0]
+                alpha_list = self.cps.binned_alphas[1]
+            else:
+                bin_values = self.cps.alphas[0]
+                alpha_list = self.cps.alphas[1]
+            for b in np.unique(bins):
+                if b not in bin_values:
+                    continue
+                idx = np.where(bin_values == b)[0][0]
+                alphas = alpha_list[idx]
+                indices = np.searchsorted(alphas, residuals[bins == b])
+                alpha_list[idx] = np.insert(alphas, indices, residuals[bins == b])
+
+    @property
+    def y_cal_hat(self):
+        """Predicted calibration targets."""
+        return self._y_cal_hat_storage[: self._y_cal_hat_size]
+
+    @property
+    def y_cal_hat_storage(self):
+        """Backwards-compatible access to the full calibration buffer."""
+        return self._y_cal_hat_storage
+
+    @y_cal_hat_storage.setter
+    def y_cal_hat_storage(self, value):
+        """Allow overwriting the calibration buffer when needed by tests."""
+        self._y_cal_hat_storage = np.asarray(value)
+        self._y_cal_hat_size = self._y_cal_hat_storage.shape[0]
+
+    @property
+    def residual_cal(self):
+        """Calibration residuals reused by conformal updates."""
+        return self._residual_cal_storage[: self._residual_cal_size]
+
+    @property
+    def sigma_cal(self):
+        """Calibration difficulty estimates."""
+        return self._sigma_cal_storage[: self._sigma_cal_size]
+
+    @property
+    def bins(self):
+        """Return the Mondrian bins associated with the calibration data."""
+        if self._bins_storage is None:
+            return None
+        return self._bins_storage[: self._bins_size]
+
+    @bins.setter
+    def bins(self, value):
+        """Assign Mondrian bin categories to the calibration data.
+
+        Parameters
+        ----------
+        value : array-like or None
+            Mondrian categories for each calibration instance. If None, clears bin assignments.
+            Otherwise, must be a 1D array matching the number of calibration instances.
+        """
+        if value is None:
+            self._bins_storage = None
+            self._bins_size = 0
+            return
+
+        value = np.asarray(value)
+        if value.ndim != 1:
+            value = value.reshape(-1)
+        self._bins_storage = np.array(value, copy=True)
+        self._bins_size = self._bins_storage.shape[0]
+
+    # Public properties for testing
+    @property
+    def bins_size(self):
+        """Number of bins in the Mondrian forest."""
+        return self._bins_size
+
+    @property
+    def bins_storage(self):
+        """Storage array for Mondrian bin assignments."""
+        return self._bins_storage
+
+    @property
+    def residual_cal_storage(self):
+        """Storage array for calibration residuals."""
+        return self._residual_cal_storage
+
+    @property
+    def sigma_cal_storage(self):
+        """Storage array for calibration sigma values."""
+        return self._sigma_cal_storage
+
+    @property
+    def y_cal_hat_size(self):
+        """Number of calibration predictions stored."""
+        return self._y_cal_hat_size
+
+    def append_bins(self, values):
+        """Append new Mondrian bin assignments to storage."""
+        return self._append_bins(values)
+
+    def ensure_capacity(self, storage, current_size, required_size):
+        """Ensure storage has capacity for required size."""
+        return self._ensure_capacity(storage, current_size, required_size)
+
+    def to_primitive(self) -> dict[str, Any]:
+        """Serialize the calibrator into a JSON-safe primitive payload."""
+
+        def _as_list(value: Any) -> Any:
+            if value is None:
+                return None
+            if hasattr(value, "tolist"):
+                return value.tolist()
+            return list(value)
+
+        primitive: dict[str, Any] = {
+            "schema_version": 2,
+            "calibrator_type": "interval_regressor",
+            "parameters": {
+                "has_bins": bool(self.bins is not None),
+                "seed": getattr(self.ce, "seed", None),
+            },
+            "fields": {
+                "bins": _as_list(self.bins),
+                "y_cal_hat": _as_list(self.y_cal_hat),
+                "residual_cal": _as_list(self.residual_cal),
+                "sigma_cal": _as_list(self.sigma_cal),
+                "split_parts": [list(part) for part in self.split.get("parts", [])],
+                "y_threshold": _as_list(self.y_threshold)
+                if isinstance(self.y_threshold, np.ndarray)
+                else self.y_threshold,
+                "current_y_threshold": _as_list(self.current_y_threshold)
+                if isinstance(self.current_y_threshold, np.ndarray)
+                else self.current_y_threshold,
+            },
+        }
+        primitive["checksums"] = primitive_checksums(primitive)
+        return primitive
+
+    @classmethod
+    def from_primitive(cls, payload: Mapping[str, object]) -> "IntervalRegressor":
+        """Rehydrate a calibrator from a primitive payload."""
+        schema_version = payload.get("schema_version")
+        if schema_version == 2:
+            return cls._from_primitive_v2(payload)
+        raise ConfigurationError(
+            "Unsupported IntervalRegressor schema_version. Only schema_version 2 is supported in "
+            "v1.0.0. Schema_version 1 (pickle) was removed. To migrate, load your state "
+            "with calibrated-explanations v0.11.x and re-save with "
+            "WrapCalibratedExplainer.save_state().",
+            details={"schema_version": schema_version, "supported_versions": [2]},
+        )
+
+    @classmethod
+    def _from_primitive_v2(cls, payload: Mapping[str, object]) -> "IntervalRegressor":
+        """Rehydrate a JSON-safe schema v2 primitive."""
+        verify_primitive_checksum(payload)
+        calibrator_type = payload.get("calibrator_type")
+        if calibrator_type != "interval_regressor":
+            raise ConfigurationError(
+                "Invalid calibrator_type for IntervalRegressor v2 payload.",
+                details={"calibrator_type": calibrator_type, "expected": "interval_regressor"},
+            )
+        fields = payload.get("fields")
+        if not isinstance(fields, Mapping):
+            raise ConfigurationError(
+                "IntervalRegressor v2 primitive missing 'fields' mapping.",
+                details={"field": "fields"},
+            )
+        required_fields = ("y_cal_hat", "residual_cal", "sigma_cal")
+        missing_fields = [name for name in required_fields if fields.get(name) is None]
+        if missing_fields:
+            raise ConfigurationError(
+                "IntervalRegressor v2 primitive missing required field(s): "
+                + ", ".join(missing_fields),
+                details={"fields": missing_fields},
+            )
+
+        obj = cls.__new__(cls)
+        obj.ce = None
+        obj._bins_storage = None
+        obj._bins_size = 0
+        obj.bins = fields.get("bins")
+        obj.model = obj
+        obj._y_cal_hat_storage = np.asarray(fields.get("y_cal_hat"), dtype=float)
+        obj._y_cal_hat_size = obj._y_cal_hat_storage.shape[0]
+        obj._residual_cal_storage = np.asarray(fields.get("residual_cal"), dtype=float)
+        obj._residual_cal_size = obj._residual_cal_storage.shape[0]
+        obj._sigma_cal_storage = np.asarray(fields.get("sigma_cal"), dtype=float)
+        obj._sigma_cal_size = obj._sigma_cal_storage.shape[0]
+        obj.cps = crepes.ConformalPredictiveSystem()
+        parameters = payload.get("parameters")
+        seed = parameters.get("seed") if isinstance(parameters, Mapping) else None
+        obj._fit_cps(seed=seed)
+        obj.venn_abers = None
+        obj.proba_cal = None
+        obj.y_threshold = fields.get("y_threshold")
+        obj.current_y_threshold = fields.get("current_y_threshold")
+        obj.split = {}
+        raw_parts = fields.get("split_parts")
+        if isinstance(raw_parts, list) and len(raw_parts) == 2:
+            obj.split["parts"] = [list(raw_parts[0]), list(raw_parts[1])]
+        else:
+            n = obj._y_cal_hat_size
+            obj.split["parts"] = [list(range(n // 2)), list(range(n // 2, n))]
+        obj._fit_split_cps(seed=seed)
+        return obj
+
+    def _fit_cps(self, *, seed: Any = None) -> None:
+        """Fit the primary conformal predictive system from stored arrays."""
+        if self.bins is None:
+            self.cps.fit(residuals=self.residual_cal, sigmas=self.sigma_cal, seed=seed)
+        else:
+            self.cps.fit(
+                residuals=self.residual_cal,
+                sigmas=self.sigma_cal,
+                bins=self.bins,
+                seed=seed,
+            )
+
+    def _fit_split_cps(self, *, seed: Any = None) -> None:
+        """Fit the probabilistic split conformal system from stored arrays."""
+        cal_cps = self.split["parts"][0]
+        self.split["cps"] = crepes.ConformalPredictiveSystem()
+        if self.bins is None:
+            self.split["cps"].fit(
+                residuals=self.residual_cal[cal_cps],
+                sigmas=self.sigma_cal[cal_cps],
+                seed=seed,
+            )
+        else:
+            self.split["cps"].fit(
+                residuals=self.residual_cal[cal_cps],
+                sigmas=self.sigma_cal[cal_cps],
+                bins=self.bins[cal_cps],
+                seed=seed,
+            )
+
+    def reattach_learner(
+        self,
+        learner: Any,
+        *,
+        calibrated_explainer: Any = None,
+        difficulty_estimator: Any = None,
+    ) -> None:
+        """Re-attach the calibrated explainer after JSON-safe restoration."""
+        del learner, difficulty_estimator
+        if calibrated_explainer is not None:
+            self.ce = calibrated_explainer

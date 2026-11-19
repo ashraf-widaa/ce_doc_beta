@@ -1,0 +1,7 @@
+{
+  "import_time_seconds": {"max_relative_increase": 0.15},
+  "classification.explain_factual_time_s": {"max_relative_increase": 0.30},
+  "classification.explore_alternatives_time_s": {"max_relative_increase": 0.35},
+  "regression.explain_factual_time_s": {"max_relative_increase": 0.30},
+  "regression.explore_alternatives_time_s": {"max_relative_increase": 0.35}
+}

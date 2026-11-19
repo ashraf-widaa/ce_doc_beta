@@ -1,0 +1,670 @@
+"""Explanation plugin protocol and shared data structures (ADR-015)."""
+
+from __future__ import annotations
+
+import contextlib
+from collections.abc import Mapping as MappingABC
+from collections.abc import MutableMapping as MutableMappingABC
+from collections.abc import Sequence as SequenceABC
+from dataclasses import dataclass, field
+from types import MappingProxyType
+from typing import (
+    TYPE_CHECKING,
+    Any,
+    Mapping,
+    MutableMapping,
+    Optional,
+    Protocol,
+    Sequence,
+    Tuple,
+    Type,
+    runtime_checkable,
+)
+
+import numpy as np
+
+if TYPE_CHECKING:
+    from ..explanations.explanations import CalibratedExplanations as CalibratedExplanationsType
+else:
+    CalibratedExplanationsType = object
+from ..utils import median_containment_sides
+from ..utils.exceptions import ValidationError
+from .base import ExplainerPlugin, PluginMeta, freeze_plugin_config, thaw_plugin_config
+from .predict import PredictBridge
+
+
+@dataclass(frozen=True)
+class ExplanationContext:
+    """Frozen request-independent context shared with explanation plugins."""
+
+    task: str
+    mode: str
+    feature_names: Sequence[str]
+    categorical_features: Sequence[int]
+    categorical_labels: Mapping[int, Mapping[int, str]]
+    discretizer: object
+    helper_handles: Mapping[str, object]
+    predict_bridge: PredictBridge
+    interval_settings: Mapping[str, object]
+    plot_settings: Mapping[str, object]
+    plugin_config: Mapping[str, object] = field(default_factory=dict)
+
+    def __post_init__(self) -> None:
+        """Freeze nested mapping/list fields to prevent plugin-side mutation."""
+
+        def _freeze_value(value: object) -> object:
+            if isinstance(value, MappingABC):
+                return MappingProxyType({k: _freeze_value(v) for k, v in value.items()})
+            if isinstance(value, (list, tuple)):
+                return tuple(_freeze_value(v) for v in value)
+            if isinstance(value, set):
+                return tuple(sorted(_freeze_value(v) for v in value))
+            return value
+
+        frozen_labels = MappingProxyType(
+            {k: MappingProxyType(dict(v)) for k, v in dict(self.categorical_labels).items()}
+        )
+        object.__setattr__(self, "categorical_labels", frozen_labels)
+        object.__setattr__(self, "interval_settings", _freeze_value(self.interval_settings))
+        object.__setattr__(self, "plot_settings", _freeze_value(self.plot_settings))
+        object.__setattr__(self, "plugin_config", freeze_plugin_config(self.plugin_config))
+        object.__setattr__(self, "helper_handles", _freeze_value(self.helper_handles))
+        object.__setattr__(self, "feature_names", _freeze_value(self.feature_names))
+        object.__setattr__(self, "categorical_features", _freeze_value(self.categorical_features))
+
+    def __getstate__(self):
+        """Return pickle-safe state for the frozen explanation context."""
+        return {key: thaw_plugin_config(value) for key, value in self.__dict__.items()}
+
+    def __setstate__(self, state):
+        """Restore state and re-freeze immutable context payloads."""
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        self.__post_init__()
+
+
+class ExplainerHandle:
+    """Read-only wrapper exposing a constrained explainer API to plugins."""
+
+    # __slots__ = ("_explainer", "_metadata")
+
+    def __init__(self, explainer: Any, metadata: Mapping[str, Any]) -> None:
+        # Use direct dict access to bypass potential autoreload/slot descriptor issues
+        self.__dict__["_explainer"] = explainer
+        self.__dict__["_metadata"] = MappingProxyType(dict(metadata))
+
+    @property
+    def num_features(self) -> int:
+        """Return the number of features."""
+        return self._explainer.num_features
+
+    @property
+    def mode(self) -> str:
+        """Return the prediction mode."""
+        return self._explainer.mode
+
+    @property
+    def is_multiclass(self) -> bool:
+        """Return True when in multiclass mode."""
+        return self._explainer.is_multiclass()
+
+    @property
+    def class_labels(self) -> Any:
+        """Return class labels."""
+        return self._explainer.class_labels
+
+    @property
+    def feature_names(self) -> Any:
+        """Return feature names."""
+        return self._explainer.feature_names
+
+    @property
+    def features_to_ignore(self) -> Any:
+        """Return features to ignore."""
+        return self._explainer.features_to_ignore
+
+    @property
+    def bins(self) -> Any:
+        """Return bins configuration."""
+        return self._explainer.bins
+
+    @property
+    def preprocessor(self) -> Any:
+        """Return the preprocessor if available."""
+        return getattr(self._explainer, "preprocessor", None)
+
+    @property
+    def feature_filter_config(self) -> Any:
+        """Return the feature filter configuration if available."""
+        return getattr(self._explainer, "feature_filter_config", None)
+
+    @property
+    def discretizer(self) -> Any:
+        """Return the discretizer if available."""
+        return getattr(self._explainer, "discretizer", None)
+
+    @property
+    def sample_percentiles(self) -> Any:
+        """Return sample percentiles if available."""
+        return getattr(self._explainer, "sample_percentiles", None)
+
+    def get_calibration_summaries(self, *args: Any, **kwargs: Any) -> Any:
+        """Return calibration summaries from the underlying explainer."""
+        return self._explainer.get_calibration_summaries(*args, **kwargs)
+
+    @property
+    def y_cal(self) -> Any:
+        """Return y_cal if available."""
+        return getattr(self._explainer, "y_cal", None)
+
+    @property
+    def categorical_features(self) -> Any:
+        """Return categorical_features if available."""
+        return getattr(self._explainer, "categorical_features", None)
+
+    @property
+    def x_cal(self) -> Any:
+        """Expose calibration features when plugins need direct access."""
+        return getattr(self._explainer, "x_cal", None)
+
+    @property
+    def plugin_manager(self) -> Any:
+        """Return the plugin manager if available."""
+        return getattr(self._explainer, "plugin_manager", None)
+
+    @property
+    def latest_explanation(self) -> Any:
+        """Expose the latest explanation attached to the underlying explainer."""
+        return getattr(self._explainer, "latest_explanation", None)
+
+    @latest_explanation.setter
+    def latest_explanation(self, value: Any) -> None:
+        """Allow plugins to set the latest explanation on the underlying explainer."""
+        self._explainer.latest_explanation = value
+
+    @property
+    def last_explanation_mode(self) -> Any:
+        """Expose the last explanation mode recorded on the underlying explainer."""
+        return getattr(self._explainer, "last_explanation_mode", None)
+
+    @last_explanation_mode.setter
+    def last_explanation_mode(self, value: Any) -> None:
+        """Allow plugins to set the last explanation mode on the underlying explainer."""
+        self._explainer.last_explanation_mode = value
+
+    def predict(self, *args: Any, **kwargs: Any) -> Any:
+        """Return calibrated predictions from the underlying explainer."""
+        return self._explainer.predict(*args, **kwargs)
+
+    def explain_factual(self, *args: Any, **kwargs: Any) -> Any:
+        """Return factual explanations from the underlying explainer."""
+        return self._explainer.explain_factual(*args, **kwargs)
+
+    def __getattr__(self, name: str) -> Any:
+        """Delegate attribute access to the underlying explainer."""
+        explainer = self.__dict__.get("_explainer")
+        if explainer is None:
+            raise AttributeError(name)
+        return getattr(explainer, name)
+
+    def __getstate__(self) -> dict[str, Any]:
+        """Return pickle-safe state for explainer handles."""
+        return {
+            "_explainer": self.__dict__.get("_explainer"),
+            "_metadata": dict(self.__dict__.get("_metadata", {})),
+        }
+
+    def __setstate__(self, state: Mapping[str, Any]) -> None:
+        """Restore explainer handle state from a pickle payload."""
+        self.__dict__["_explainer"] = state.get("_explainer")
+        metadata = state.get("_metadata", {})
+        if isinstance(metadata, MappingABC):
+            self.__dict__["_metadata"] = MappingProxyType(dict(metadata))
+        else:
+            self.__dict__["_metadata"] = MappingProxyType({})
+
+    def explain_fast(self, *args: Any, **kwargs: Any) -> Any:
+        """Return fast explanations from the underlying explainer."""
+        return self._explainer.explain_fast(*args, **kwargs)
+
+    def get_metadata(self) -> Mapping[str, Any]:
+        """Return immutable metadata describing the explainer and dependencies."""
+        return self._metadata
+
+    def get_preprocessor_state(self) -> Mapping[str, Any] | None:
+        """Return the preprocessor metadata snapshot when available."""
+        preprocessor_meta = getattr(self._explainer, "preprocessor_metadata", None)
+        if preprocessor_meta is None:
+            return None
+        if isinstance(preprocessor_meta, MappingABC):
+            return MappingProxyType(dict(preprocessor_meta))
+        return {"value": preprocessor_meta}
+
+
+@dataclass(frozen=True)
+class ExplanationRequest:
+    """Frozen context for a specific explanation batch request."""
+
+    threshold: Optional[object]
+    low_high_percentiles: Optional[Tuple[float, float]]
+    bins: Optional[object]
+    features_to_ignore: Sequence[int] | Sequence[Sequence[int]]
+    interval_summary: Optional[object] = None
+    extras: Mapping[str, object] = field(default_factory=dict)
+    feature_filter_per_instance_ignore: Sequence[Sequence[int]] | None = None
+    guarded: bool = False
+
+    def __post_init__(self) -> None:
+        """Freeze mutable fields such as `bins` and `extras` for safety.
+
+        This ensures plugins cannot mutate shared request state (Mondrian
+        bins in particular) by converting arrays/lists into tuples and
+        mapping payloads into read-only proxies.
+        """
+
+        def _freeze_value(val: object) -> object:
+            # numpy arrays -> nested tuples
+            if isinstance(val, np.ndarray):
+                try:
+                    return tuple(_freeze_value(x) for x in val.tolist())
+                except Exception:  # adr002_allow
+                    return tuple(val.tolist())
+            if isinstance(val, (list, tuple)):
+                return tuple(_freeze_value(x) for x in val)
+            # mappings -> MappingProxyType with frozen values
+            if isinstance(val, MappingABC):
+                return MappingProxyType({k: _freeze_value(v) for k, v in val.items()})
+            return val
+
+        # Freeze bins if present
+        frozen_bins = None if self.bins is None else _freeze_value(self.bins)
+        object.__setattr__(self, "bins", frozen_bins)
+
+        # Freeze extras into an immutable mapping
+        try:
+            frozen_extras = (
+                MappingProxyType({k: _freeze_value(v) for k, v in dict(self.extras).items()})
+                if self.extras is not None
+                else MappingProxyType({})
+            )
+        except Exception:  # adr002_allow
+            frozen_extras = MappingProxyType(dict(self.extras or {}))
+        object.__setattr__(self, "extras", frozen_extras)
+
+    def __getstate__(self):
+        """Return pickle-safe state for the frozen explanation request."""
+        return {key: thaw_plugin_config(value) for key, value in self.__dict__.items()}
+
+    def __setstate__(self, state):
+        """Restore state and re-freeze immutable request payloads."""
+        for key, value in state.items():
+            object.__setattr__(self, key, value)
+        self.__post_init__()
+
+
+@dataclass
+class ExplanationBatch:
+    """Batch payload returned by ``ExplanationPlugin.explain_batch``."""
+
+    container_cls: Type[CalibratedExplanationsType]
+    explanation_cls: Type  # CalibratedExplanation (deferred import to avoid circular dependency)
+    instances: Sequence[Mapping[str, Any]]
+    collection_metadata: MutableMapping[str, Any]
+
+
+@runtime_checkable
+class ExplanationPlugin(ExplainerPlugin, Protocol):
+    """Extended protocol for explanation plugins."""
+
+    plugin_meta: PluginMeta
+
+    def supports_mode(self, mode: str, *, task: str) -> bool:
+        """Return ``True`` when the plugin supports *mode* for *task*."""
+
+    def initialize(self, context: ExplanationContext) -> None:
+        """Initialise the plugin with immutable runtime *context*."""
+
+    def explain_batch(self, x: Any, request: ExplanationRequest) -> ExplanationBatch:
+        """Produce an :class:`ExplanationBatch` for payload *x*."""
+
+
+__all__ = [
+    "ExplanationBatch",
+    "ExplanationContext",
+    "ExplanationPlugin",
+    "ExplanationRequest",
+    "ExplainerHandle",
+    "PluginMeta",
+    "validate_explanation_batch",
+]
+
+
+def validate_explanation_batch(
+    batch: ExplanationBatch,
+    *,
+    expected_mode: str | None = None,
+    expected_task: str | None = None,
+    low_high_percentiles: Tuple[float, float] | None = None,
+) -> ExplanationBatch:
+    """Validate runtime contracts for ``ExplanationBatch`` payloads.
+
+    ``low_high_percentiles`` is the request's percentile pair for
+    percentile-driven regression (pass ``None`` when a threshold is used). It
+    limits the regression ``low <= predict <= high`` checks to the sides the
+    percentiles imply (ADR-021); ``None`` enforces both sides.
+    """
+    if not isinstance(batch, ExplanationBatch):
+        raise ValidationError("explanation plugins must return an ExplanationBatch instance")
+
+    container_cls = batch.container_cls
+    if not isinstance(container_cls, type):
+        raise ValidationError("batch.container_cls must be a class")
+
+    def _inherits_calibrated_explanations(cls: type) -> bool:
+        with contextlib.suppress(ImportError, TypeError):
+            from ..explanations.explanations import (
+                CalibratedExplanations,  # pylint: disable=import-outside-toplevel
+            )
+
+            if issubclass(cls, CalibratedExplanations):
+                return True
+        return any(
+            base.__name__ == "CalibratedExplanations" for base in getattr(cls, "__mro__", ())
+        )
+
+    if not _inherits_calibrated_explanations(container_cls):
+        raise ValidationError("batch.container_cls must inherit from CalibratedExplanations")
+
+    explanation_cls = batch.explanation_cls
+    if not isinstance(explanation_cls, type):
+        raise ValidationError("batch.explanation_cls must be a class")
+
+    def _inherits_calibrated_explanation(cls: type) -> bool:
+        with contextlib.suppress(ImportError, TypeError):
+            from ..explanations.explanation import (
+                CalibratedExplanation,
+            )
+
+            if issubclass(cls, CalibratedExplanation):
+                return True
+        return any(base.__name__ == "CalibratedExplanation" for base in getattr(cls, "__mro__", ()))
+
+    if not _inherits_calibrated_explanation(explanation_cls):
+        raise ValidationError("batch.explanation_cls must inherit from CalibratedExplanation")
+
+    instances = batch.instances
+    if not isinstance(instances, SequenceABC) or isinstance(instances, (str, bytes)):
+        raise ValidationError("batch.instances must be a sequence of mappings")
+    for index, instance in enumerate(instances):
+        if not isinstance(instance, MappingABC):
+            raise ValidationError(
+                f"batch.instances[{index}] must be a mapping describing the instance"
+            )
+
+    metadata = batch.collection_metadata
+    if not isinstance(metadata, MutableMappingABC):
+        raise ValidationError(
+            "batch.collection_metadata must be a mutable mapping",
+            details={
+                "param": "batch.collection_metadata",
+                "expected_type": "MutableMapping",
+                "actual_type": type(metadata).__name__,
+            },
+        )
+
+    mode_hint = metadata.get("mode")
+    if expected_mode is not None and mode_hint is not None and str(mode_hint) != expected_mode:
+        raise ValidationError(
+            "ExplanationBatch metadata reports mode '"
+            + str(mode_hint)
+            + "' but runtime expected '"
+            + expected_mode
+            + "'",
+            details={
+                "param": "mode",
+                "expected": expected_mode,
+                "actual": str(mode_hint),
+                "source": "batch.collection_metadata",
+            },
+        )
+
+    task_hint = metadata.get("task")
+    if expected_task is not None and task_hint is not None and str(task_hint) != expected_task:
+        raise ValidationError(
+            "ExplanationBatch metadata reports task '"
+            + str(task_hint)
+            + "' but runtime expected '"
+            + expected_task
+            + "'",
+            details={
+                "param": "task",
+                "expected": expected_task,
+                "actual": str(task_hint),
+                "source": "batch.collection_metadata",
+            },
+        )
+
+    task = str(task_hint or expected_task or "")
+    sides = median_containment_sides(low_high_percentiles) if task == "regression" else (True, True)
+    for index, instance in enumerate(instances):
+        prediction = instance.get("prediction")
+        if isinstance(prediction, MappingABC):
+            _validate_prediction_invariant(
+                prediction,
+                f"Instance {index} prediction",
+                task=task,
+                sides=sides,
+            )
+        mode = str(instance.get("mode") or instance.get("explanation_type") or mode_hint or "")
+        if mode == "alternative":
+            _validate_alternative_reference_prediction(instance, metadata, index, sides=sides)
+        for rule_index, rule in enumerate(_iter_rule_mappings(instance, index)):
+            _validate_rule_weight_interval(rule, index, rule_index)
+            if mode == "alternative":
+                _validate_alternative_rule_prediction(rule, index, rule_index, sides=sides)
+
+    return batch
+
+
+def _iter_rule_mappings(instance: MappingABC[str, Any], instance_index: int) -> SequenceABC:
+    """Return rule mappings from an instance payload, validating container shape."""
+    rules = instance.get("rules")
+    if rules is None:
+        return ()
+    if not isinstance(rules, SequenceABC) or isinstance(rules, (str, bytes)):
+        raise ValidationError(
+            f"Instance {instance_index} rules must be a sequence of mappings",
+            details={"instance_index": instance_index, "actual_type": type(rules).__name__},
+        )
+    for rule_index, rule in enumerate(rules):
+        if not isinstance(rule, MappingABC):
+            raise ValidationError(
+                f"Instance {instance_index} rule {rule_index} must be a mapping",
+                details={
+                    "instance_index": instance_index,
+                    "rule_index": rule_index,
+                    "actual_type": type(rule).__name__,
+                },
+            )
+    return rules
+
+
+def _validate_rule_weight_interval(
+    rule: MappingABC[str, Any], instance_index: int, rule_index: int
+) -> None:
+    """Validate factual rule weight intervals when supplied by a plugin."""
+    rule_weight = rule.get("rule_weight")
+    weight_interval = rule.get("weight_interval")
+    if not isinstance(weight_interval, MappingABC) and isinstance(rule_weight, MappingABC):
+        weight_interval = rule_weight
+
+    if not isinstance(weight_interval, MappingABC):
+        return
+    if "low" not in weight_interval or "high" not in weight_interval:
+        return
+
+    weight = rule.get("weight")
+    if weight is None and isinstance(rule_weight, MappingABC):
+        weight = rule_weight.get("predict", rule_weight.get("weight"))
+    if weight is None:
+        raise ValidationError(
+            f"Instance {instance_index} rule {rule_index}: weight interval requires weight",
+            details={"instance_index": instance_index, "rule_index": rule_index},
+        )
+
+    _validate_numeric_interval(
+        weight,
+        weight_interval["low"],
+        weight_interval["high"],
+        f"Instance {instance_index} rule {rule_index} weight",
+    )
+
+
+def _validate_alternative_reference_prediction(
+    instance: MappingABC[str, Any],
+    metadata: MappingABC[str, Any],
+    instance_index: int,
+    *,
+    sides: Tuple[bool, bool] = (True, True),
+) -> None:
+    """Validate the required alternative reference prediction payload."""
+    reference_prediction = instance.get(
+        "reference_prediction", metadata.get("reference_prediction")
+    )
+    if reference_prediction is None:
+        raise ValidationError(
+            f"Instance {instance_index}: alternative explanations require reference_prediction",
+            details={"instance_index": instance_index},
+        )
+    if isinstance(reference_prediction, MappingABC):
+        _validate_prediction_invariant(
+            reference_prediction,
+            f"Instance {instance_index} reference_prediction",
+            task=str(metadata.get("task") or ""),
+            sides=sides,
+        )
+
+
+def _validate_alternative_rule_prediction(
+    rule: MappingABC[str, Any],
+    instance_index: int,
+    rule_index: int,
+    *,
+    sides: Tuple[bool, bool] = (True, True),
+) -> None:
+    """Validate alternative rule predicted values and optional intervals."""
+    if "predicted_value" not in rule:
+        raise ValidationError(
+            f"Instance {instance_index} rule {rule_index}: alternative rule requires predicted_value",
+            details={"instance_index": instance_index, "rule_index": rule_index},
+        )
+
+    prediction_interval = rule.get("prediction_interval")
+    if not isinstance(prediction_interval, MappingABC):
+        return
+    if "low" not in prediction_interval or "high" not in prediction_interval:
+        return
+
+    _validate_numeric_interval(
+        rule["predicted_value"],
+        prediction_interval["low"],
+        prediction_interval["high"],
+        f"Instance {instance_index} rule {rule_index} predicted_value",
+        sides=sides,
+    )
+
+
+def _within_bounds(
+    value_arr: np.ndarray, low_arr: np.ndarray, high_arr: np.ndarray, sides: Tuple[bool, bool]
+) -> bool:
+    """Return whether ``value`` respects the enforced sides of ``[low, high]``."""
+    epsilon = 1e-9
+    check_low, check_high = sides
+    above_low = (low_arr - epsilon <= value_arr) if check_low else True
+    below_high = (value_arr <= high_arr + epsilon) if check_high else True
+    return bool(np.all(np.logical_and(above_low, below_high)))
+
+
+def _validate_numeric_interval(
+    value: Any,
+    low: Any,
+    high: Any,
+    context: str,
+    *,
+    sides: Tuple[bool, bool] = (True, True),
+) -> None:
+    """Enforce low <= value <= high with small floating-point tolerance."""
+    with contextlib.suppress(TypeError, ValueError):
+        value_arr = np.asanyarray(value)
+        low_arr = np.asanyarray(low)
+        high_arr = np.asanyarray(high)
+
+        if value_arr.size == 0 or low_arr.size == 0 or high_arr.size == 0:
+            return
+        if not (
+            np.issubdtype(value_arr.dtype, np.number)
+            and np.issubdtype(low_arr.dtype, np.number)
+            and np.issubdtype(high_arr.dtype, np.number)
+        ):
+            return
+
+        if not np.all(low_arr <= high_arr):
+            raise ValidationError(f"{context}: Interval invariant violated: low > high")
+
+        if not _within_bounds(value_arr, low_arr, high_arr, sides):
+            raise ValidationError(
+                f"{context}: Prediction invariant violated: predict not in [low, high]"
+            )
+
+
+def _validate_prediction_invariant(
+    payload: Mapping[str, Any],
+    context: str,
+    *,
+    task: str = "",
+    sides: Tuple[bool, bool] = (True, True),
+) -> None:
+    """Enforce prediction interval invariants on payloads.
+
+    Regression point predictions must lie inside their numeric intervals, on
+    the ``sides`` the requested percentiles imply. Classification payloads may
+    pair calibrated score intervals with class labels, so only the
+    low <= high interval shape invariant is enforced.
+    """
+    import numpy as np
+
+    predict = payload.get("predict")
+    low = payload.get("low")
+    high = payload.get("high")
+
+    if predict is None or low is None or high is None:
+        return
+
+    with contextlib.suppress(TypeError, ValueError):
+        # Convert to numpy arrays for uniform handling
+        predict_arr = np.asanyarray(predict)
+        low_arr = np.asanyarray(low)
+        high_arr = np.asanyarray(high)
+
+        # Skip if any are empty
+        if predict_arr.size == 0 or low_arr.size == 0 or high_arr.size == 0:
+            return
+
+        # Check for numeric types
+        if not (
+            np.issubdtype(predict_arr.dtype, np.number)
+            and np.issubdtype(low_arr.dtype, np.number)
+            and np.issubdtype(high_arr.dtype, np.number)
+        ):
+            return
+
+        # Check low <= high
+        if not np.all(low_arr <= high_arr):
+            raise ValidationError(f"{context}: Interval invariant violated: low > high")
+
+        # Check low <= predict <= high on the enforced sides, with a small
+        # floating point tolerance
+        if task == "regression" and not _within_bounds(predict_arr, low_arr, high_arr, sides):
+            raise ValidationError(
+                f"{context}: Prediction invariant violated: predict not in [low, high]"
+            )

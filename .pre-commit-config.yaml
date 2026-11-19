@@ -1,0 +1,74 @@
+repos:
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.15.11
+    hooks:
+      - id: ruff
+        args: [--fix, --exit-non-zero-on-fix]
+        exclude: \.ipynb$
+      - id: ruff
+        name: ruff-naming
+        args: [--select, N]
+        exclude: \.ipynb$
+      - id: ruff-format
+        exclude: \.ipynb$
+
+  - repo: https://github.com/PyCQA/bandit
+    rev: 1.7.9
+    hooks:
+      - id: bandit
+        args: ["-q", "-r", "src", "-s", "B101"]
+        pass_filenames: false
+        stages: [pre-commit]
+
+  - repo: https://github.com/pypa/pip-audit
+    rev: v2.7.3
+    hooks:
+      - id: pip-audit
+        # Kept in sync with the repository-owned audit inputs/exception used by
+        # scripts/local_checks.py (`make local-checks-release`) and
+        # .github/workflows/scheduled.yml's dependency-audit job.
+        args:
+          [
+            "--requirement", "requirements.txt",
+            "--requirement", "docs/requirements-doc.txt",
+            "--ignore-vuln", "GHSA-xm59-rqc7-hhvf",
+          ]
+        # Make pip-audit opt-in locally to avoid slow runs; invoke manually when needed:
+        #   pre-commit run pip-audit --all-files
+        stages: [manual]
+
+  - repo: https://github.com/codespell-project/codespell
+    rev: v2.3.0
+    hooks:
+      - id: codespell
+        args: ["-L", "dataframe,nd,nknown", "-S", "*.lock,*.csv,*.txt,*.json,*.md,*.png,*.jpg,*.gif,*.zip"]
+        exclude: "(^data/|^tests/benchmarks/|^build/|^dist/|^notebooks/|^evaluation/|^docs/_build/|^docs_old/_build/)"
+
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v4.6.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: mixed-line-ending
+      - id: trailing-whitespace
+      - id: check-added-large-files
+        args: ["--maxkb=1500"]
+        exclude: "(^notebooks/|\\.ipynb$)"
+
+  # Local repo hooks
+  # (removed heavy pre-push pytest hook to speed up pushes)
+  - repo: local
+    hooks:
+      # Layer 3 of the ADR-035 inventory guard (v0.11.6 Task 60): an
+      # unapproved workflow file fails at commit time. Must stay identical to
+      # the ci.yml policy job and the local-checks-pr profile step.
+      - id: ci-policy-full-inventory
+        name: CI policy (full inventory, ADR-035)
+        entry: python scripts/quality/validate_ci_policy.py --full-inventory
+        language: system
+        files: ^\.github/
+        pass_filenames: false
+
+ci:
+  autofix_prs: true
+  autofix_commit_msg: "chore(pre-commit): auto-fix"
+  skip: [pip-audit, ci-policy-full-inventory]

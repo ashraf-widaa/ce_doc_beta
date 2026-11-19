@@ -1,0 +1,781 @@
+import sys
+import types
+
+import pytest
+
+from calibrated_explanations.viz import matplotlib_adapter as ma
+from calibrated_explanations.viz import (
+    BarHPanelSpec,
+    BarItem,
+    GlobalPlotSpec,
+    GlobalSpec,
+    IntervalHeaderSpec,
+    PlotSpec,
+    TriangularPlotSpec,
+    TriangularSpec,
+)
+from calibrated_explanations.utils.exceptions import ValidationError
+
+
+CREATED_FIGURES = []
+
+
+class FakeSpine:
+    def __init__(self):
+        self.visible = True
+
+    def set_visible(self, flag):
+        self.visible = bool(flag)
+
+
+class BadLabel:
+    def __str__(self):  # pragma: no cover - trivial
+        raise ValueError("label failed")
+
+
+class FakeAxes:
+    def __init__(self):
+        self.calls = []
+        self.twin_axes = []
+        self.ylim_value = (0.0, 0.0)
+        self.spines = {key: FakeSpine() for key in ("top", "right", "bottom", "left")}
+
+    def fill_betweenx(self, *args, **kwargs):
+        self.calls.append(("fill_betweenx", args, kwargs))
+
+    def plot(self, *args, **kwargs):
+        self.calls.append(("plot", args, kwargs))
+
+    def quiver(self, *args, **kwargs):
+        self.calls.append(("quiver", args, kwargs))
+
+    def scatter(self, *args, **kwargs):
+        self.calls.append(("scatter", args, kwargs))
+
+    def set_xlim(self, *args, **kwargs):
+        self.calls.append(("set_xlim", args, kwargs))
+
+    def set_xlabel(self, *args, **kwargs):
+        self.calls.append(("set_xlabel", args, kwargs))
+
+    def set_xticks(self, *args, **kwargs):
+        self.calls.append(("set_xticks", args, kwargs))
+
+    def set_yticks(self, *args, **kwargs):
+        self.calls.append(("set_yticks", args, kwargs))
+
+    def set_yticklabels(self, *args, **kwargs):
+        self.calls.append(("set_yticklabels", args, kwargs))
+
+    def set_ylabel(self, *args, **kwargs):
+        self.calls.append(("set_ylabel", args, kwargs))
+
+    def set_title(self, *args, **kwargs):
+        self.calls.append(("set_title", args, kwargs))
+
+    def legend(self, *args, **kwargs):
+        self.calls.append(("legend", args, kwargs))
+
+    def set_ylim(self, *args, **kwargs):
+        if args:
+            self.ylim_value = args[0]
+        self.calls.append(("set_ylim", args, kwargs))
+
+    def get_ylim(self):
+        return self.ylim_value
+
+    def twinx(self):
+        twin = FakeAxes()
+        self.twin_axes.append(twin)
+        self.calls.append(("twinx", (), {}))
+        return twin
+
+    def set_axis_off(self, *args, **kwargs):
+        self.calls.append(("set_axis_off", args, kwargs))
+
+
+class FakeGridSpec:
+    def __init__(self, figure, nrows, ncols, height_ratios=None):
+        self.figure = figure
+        self.nrows = nrows
+        self.ncols = ncols
+        self.height_ratios = height_ratios
+
+    def __getitem__(self, item):
+        return item
+
+
+class FakeFigure:
+    def __init__(self, figsize=None):
+        self.figsize = figsize
+        self.axes = []
+        self.closed = False
+        self.suptitle_args = None
+        self.calls = []
+        CREATED_FIGURES.append(self)
+
+    def add_gridspec(self, nrows, ncols, height_ratios=None, **kwargs):
+        return FakeGridSpec(self, nrows, ncols, height_ratios)
+
+    def add_subplot(self, spec):
+        ax = FakeAxes()
+        self.axes.append(ax)
+        return ax
+
+    def suptitle(self, *args, **kwargs):
+        self.suptitle_args = (args, kwargs)
+
+    def tight_layout(self, *args, **kwargs):
+        self.calls.append(("tight_layout", args, kwargs))
+
+    def subplots_adjust(self, *args, **kwargs):
+        self.calls.append(("subplots_adjust", args, kwargs))
+
+    def savefig(self, *args, **kwargs):
+        self.calls.append(("savefig", args, kwargs))
+
+
+@pytest.fixture(autouse=True)
+def patch_matplotlib(monkeypatch):
+    CREATED_FIGURES.clear()
+    fake_pyplot = types.ModuleType("pyplot")
+
+    def figure(*, figsize=None):
+        return FakeFigure(figsize)
+
+    def close(fig=None):
+        if fig is not None:
+            fig.closed = True
+
+    def show(*args, **kwargs):
+        fake_pyplot.last_show = (args, kwargs)
+
+    fake_pyplot.figure = figure
+    fake_pyplot.close = close
+    fake_pyplot.show = show
+
+    fake_matplotlib = types.ModuleType("matplotlib")
+    fake_matplotlib.pyplot = fake_pyplot
+    monkeypatch.setitem(sys.modules, "matplotlib", fake_matplotlib)
+    monkeypatch.setitem(sys.modules, "matplotlib.pyplot", fake_pyplot)
+
+    monkeypatch.setattr(ma, "_require_mpl", lambda: None)
+    style = {
+        "figure": {"width": 7.5},
+        "colors": {
+            "alpha": 0.35,
+            "positive": "#1976d2",
+            "negative": "#d32f2f",
+            "regression": "#455a64",
+        },
+    }
+    monkeypatch.setattr(ma, "_setup_style", lambda _: style)
+
+    yield
+
+
+def test_render_noop_when_no_output_requested():
+    spec = PlotSpec(title="unused")
+    assert ma.render(spec) is None
+
+
+def test_render_headless_skips_matplotlib(monkeypatch):
+    """When nothing is requested the adapter must not attempt to import matplotlib."""
+
+    spec = PlotSpec(title="skip")
+
+    def boom():  # pragma: no cover - should not execute
+        raise AssertionError("_require_mpl should not be called")
+
+    monkeypatch.setattr(ma, "_require_mpl", boom)
+    assert ma.render(spec) is None
+
+
+def test_render_short_circuits_before_import(monkeypatch):
+    """The adapter should not import matplotlib when nothing is rendered."""
+
+    calls: list[bool] = []
+
+    def marker():  # pragma: no cover - simple spy
+        calls.append(True)
+
+    monkeypatch.setattr(ma, "_require_mpl", marker)
+    spec = PlotSpec(title="unused")
+    assert ma.render(spec) is None
+    assert not calls
+
+
+def test_render_saves_before_show(monkeypatch):
+    """Saving to disk must occur before the adapter requests a GUI show."""
+
+    header = IntervalHeaderSpec(pred=0.5, low=0.2, high=0.8, dual=False)
+    body = BarHPanelSpec(
+        bars=[BarItem(label="f0", value=0.3, instance_value=0.1)],
+        xlabel="Contribution",
+        ylabel="Features",
+    )
+    spec = PlotSpec(title="order", header=header, body=body)
+
+    events: list[str] = []
+
+    fake_pyplot = sys.modules["matplotlib.pyplot"]
+    original_show = fake_pyplot.show
+
+    def spy_show(*args, **kwargs):  # pragma: no cover - spy helper
+        events.append("show")
+        return original_show(*args, **kwargs)
+
+    original_savefig = FakeFigure.savefig
+
+    def spy_savefig(self, *args, **kwargs):  # pragma: no cover - spy helper
+        events.append("save")
+        return original_savefig(self, *args, **kwargs)
+
+    monkeypatch.setattr(fake_pyplot, "show", spy_show)
+    monkeypatch.setattr(FakeFigure, "savefig", spy_savefig)
+
+    ma.render(spec, show=True, save_path="out.png")
+
+    assert events[0] == "save"
+    assert events[1] == "show"
+
+
+def test_auto_height_falls_back_when_label_conversion_fails():
+    header = IntervalHeaderSpec(pred=0.5, low=0.2, high=0.8, dual=False)
+    body = BarHPanelSpec(
+        bars=[BarItem(label=BadLabel(), value=0.1), BarItem(label="ok", value=-0.2)],
+    )
+    spec = PlotSpec(title="height", header=header, body=body)
+
+    fig = ma.render(spec, return_fig=True)
+
+    assert isinstance(fig, FakeFigure)
+    # Height should stay finite and compact even after the label exception path executes.
+    assert fig.figsize[1] == pytest.approx(2.8)
+
+
+def test_compact_row_layout_does_not_depend_on_sibling_helper(monkeypatch):
+    header = IntervalHeaderSpec(pred=0.5, low=0.2, high=0.8, dual=False)
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(label="a\nb\nc", value=0.1),
+            BarItem(label="ok", value=-0.2),
+        ],
+    )
+    spec = PlotSpec(title="height", header=header, body=body)
+
+    monkeypatch.delattr(ma, "_rule_label_row_units", raising=False)
+
+    fig = ma.render(spec, return_fig=True)
+
+    assert isinstance(fig, FakeFigure)
+    assert fig.figsize[1] == pytest.approx(2.8)
+
+
+def test_instance_value_labels_use_same_multiline_spacing_as_rules():
+    header = IntervalHeaderSpec(pred=0.5, low=0.2, high=0.8, dual=False)
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(label="a\nb\nc", value=0.1, instance_value="1\n2\n3"),
+            BarItem(label="ok", value=-0.2, instance_value="4"),
+        ],
+    )
+    spec = PlotSpec(title="spacing", header=header, body=body)
+
+    fig = ma.render(spec, return_fig=True)
+
+    assert isinstance(fig, FakeFigure)
+    body_ax = fig.axes[-1]
+    left_label_calls = [call for call in body_ax.calls if call[0] == "set_yticklabels"]
+    assert left_label_calls[-1][2]["linespacing"] == pytest.approx(0.92)
+
+    twin_ax = body_ax.twin_axes[0]
+    right_label_calls = [call for call in twin_ax.calls if call[0] == "set_yticklabels"]
+    assert right_label_calls[-1][2]["linespacing"] == pytest.approx(0.92)
+
+
+def test_render_normalizes_non_panel_plotspecs():
+    tri = TriangularPlotSpec(
+        kind="triangular",
+        mode="classification",
+        triangular=TriangularSpec(
+            proba=[0.4, 0.6],
+            uncertainty=[0.1, 0.2],
+            rule_proba=[0.5],
+            rule_uncertainty=[0.1],
+        ),
+    )
+    tri_result = ma.render(tri, export_drawn_primitives=True)
+    assert tri_result["triangle_background"]["type"] == "triangle_background"
+    assert any(p["type"] == "quiver" for p in tri_result["primitives"])
+
+    global_spec = GlobalPlotSpec(
+        kind="global_probabilistic",
+        mode="classification",
+        global_entries=GlobalSpec(
+            proba=[[0.1, 0.9], [0.25, 0.75]],
+            uncertainty=[[0.05, 0.15], [0.02, 0.12]],
+        ),
+    )
+    glob_result = ma.render(global_spec, export_drawn_primitives=True)
+    scatter_ids = [p["id"] for p in glob_result["primitives"] if p["type"] == "scatter"]
+    assert scatter_ids == ["global.scatter.0", "global.scatter.1"]
+
+    # Scalar probabilities hit the non-multiclass branch and still emit scatter primitives
+    scalar_spec = GlobalPlotSpec(
+        kind="global_probabilistic",
+        mode="classification",
+        global_entries=GlobalSpec(proba=[0.2, 0.8], uncertainty=[0.1, 0.05]),
+    )
+    scalar_result = ma.render(scalar_spec, export_drawn_primitives=True)
+    assert [p["coords"]["x"] for p in scalar_result["primitives"] if p["type"] == "scatter"] == [
+        0.2,
+        0.8,
+    ]
+
+    # Trigger the defensive fallback path when casting to float fails
+    bad_global = GlobalPlotSpec(
+        kind="global_probabilistic",
+        mode="classification",
+        global_entries=GlobalSpec(proba=["bad"], uncertainty=["bad"]),
+    )
+    bad_result = ma.render(bad_global, export_drawn_primitives=True)
+    assert any(p["id"] == "global.scatter.summary" for p in bad_result["primitives"])
+
+
+def test_dual_body_respects_item_level_solid_flags():
+    header = IntervalHeaderSpec(pred=0.7, low=0.4, high=0.9, dual=True)
+    body = types.SimpleNamespace(
+        bars=[
+            BarItem(
+                label="unstable",
+                value=1.1,
+                interval_low=0.8,
+                interval_high=1.3,
+                solid_on_interval_crosses_zero=False,
+            )
+        ],
+        xlabel=None,
+        ylabel=None,
+    )
+    spec = PlotSpec(title="flaky", header=header, body=body)
+
+    result = ma.render(spec, export_drawn_primitives=True)
+
+    solids = result.get("solids", [])
+    assert solids and solids[0]["index"] == 0
+    assert solids[0]["x0"] == 0.0 and solids[0]["x1"] > 0.0
+
+
+def test_dual_body_zero_extent_sets_padding():
+    header = IntervalHeaderSpec(pred=0.5, low=0.4, high=0.6, dual=True)
+    zero_body = types.SimpleNamespace(
+        bars=[
+            BarItem(label="zero_a", value=0.0, interval_low=0.0, interval_high=0.0),
+            BarItem(label="zero_b", value=0.0, interval_low=0.0, interval_high=0.0),
+        ],
+        xlabel=None,
+        ylabel=None,
+    )
+    spec = PlotSpec(title="dual-zero", header=header, body=zero_body)
+
+    ma.render(spec, export_drawn_primitives=True)
+
+    axis = CREATED_FIGURES[-1].axes[-1]
+    xlim_calls = [call for call in axis.calls if call[0] == "set_xlim"]
+    assert xlim_calls
+
+
+class SimpleBar:
+    def __init__(self, label, value, low, high):
+        self.label = label
+        self.value = value
+        self.interval_low = low
+        self.interval_high = high
+        self.instance_value = None
+
+
+def test_dual_body_defaults_suppress_when_flags_missing():
+    header = IntervalHeaderSpec(pred=0.4, low=0.2, high=0.6, dual=True)
+    body = types.SimpleNamespace(
+        bars=[SimpleBar("no-flag", 0.3, -0.2, 0.5)],
+        xlabel=None,
+        ylabel=None,
+    )
+    spec = PlotSpec(title="dual-default", header=header, body=body)
+
+    result = ma.render(spec, export_drawn_primitives=True)
+
+    solids = result.get("solids", [])
+    assert not solids  # solid suppressed because default flag is True
+
+
+def test_render_dual_header_exports_primitives():
+    header = IntervalHeaderSpec(
+        pred=0.6,
+        low=0.2,
+        high=0.9,
+        xlim=(0.5, 0.5),
+        xlabel="probability",
+        ylabel="target",
+        dual=True,
+    )
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(
+                label="first\nline",
+                value=0.65,
+                interval_low=0.55,
+                interval_high=0.75,
+                instance_value=1.0,
+            ),
+            BarItem(
+                label="second",
+                value=0.92,
+                interval_low=0.8,
+                interval_high=0.94,
+                solid_on_interval_crosses_zero=False,
+                instance_value=0.5,
+            ),
+            BarItem(label="plain", value=-0.25),
+        ],
+        xlabel="Contribution",
+        ylabel="Feature",
+        solid_on_interval_crosses_zero=True,
+    )
+    spec = PlotSpec(title="Dual", header=header, body=body)
+    result = ma.render(spec, export_drawn_primitives=True)
+
+    assert isinstance(result["primitives"], list) and result["primitives"]
+    assert set(result.keys()) >= {"solids", "overlays", "base_interval", "header"}
+    header_pos = result["header"]["positive"]
+    assert header_pos["solid"][0] == 0.0
+    overlays = result["overlays"]
+    assert any(o["color"] in ["#1976d2", "#d32f2f"] for o in overlays)
+    # Ensure body primitives reflect contribution coordinates (span values around zero)
+    assert any(s["x0"] < 0.0 for s in result["solids"])
+    assert result["base_interval"]["body"]["x0"] < result["base_interval"]["body"]["x1"]
+
+    # Rendering with explicit class labels exercises the alternate ytick branch
+    labeled_header = IntervalHeaderSpec(
+        pred=0.55,
+        low=0.2,
+        high=0.8,
+        xlim=(0.0, 1.0),
+        xlabel="probability",
+        ylabel=None,
+        dual=True,
+        neg_label="no",
+        pos_label="yes",
+    )
+    labeled_spec = PlotSpec(title="Dual labeled", header=labeled_header, body=body)
+    labeled_result = ma.render(labeled_spec, export_drawn_primitives=True)
+    assert "header" in labeled_result
+
+
+def test_render_returns_figure_for_single_header():
+    header = IntervalHeaderSpec(
+        pred=10.0,
+        low=8.0,
+        high=12.0,
+        xlabel="value",
+        ylabel="prediction",
+        dual=False,
+    )
+    spec = PlotSpec(title="Regression", figure_size=(4.0, 2.5), header=header, body=None)
+    fig = ma.render(spec, return_fig=True, draw_intervals=False)
+    assert isinstance(fig, FakeFigure)
+    assert not fig.closed
+
+
+def test_render_regression_body_handles_intervals(tmp_path):
+    header = IntervalHeaderSpec(
+        pred=1.5,
+        low=1.0,
+        high=2.0,
+        xlim=(2.0, 2.0),
+        xlabel="score",
+        ylabel="outcome",
+        dual=False,
+    )
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(
+                label="alpha",
+                value=1.7,
+                interval_low=1.2,
+                interval_high=1.9,
+                instance_value=3.14,
+            ),
+            BarItem(
+                label="beta",
+                value=1.1,
+                interval_low=0.8,
+                interval_high=1.4,
+            ),
+            BarItem(
+                label="gamma",
+                value=0.0,
+                interval_low=1.0,
+                interval_high=2.0,
+            ),
+        ],
+        xlabel="Contribution",
+        ylabel="Feature",
+        solid_on_interval_crosses_zero=False,
+    )
+    spec = PlotSpec(title="Regression body", header=header, body=body)
+    save_path = tmp_path / "plot.png"
+    result = ma.render(
+        spec,
+        export_drawn_primitives=True,
+        save_path=str(save_path),
+    )
+
+    assert save_path.name == "plot.png"
+    assert result.get("base_interval", {}).get("body") is None
+    # Header-matching intervals are rendered alongside others
+    labels = [p.get("index") for p in result.get("solids", [])]
+    assert set(labels) >= {0, 1, 2}
+    overlay_indices = {p.get("index") for p in result.get("overlays", [])}
+    assert {0, 1, 2}.issubset(overlay_indices)
+
+    # When solids are suppressed for cross-zero intervals, the dedicated branch emits split overlays
+    cross_body = BarHPanelSpec(
+        bars=[
+            BarItem(
+                label="alpha",
+                value=1.7,
+                interval_low=1.2,
+                interval_high=1.9,
+            ),
+            BarItem(
+                label="beta",
+                value=1.1,
+                interval_low=0.8,
+                interval_high=1.4,
+            ),
+        ],
+        solid_on_interval_crosses_zero=True,
+    )
+    cross_spec = PlotSpec(title="Regression body", header=header, body=cross_body)
+    cross_result = ma.render(cross_spec, export_drawn_primitives=True, show=True)
+    body_primitives = [item for item in cross_result["primitives"] if item.get("axis_id") == "body"]
+    assert body_primitives
+    cross_overlays = cross_result.get("overlays", [])
+    # New adapter draws regression overlays directly in value space; just
+    # ensure overlays are present and well-ordered, not necessarily crossing 0.
+    assert cross_overlays and all(o.get("x0") <= o.get("x1") for o in cross_overlays)
+
+
+def test_should_skip_tight_layout_when_rendering_standard_panel_plot_to_file():
+    header = IntervalHeaderSpec(pred=0.5, low=0.2, high=0.8, dual=True)
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(
+                label="f0", value=0.1, interval_low=-0.1, interval_high=0.2, instance_value=1.0
+            ),
+            BarItem(
+                label="f1", value=-0.2, interval_low=-0.3, interval_high=0.1, instance_value=2.0
+            ),
+        ],
+        xlabel="Contribution",
+        ylabel="Features",
+    )
+    spec = PlotSpec(title="standard-panel", header=header, body=body)
+
+    ma.render(spec, save_path="panel.png")
+
+    figure = CREATED_FIGURES[-1]
+    save_calls = [call for call in figure.calls if call[0] == "savefig"]
+
+    assert not any(call[0] == "tight_layout" for call in figure.calls)
+    assert save_calls
+    assert save_calls[-1][2].get("bbox_inches") == "tight"
+
+
+def test_should_use_tight_layout_when_rendering_multiline_panel_plot_to_file():
+    header = IntervalHeaderSpec(pred=0.6, low=0.3, high=0.9, dual=True)
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(
+                label="first line\nsecond line", value=0.2, interval_low=0.1, interval_high=0.3
+            ),
+            BarItem(label="plain", value=-0.1, interval_low=-0.2, interval_high=0.0),
+        ],
+        xlabel="Contribution",
+        ylabel="Features",
+    )
+    spec = PlotSpec(title="multiline-panel", header=header, body=body)
+
+    ma.render(spec, save_path="multiline.png")
+
+    figure = CREATED_FIGURES[-1]
+    save_calls = [call for call in figure.calls if call[0] == "savefig"]
+
+    assert any(call[0] == "tight_layout" for call in figure.calls)
+    assert save_calls
+    assert "bbox_inches" not in save_calls[-1][2]
+
+
+def test_should_use_alternative_margins_when_rendering_single_panel_alternative_plot_to_file():
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(
+                label="rule 1", value=0.4, interval_low=0.3, interval_high=0.6, instance_value="A"
+            ),
+            BarItem(
+                label="rule 2", value=0.2, interval_low=0.1, interval_high=0.4, instance_value="B"
+            ),
+        ],
+        xlabel="Probability",
+        ylabel="Alternative rules",
+        is_alternative=True,
+    )
+    spec = PlotSpec(title="alternative-panel", body=body)
+
+    ma.render(spec, save_path="alternative.png")
+
+    figure = CREATED_FIGURES[-1]
+    save_calls = [call for call in figure.calls if call[0] == "savefig"]
+
+    assert any(call[0] == "tight_layout" for call in figure.calls)
+    assert any(call[0] == "subplots_adjust" for call in figure.calls)
+    assert save_calls
+    assert "bbox_inches" not in save_calls[-1][2]
+
+
+def test_regression_body_respects_item_solid_flags_and_extent_padding():
+    header = IntervalHeaderSpec(pred=0.0, low=-0.1, high=0.1, dual=False)
+    zero_body = types.SimpleNamespace(
+        bars=[
+            BarItem(label="zero_a", value=0.0, interval_low=0.0, interval_high=0.0),
+            BarItem(label="zero_b", value=0.0, interval_low=0.0, interval_high=0.0),
+        ],
+        xlabel=None,
+        ylabel=None,
+    )
+    zero_spec = PlotSpec(title="padding", header=header, body=zero_body)
+
+    ma.render(zero_spec, export_drawn_primitives=True)
+
+    skip_body = types.SimpleNamespace(
+        bars=[
+            BarItem(label="baseline", value=0.2, interval_low=-0.1, interval_high=0.1),
+            BarItem(
+                label="skip",
+                value=0.5,
+                interval_low=-0.1,
+                interval_high=0.1,
+                solid_on_interval_crosses_zero=False,
+            ),
+        ],
+        xlabel=None,
+        ylabel=None,
+    )
+    skip_spec = PlotSpec(title="skip", header=header, body=skip_body)
+
+    skip_result = ma.render(skip_spec, export_drawn_primitives=True)
+
+    solids = skip_result.get("solids", [])
+    assert any(item.get("index") == 1 for item in solids)
+
+
+def test_regression_colors_without_uncertainty_match_legacy_palette():
+    header = IntervalHeaderSpec(pred=0.0, low=-1.0, high=1.0, dual=False)
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(label="positive", value=0.4),
+            BarItem(label="negative", value=-0.6),
+        ],
+        xlabel="Contribution",
+        ylabel="Feature",
+    )
+    spec = PlotSpec(title="regression-colors", header=header, body=body)
+
+    result = ma.render(spec, export_drawn_primitives=True)
+
+    solids = {item["index"]: item for item in result.get("solids", [])}
+    assert 0 in solids and 1 in solids
+    assert solids[0]["color"] == "b"
+    assert solids[1]["color"] == "r"
+    assert result.get("base_interval", {}).get("body") is None
+
+
+def test_regression_interval_colors_match_legacy_palette():
+    header = IntervalHeaderSpec(pred=0.0, low=-0.5, high=0.5, dual=False)
+    body = BarHPanelSpec(
+        bars=[
+            BarItem(
+                label="positive",
+                value=0.5,
+                interval_low=0.2,
+                interval_high=0.7,
+                solid_on_interval_crosses_zero=False,
+            ),
+            BarItem(
+                label="negative",
+                value=-0.3,
+                interval_low=-0.6,
+                interval_high=-0.1,
+                solid_on_interval_crosses_zero=False,
+            ),
+        ],
+        xlabel="Contribution",
+        ylabel="Feature",
+        solid_on_interval_crosses_zero=False,
+    )
+    spec = PlotSpec(title="regression-interval-colors", header=header, body=body)
+
+    result = ma.render(spec, export_drawn_primitives=True)
+
+    solids = {item["index"]: item for item in result.get("solids", [])}
+    assert 0 in solids and 1 in solids
+    assert solids[0]["color"] == "b"
+    assert solids[1]["color"] == "r"
+
+    overlays = {item["index"]: item for item in result.get("overlays", [])}
+    assert overlays.get(0, {}).get("color") == "b"
+    assert overlays.get(1, {}).get("color") == "r"
+
+    assert result.get("base_interval", {}).get("body") is None
+
+
+def test_export_guard_raises_on_probability_coordinate_mismatch():
+    header = IntervalHeaderSpec(pred=1.3, low=1.1, high=1.4, dual=True)
+    body = BarHPanelSpec(
+        bars=[BarItem(label="bad", value=1.2, interval_low=1.1, interval_high=1.3)]
+    )
+    spec = PlotSpec(title="assert", header=header, body=body)
+
+    with pytest.raises(AssertionError):
+        ma.render(spec, export_drawn_primitives=True)
+
+
+class NamespaceSpec:
+    def __init__(self, **kwargs):
+        self.__dict__.update(kwargs)
+
+
+def test_render_handles_non_dataclass_spec_payload():
+    header = IntervalHeaderSpec(pred=0.2, low=0.1, high=0.3, dual=False)
+    body = BarHPanelSpec(bars=[BarItem(label="ns", value=0.1)])
+    spec = NamespaceSpec(title="ns", header=header, body=body, figure_size=(4, 3))
+
+    with pytest.raises(ValidationError):
+        ma.render(spec, export_drawn_primitives=True)
+
+
+def test_render_rejects_raw_dict_payload():
+    with pytest.raises(ValidationError):
+        ma.render({"plot_spec": {"kind": "triangular"}}, export_drawn_primitives=True)
+
+
+def test_render_closes_when_only_show_requested():
+    header = IntervalHeaderSpec(pred=0.1, low=0.0, high=0.2, dual=False)
+    body = BarHPanelSpec(bars=[BarItem(label="show", value=0.2)])
+    spec = PlotSpec(title="show", header=header, body=body)
+
+    ma.render(spec, show=True)
+
+    assert CREATED_FIGURES[-1].closed is True

@@ -1,0 +1,1099 @@
+"""Orchestration layer for prediction and interval calibration.
+
+This module provides the PredictionOrchestrator class which coordinates
+prediction pipeline execution, including interval calibration, difficulty
+estimation, uncertainty quantification, and caching.
+
+Part of Phase 1b: Delegate Prediction Orchestration (ADR-001, ADR-004).
+
+Note: All plugin defaults, chaining, and fallback logic has been moved to
+PluginManager. This orchestrator delegates all chain-building to PluginManager.
+"""
+
+# pylint: disable=protected-access, too-many-lines, invalid-name, import-outside-toplevel
+# pylint: disable=line-too-long, unnecessary-pass, broad-except
+
+from __future__ import annotations
+
+import contextlib
+import inspect
+import logging
+import sys
+import warnings
+from collections.abc import Mapping, MutableMapping, Sequence
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, List, Tuple
+
+import numpy as np
+
+from ...calibration.interval_wrappers import FastIntervalCalibrator, is_fast_interval_collection
+from ...logging import logging_context
+from ...plugins import (
+    ClassificationIntervalCalibrator,
+    IntervalCalibratorContext,
+    RegressionIntervalCalibrator,
+    validate_interval_calibrator_output,
+)
+from ...utils import assert_threshold, median_containment_sides
+from ...utils.exceptions import (
+    CalibratedError,
+    ConfigurationError,
+    DataShapeError,
+    NotFittedError,
+    ValidationError,
+)
+from ..config_manager import ConfigManager
+from .interval_summary import coerce_interval_summary
+from .validation import check_interval_runtime_metadata
+
+if TYPE_CHECKING:
+    from ..calibrated_explainer import CalibratedExplainer
+
+
+def _freeze_context_value(value: Any) -> Any:
+    if isinstance(value, Mapping):
+        return MappingProxyType({k: _freeze_context_value(v) for k, v in value.items()})
+    if isinstance(value, (list, tuple)):
+        return tuple(_freeze_context_value(item) for item in value)
+    if hasattr(value, "copy") and callable(value.copy):
+        try:
+            return value.copy()
+        except CalibratedError:  # pragma: no cover - defensive
+            return value
+    return value
+
+
+def _freeze_context_mapping(mapping: Mapping[str, Any]) -> Mapping[str, Any]:
+    return MappingProxyType({key: _freeze_context_value(value) for key, value in mapping.items()})
+
+
+class PredictionOrchestrator:
+    """Orchestrate prediction pipeline execution and interval calibration.
+
+    This class handles the complete prediction workflow including:
+    - Interval calibration and plugin resolution
+    - Difficulty estimation coordination
+    - Uncertainty quantification
+    - Prediction caching and performance tracking
+
+    Attributes
+    ----------
+    explainer : CalibratedExplainer
+        Back-reference to the parent explainer instance.
+    """
+
+    def __init__(self, explainer: CalibratedExplainer) -> None:
+        """Initialize the orchestrator with a back-reference to the explainer.
+
+        Parameters
+        ----------
+        explainer : CalibratedExplainer
+            The parent explainer instance.
+
+        Notes
+        -----
+        The orchestrator is a thin coordination layer that manages behavior
+        using state stored on the parent explainer. It does not hold state itself.
+        State is accessed through these explainer fields:
+        - explainer._interval_plugin_identifiers
+        - explainer._interval_plugin_fallbacks
+        - explainer._interval_plugin_hints
+        - explainer._interval_context_metadata
+        - explainer._telemetry_interval_sources
+        - explainer._interval_preferred_identifier
+        """
+        self.explainer = explainer
+        # Initialize interval registry for managing interval learner lifecycle
+        from .interval_registry import IntervalRegistry
+
+        self.interval_registry = IntervalRegistry(explainer)
+        self._logger = logging.getLogger(__name__)
+        self._interval_calibration_features: dict[str, np.ndarray] = {}
+        self._config_manager = ConfigManager.from_sources()
+
+    def _config_env(self, key: str) -> str | None:
+        """Resolve runtime config for fallback-sensitive behavior checks."""
+        return self._config_manager.env(key)
+
+    def initialize_chains(self) -> None:
+        """Delegate to PluginManager for chain initialization.
+
+        PluginManager is now the single source of truth for all plugin
+        defaults, chains, and fallbacks. This method delegates to it.
+
+        Notes
+        -----
+        This method is called during explainer initialization to pre-compute the
+        interval calibrator plugin resolution chains for default and fast modes.
+        """
+        self.explainer.plugin_manager.initialize_chains()
+
+    def restore_calibrator_with_learner(
+        self,
+        calibrator: Any,
+        learner: Any,
+        *,
+        difficulty_estimator: Any = None,
+    ) -> None:
+        """Attach a restored calibrator to the explainer prediction context."""
+        if isinstance(calibrator, list):
+            for item in calibrator:
+                self.restore_calibrator_with_learner(
+                    item,
+                    learner,
+                    difficulty_estimator=difficulty_estimator,
+                )
+            self.explainer.interval_learner = calibrator
+            return
+        if isinstance(calibrator, tuple):
+            restored_items = []
+            for item in calibrator:
+                self.restore_calibrator_with_learner(
+                    item,
+                    learner,
+                    difficulty_estimator=difficulty_estimator,
+                )
+                restored_items.append(item)
+            self.explainer.interval_learner = tuple(restored_items)
+            return
+        reattach = getattr(calibrator, "reattach_learner", None)
+        if callable(reattach):
+            reattach(
+                learner,
+                calibrated_explainer=self.explainer,
+                difficulty_estimator=difficulty_estimator,
+            )
+        self.explainer.interval_learner = calibrator
+
+    def predict(
+        self,
+        x,
+        threshold=None,
+        low_high_percentiles=(5, 95),
+        classes=None,
+        bins=None,
+        feature=None,
+        reject_policy: Any | None = None,
+        **kwargs,
+    ):
+        """Execute a prediction with optional uncertainty quantification.
+
+        Parameters
+        ----------
+        x : array-like
+            Test instances to predict.
+        threshold : float, int, array-like, or None
+            Threshold for probabilistic regression predictions.
+        low_high_percentiles : tuple of floats
+            Low and high percentiles for interval calculation.
+        classes : array-like or None
+            Classes for multiclass predictions.
+        bins : array-like or None
+            Mondrian categories.
+        feature : int or None
+            Feature index for fast prediction mode.
+        **kwargs : dict
+            Additional arguments (show, style_override are stripped).
+
+        Returns
+        -------
+        tuple
+            (prediction, low, high, classes) for classification/regression.
+        """
+        return self._predict(
+            x,
+            threshold=threshold,
+            low_high_percentiles=low_high_percentiles,
+            classes=classes,
+            bins=bins,
+            feature=feature,
+            reject_policy=reject_policy,
+            **kwargs,
+        )
+
+    def _predict(
+        self,
+        x,
+        threshold=None,
+        low_high_percentiles=(5, 95),
+        classes=None,
+        bins=None,
+        feature=None,
+        reject_policy: Any | None = None,
+        **kwargs,
+    ):
+        """Cache-aware wrapper around _predict_impl.
+
+        Checks performance cache before delegating to actual prediction logic.
+        Stores results in cache after successful prediction.
+        """
+        cache = getattr(self.explainer, "perf_cache", None)
+        cache_enabled = getattr(cache, "enabled", False)
+        # Reject policy handling: delegate to RejectOrchestrator when enabled
+        from calibrated_explanations.core.reject.policy import RejectPolicy
+
+        effective_policy = None
+        if reject_policy is not None:
+            try:
+                effective_policy = RejectPolicy(reject_policy)
+            except Exception:  # adr002_allow
+                effective_policy = RejectPolicy.NONE
+        else:
+            effective_policy = RejectPolicy.NONE
+
+        if effective_policy is not None and effective_policy is not RejectPolicy.NONE:
+            # Ensure reject orchestrator is available (implicit enable)
+            try:
+                _ = self.explainer.reject_orchestrator
+            except Exception:  # adr002_allow
+                with contextlib.suppress(Exception):
+                    self.explainer.plugin_manager.initialize_orchestrators()
+
+            def _predict_fn(x_subset, **kw):
+                return self._predict_impl(
+                    x_subset,
+                    threshold=threshold,
+                    low_high_percentiles=low_high_percentiles,
+                    classes=classes,
+                    bins=kw.get("bins", bins),
+                    feature=feature,
+                    **kw,
+                )
+
+            result = self.explainer.reject_orchestrator.apply_policy(
+                effective_policy,
+                x,
+                explain_fn=_predict_fn,
+                bins=bins,
+                threshold=threshold,
+                result_schema="v2",
+            )
+            try:
+                from ...explanations.reject import (
+                    RejectResultV2,
+                    reject_result_v2_to_legacy,
+                )
+
+                if isinstance(result, RejectResultV2):
+                    return reject_result_v2_to_legacy(result, emit_deprecation_warning=False)
+            except Exception:  # adr002_allow
+                return result
+            return result
+        key_parts = None
+        if cache_enabled:
+            x_arr = np.asarray(x)
+            key_parts = (
+                ("mode", self.explainer.mode),
+                ("feature", feature),
+                ("shape", x_arr.shape),
+                ("x", x_arr),
+                ("threshold", np.asarray(threshold) if threshold is not None else None),
+                ("percentiles", tuple(low_high_percentiles)),
+                ("classes", np.asarray(classes) if classes is not None else None),
+                ("bins", np.asarray(bins) if bins is not None else None),
+                ("kwargs", dict(kwargs) if kwargs else {}),
+            )
+            cached = cache.get(stage="predict", parts=key_parts)
+            if cached is not None:
+                return cached
+
+        result = self._predict_impl(
+            x,
+            threshold=threshold,
+            low_high_percentiles=low_high_percentiles,
+            classes=classes,
+            bins=bins,
+            feature=feature,
+            **kwargs,
+        )
+
+        if cache_enabled and key_parts is not None:
+            cache.set(stage="predict", parts=key_parts, value=result)
+
+        self._validate_prediction_result(
+            result, threshold=threshold, low_high_percentiles=low_high_percentiles
+        )
+        return result
+
+    def _validate_prediction_result(self, result, *, threshold=None, low_high_percentiles=None):
+        """Enforce low <= predict <= high invariant on prediction results.
+
+        For percentile-driven regression (no threshold), each side of the
+        containment check applies only where ``median_containment_sides``
+        says the requested percentiles imply it (ADR-021).
+        """
+        predict, low, high, _ = result
+        check_low, check_high = True, True
+        if threshold is None and "regression" in str(getattr(self.explainer, "mode", "")):
+            check_low, check_high = median_containment_sides(low_high_percentiles)
+
+        # Skip validation if any component is None or empty
+        if predict is None or low is None or high is None:
+            return
+
+        with contextlib.suppress(TypeError, ValueError):
+            # Skip validation if conversion to array fails or types are incompatible
+            predict = np.asanyarray(predict)
+            low = np.asanyarray(low)
+            high = np.asanyarray(high)
+
+            if predict.size == 0 or low.size == 0 or high.size == 0:
+                return
+
+            # Check for numeric types
+            if not (
+                np.issubdtype(predict.dtype, np.number)
+                and np.issubdtype(low.dtype, np.number)
+                and np.issubdtype(high.dtype, np.number)
+            ):
+                return
+
+            # Check low <= high
+            if not np.all(low <= high):
+                warnings.warn(
+                    "Prediction interval invariant violated: low > high. This indicates an issue with the underlying estimator.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
+            # Check low <= predict <= high
+            # Allow small floating point tolerance
+            epsilon = 1e-9
+            above_low = (low - epsilon <= predict) if check_low else True
+            below_high = (predict <= high + epsilon) if check_high else True
+            if not np.all(np.logical_and(above_low, below_high)):
+                warnings.warn(
+                    "Prediction invariant violated: predict not in [low, high]. This may indicate poor calibration or inconsistent point predictions.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
+    # Public alias for testing
+    validate_prediction_result = _validate_prediction_result
+
+    def predict_internal(self, *args, **kwargs) -> Any:
+        """Public alias for internal predict implementation."""
+        return self._predict_impl(*args, **kwargs)
+
+    def _predict_impl(
+        self,
+        x,
+        threshold=None,
+        low_high_percentiles=(5, 95),
+        classes=None,
+        bins=None,
+        feature=None,
+        **kwargs,
+    ):
+        """Backwards-compatible alias for predict_impl."""
+        return self.predict_impl(
+            x,
+            threshold=threshold,
+            low_high_percentiles=low_high_percentiles,
+            classes=classes,
+            bins=bins,
+            feature=feature,
+            **kwargs,
+        )
+
+    def predict_impl(
+        self,
+        x,
+        threshold=None,
+        low_high_percentiles=(5, 95),
+        classes=None,
+        bins=None,
+        feature=None,
+        interval_summary=None,
+        **kwargs,
+    ):
+        """Execute the internal prediction method for classification and regression cases.
+
+        For classification:
+        - Returns probabilities and intervals for binary/multiclass
+        - Handles Mondrian categories via bins parameter
+
+        For regression:
+        - Returns predictions and uncertainty intervals
+        - Can return probability predictions when threshold is provided (probabilistic regression)
+
+        Parameters
+        ----------
+        x : A set of test objects to predict
+        threshold : float, int or array-like of shape (n_samples,), default=None
+            values for which p-values should be returned. Only used for probabilistic regression
+            (also called thresholded regression). Returns P(y <= threshold) probabilities.
+        low_high_percentiles : a tuple of floats, default=(5, 95)
+            The low and high percentile used to calculate the interval. Applicable to regression.
+        classes : None or array-like of shape (n_samples,), default=None
+            The classes predicted for the original instance. None if not multiclass or regression.
+
+        Raises
+        ------
+        ValueError: The length of the threshold-parameter must be either a constant or the same as the number of
+            instances in x.
+
+        Returns
+        -------
+        predict : ndarray of shape (n_samples,)
+            The prediction for the test data. For classification, this is the selected summary of the
+            Venn-Abers interval (regularized mean by default) for the positive class. For regression,
+            this is the median prediction from the ConformalPredictiveSystem.
+        low : ndarray of shape (n_samples,)
+            The lower bound of the prediction interval. For classification, this is derived using
+            VennAbers. For regression, this is the lower percentile given as parameter, derived from the
+            ConformalPredictiveSystem.
+        high : ndarray of shape (n_samples,)
+            The upper bound of the prediction interval. For classification, this is derived using
+            VennAbers. For regression, this is the upper percentile given as parameter, derived from the
+            ConformalPredictiveSystem.
+        classes : ndarray of shape (n_samples,)
+            The classes predicted for the original instance. None if not multiclass or regression.
+        bins : array-like of shape (n_samples,), default=None
+            Mondrian categories
+        """
+        # strip plotting-only keys that callers may pass
+        kwargs.pop("show", None)
+        kwargs.pop("style_override", None)
+        if bins is not None:
+            bins = np.asarray(bins)
+        if not self.explainer.initialized:
+            raise NotFittedError("The learner must be initialized before calling predict.")
+        interval_summary = coerce_interval_summary(
+            interval_summary if interval_summary is not None else self.explainer.interval_summary
+        )
+        if feature is None and self.explainer.is_fast():
+            feature = self.explainer.num_features  # Use the calibrator defined using x_cal
+        if self.explainer.mode == "classification":
+            if threshold is not None:
+                raise ValidationError(
+                    "The threshold parameter is only supported for mode='regression'.",
+                    details={
+                        "param": "threshold",
+                        "mode": self.explainer.mode,
+                        "surface": "PredictionOrchestrator.predict",
+                    },
+                )
+            if self.explainer.is_multiclass():
+                if self.explainer.is_fast():
+                    predict, low, high, new_classes = self.explainer.interval_learner[
+                        feature
+                    ].predict_proba(
+                        x,
+                        output_interval=True,
+                        classes=classes,
+                        bins=bins,
+                        interval_summary=interval_summary,
+                    )
+                else:
+                    predict, low, high, new_classes = self.explainer.interval_learner.predict_proba(
+                        x,
+                        output_interval=True,
+                        classes=classes,
+                        bins=bins,
+                        interval_summary=interval_summary,
+                    )
+                if classes is None:
+                    return (
+                        np.array([predict[i, c] for i, c in enumerate(new_classes)]),
+                        np.array([low[i, c] for i, c in enumerate(new_classes)]),
+                        np.array([high[i, c] for i, c in enumerate(new_classes)]),
+                        new_classes,
+                    )
+                if type(classes) not in (list, np.ndarray):
+                    classes = [classes]
+                return np.array([predict[i, c] for i, c in enumerate(classes)]), low, high, None
+
+            if self.explainer.is_fast():
+                predict, low, high = self.explainer.interval_learner[feature].predict_proba(
+                    x, output_interval=True, bins=bins, interval_summary=interval_summary
+                )
+            else:
+                predict, low, high = self.explainer.interval_learner.predict_proba(
+                    x, output_interval=True, bins=bins, interval_summary=interval_summary
+                )
+            return predict[:, 1], low, high, None
+        if "regression" in self.explainer.mode:
+            # pylint: disable=unexpected-keyword-arg, no-value-for-parameter
+            if threshold is None:  # normal regression
+                if not (low_high_percentiles[0] <= low_high_percentiles[1]):  # pylint: disable=superfluous-parens
+                    raise ValidationError(
+                        "The low percentile must be smaller than (or equal to) the high percentile."
+                    )
+                if not (
+                    (
+                        (low_high_percentiles[0] > 0 and low_high_percentiles[0] <= 50)
+                        and (low_high_percentiles[1] >= 50 and low_high_percentiles[1] < 100)
+                    )
+                    or low_high_percentiles[0] == -np.inf
+                    or low_high_percentiles[1] == np.inf
+                    and not (
+                        low_high_percentiles[0] == -np.inf and low_high_percentiles[1] == np.inf
+                    )
+                ):
+                    raise ValidationError(
+                        "The percentiles must be between 0 and 100 (exclusive). \
+                            The lower percentile can be -np.inf and the higher percentile can \
+                            be np.inf (but not at the same time) to allow one-sided intervals."
+                    )
+                low = (
+                    [low_high_percentiles[0], 50]
+                    if low_high_percentiles[0] != -np.inf
+                    else [50, 50]
+                )
+                high = (
+                    [low_high_percentiles[1], 50] if low_high_percentiles[1] != np.inf else [50, 50]
+                )
+
+                try:
+                    if self.explainer.is_fast():
+                        return self.explainer.interval_learner[feature].predict_uncertainty(
+                            x, low_high_percentiles, bins=bins
+                        )
+                    return self.explainer.interval_learner.predict_uncertainty(
+                        x, low_high_percentiles, bins=bins
+                    )
+                except:  # pylint: disable=bare-except
+                    # typically crepes broadcasting/shape errors
+                    # Use bare except + sys.exc_info to avoid catching 'Exception' explicitly (ADR-002)
+                    exc = sys.exc_info()[1]
+                    if not isinstance(exc, Exception):
+                        raise
+
+                    if self.explainer.suppress_crepes_errors:
+                        # Log and return placeholder arrays (caller should handle downstream)
+                        # Emit a UserWarning only when fallback chains are enabled
+                        # (tests opt-in via the `enable_fallbacks` fixture which
+                        # deletes the env var set by the disable fixture). When
+                        # fallbacks remain disabled we log info instead to avoid
+                        # triggering the runtime fallback enforcement.
+                        if self._config_env("CE_INTERVAL_PLUGIN_FALLBACKS") is None:
+                            warnings.warn(
+                                "crepes produced an unexpected result (likely too-small calibration set); returning zeros as a degraded fallback.",
+                                UserWarning,
+                                stacklevel=2,
+                            )
+                        else:
+                            self._logger.info(
+                                "crepes produced an unexpected result (likely too-small calibration set); returning zeros as a degraded result: %s",
+                                exc,
+                            )
+                        n = x.shape[0]
+                        # produce zero-length or zero arrays consistent with expected shape
+                        return np.zeros(n), np.zeros(n), np.zeros(n), None
+                    # Preserve prior behavior: re-raise the original exception so callers/tests
+                    # see the original error (instead of converting it to DataShapeError).
+                    raise
+
+            # regression with threshold condition
+            assert_threshold(threshold, x)
+            try:
+                if self.explainer.is_fast():
+                    return self.explainer.interval_learner[feature].predict_probability(
+                        x, threshold, bins=bins, interval_summary=interval_summary
+                    )
+                # pylint: disable=unexpected-keyword-arg
+                return self.explainer.interval_learner.predict_probability(
+                    x, threshold, bins=bins, interval_summary=interval_summary
+                )
+            except:  # noqa: E722 - ADR-002: Use bare except + sys.exc_info to avoid catching 'Exception' explicitly
+                exc = sys.exc_info()[1]
+                if not isinstance(exc, Exception):
+                    raise
+
+                if self.explainer.suppress_crepes_errors:
+                    if self._config_env("CE_INTERVAL_PLUGIN_FALLBACKS") is None:
+                        warnings.warn(
+                            "crepes produced an unexpected result while computing probabilities; returning zeros as a degraded fallback.",
+                            UserWarning,
+                            stacklevel=2,
+                        )
+                    else:
+                        self._logger.info(
+                            "crepes produced an unexpected result while computing probabilities; returning zeros as a degraded result: %s",
+                            exc,
+                        )
+                    n = x.shape[0]
+                    return np.zeros(n), np.zeros(n), np.zeros(n), None
+                # Re-raise as a clearer DataShapeError with guidance
+                raise DataShapeError(
+                    "Error while computing prediction intervals from the underlying crepes library. "
+                    "This commonly occurs when the calibration set is too small for the requested "
+                    "percentiles. Consider using a larger calibration set, or instantiate the "
+                    "explainer with suppress_crepes_errors=True to return a degraded fallback. "
+                    f"(original error: {exc})"
+                ) from exc
+
+        return None, None, None, None  # Should never happen
+
+    def ensure_interval_runtime_state(self) -> None:
+        """Ensure interval tracking members exist for legacy instances."""
+        if not self.explainer.plugin_manager.interval_plugin_hints:
+            self.explainer.plugin_manager.interval_plugin_hints = {}
+        if not self.explainer.plugin_manager.interval_plugin_fallbacks:
+            self.explainer.plugin_manager.interval_plugin_fallbacks = {}
+        if not self.explainer.plugin_manager.interval_plugin_identifiers:
+            self.explainer.plugin_manager.interval_plugin_identifiers = {
+                "default": None,
+                "fast": None,
+            }
+        if not self.explainer.plugin_manager.telemetry_interval_sources:
+            self.explainer.plugin_manager.telemetry_interval_sources = {
+                "default": None,
+                "fast": None,
+            }
+        if not self.explainer.plugin_manager.interval_preferred_identifier:
+            self.explainer.plugin_manager.interval_preferred_identifier = {
+                "default": None,
+                "fast": None,
+            }
+        if not self.explainer.plugin_manager.interval_context_metadata:
+            self.explainer.plugin_manager.interval_context_metadata = {"default": {}, "fast": {}}
+
+    def gather_interval_hints(self, *, fast: bool) -> Tuple[str, ...]:
+        """Return interval dependency hints collected from explanation plugins."""
+        if fast:
+            return self.explainer.plugin_manager.interval_plugin_hints.get("fast", ())
+        ordered: List[str] = []
+        seen: set[str] = set()
+        for mode in ("factual", "alternative"):
+            for identifier in self.explainer.plugin_manager.interval_plugin_hints.get(mode, ()):  # noqa: B020
+                if identifier not in seen:
+                    ordered.append(identifier)
+                    seen.add(identifier)
+        return tuple(ordered)
+
+    def check_interval_runtime_metadata(
+        self,
+        metadata: Mapping[str, Any] | None,
+        *,
+        identifier: str | None,
+        fast: bool,
+    ) -> str | None:
+        """Validate interval plugin metadata for the current execution."""
+        return check_interval_runtime_metadata(
+            metadata,
+            identifier=identifier,
+            fast=fast,
+            mode=self.explainer.mode,
+            bins=self.explainer.bins,
+        )
+
+    def _record_interval_calibration_features(
+        self,
+        *,
+        context: IntervalCalibratorContext,
+        fast: bool,
+    ) -> None:
+        """Capture the calibration feature matrix used to build the active interval learner."""
+        calibration_splits = getattr(context, "calibration_splits", ())
+        if not calibration_splits:
+            return
+        try:
+            features = calibration_splits[0][0]
+        except (IndexError, TypeError):  # pragma: no cover - defensive
+            return
+        if features is None:
+            return
+        key = "fast" if fast else "default"
+        self._interval_calibration_features[key] = np.asarray(features).copy()
+
+    def set_interval_calibration_snapshot(
+        self, features: np.ndarray, *, fast: bool = False
+    ) -> None:
+        """Directly set the calibration-feature snapshot for a given mode.
+
+        Intended for testing and controlled recalibration scenarios.  For normal
+        calibration workflows use ``refresh_interval_calibration_snapshot`` or
+        ``obtain_interval_calibrator`` instead.
+        """
+        key = "fast" if fast else "default"
+        self._interval_calibration_features[key] = np.asarray(features).copy()
+
+    def record_interval_calibration_features(
+        self,
+        *,
+        context: "IntervalCalibratorContext",
+        fast: bool,
+    ) -> None:
+        """Public entry-point for capturing the calibration feature snapshot.
+
+        Delegates to the internal implementation.  Exposed so tests can call
+        this without private-member access.
+        """
+        self._record_interval_calibration_features(context=context, fast=fast)
+
+    def get_interval_calibration_features(self, *, fast: bool | None = None) -> np.ndarray | None:
+        """Return the feature matrix used to initialize the active interval learner.
+
+        Parameters
+        ----------
+        fast : bool or None, optional
+            When ``None`` (default) the current ``explainer.is_fast()`` state is
+            used to determine the key.  Pass ``True`` or ``False`` to query a
+            specific mode explicitly.
+
+        Returns
+        -------
+        np.ndarray or None
+            The calibration feature matrix snapshot recorded when the active
+            interval learner was last built, or ``None`` if no snapshot exists
+            yet for the requested mode.  No cross-key fallback is applied: if
+            the requested mode key is absent the method returns ``None``.
+        """
+        if fast is None:
+            is_fast = getattr(self.explainer, "is_fast", None)
+            if callable(is_fast):
+                with contextlib.suppress(TypeError):
+                    fast = bool(is_fast())
+            if fast is None:
+                fast = bool(is_fast) if is_fast is not None else False
+
+        key = "fast" if fast else "default"
+        return self._interval_calibration_features.get(key)
+
+    def refresh_interval_calibration_snapshot(self) -> None:
+        """Refresh the calibration-feature snapshot from the current ``explainer.x_cal``.
+
+        Call this after in-place interval learner updates (e.g. regression
+        ``insert_calibration``) so that guarded entrypoints see the up-to-date
+        calibration data rather than the stale pre-update snapshot recorded at
+        the time the learner was last built via ``obtain_interval_calibrator``.
+
+        Notes
+        -----
+        Only the ``"default"`` (non-fast) key is refreshed.  Fast mode does not
+        go through this update path and is not supported by guarded entrypoints.
+        """
+        x_cal = getattr(self.explainer, "x_cal", None)
+        if x_cal is None:
+            return
+        self._interval_calibration_features["default"] = np.asarray(x_cal).copy()
+
+    def resolve_interval_plugin(
+        self,
+        *,
+        fast: bool,
+        hints: Sequence[str] = (),
+    ) -> Tuple[Any, str | None]:
+        """Resolve the interval plugin for the requested execution path."""
+        raw_override = (
+            self.explainer.plugin_manager.fast_interval_plugin_override
+            if fast
+            else self.explainer.plugin_manager.interval_plugin_override
+        )
+        coerced_override = self.explainer.plugin_manager.coerce_plugin_override(raw_override)
+        if coerced_override is not None and not isinstance(coerced_override, str):
+            identifier = getattr(coerced_override, "plugin_meta", {}).get("name")
+            return coerced_override, identifier
+
+        plugin, identifier = self.explainer.plugin_manager.resolve_interval_plugin(
+            fast=fast,
+            hints=hints,
+            runtime_validator=self.check_interval_runtime_metadata,
+        )
+
+        plugin = self.explainer.explanation_orchestrator.instantiate_plugin(plugin)
+        return plugin, identifier
+
+    def build_interval_context(
+        self,
+        *,
+        fast: bool,
+        metadata: Mapping[str, Any],
+        plugin: Any | None = None,
+        identifier: str | None = None,
+    ) -> IntervalCalibratorContext:
+        """Construct an immutable interval context with mutable plugin scratch state."""
+        calibration_splits: Tuple[Any, ...] = ((self.explainer.x_cal, self.explainer.y_cal),)
+        bins = {"calibration": self.explainer.bins}
+        difficulty = {"estimator": self.explainer.difficulty_estimator}
+        fast_flags = {"fast": fast}
+        residuals: Mapping[str, Any] = {}
+        key = "fast" if fast else "default"
+        stored_metadata = dict(self.explainer.plugin_manager.interval_context_metadata.get(key, {}))
+        enriched_metadata = stored_metadata
+        enriched_metadata.update(metadata)
+        # The mode changes via `set_mode` and the predict function is rebound by
+        # `reinitialize`/`set_mode`. Overwrite any cached value unless the caller
+        # supplied one explicitly.
+        current = {
+            "task": self.explainer.mode,
+            "mode": self.explainer.mode,
+            "predict_function": getattr(self.explainer, "predict_function", None),
+        }
+        for name, value in current.items():
+            if name not in metadata:
+                enriched_metadata[name] = value
+        # Difficulty estimator can be updated post-init via `set_difficulty_estimator`.
+        # Always overwrite any cached value so interval plugins see the current estimator.
+        enriched_metadata["difficulty_estimator"] = self.explainer.difficulty_estimator
+        enriched_metadata.setdefault("explainer", self.explainer)
+        enriched_metadata.setdefault(
+            "categorical_features", tuple(self.explainer.categorical_features)
+        )
+        enriched_metadata.setdefault("num_features", self.explainer.num_features)
+        enriched_metadata.setdefault(
+            "noise_config",
+            {
+                "noise_type": getattr(self.explainer, "noise_type", None),
+                "scale_factor": getattr(self.explainer, "scale_factor", None),
+                "severity": getattr(self.explainer, "severity", None),
+                "seed": getattr(self.explainer, "seed", None),
+                "rng": getattr(self.explainer, "rng", None),
+            },
+        )
+        if fast:
+            existing_fast = enriched_metadata.get("existing_fast_calibrators")
+            if not existing_fast:
+                stored_fast = stored_metadata.get("fast_calibrators") or stored_metadata.get(
+                    "existing_fast_calibrators"
+                )
+                if stored_fast:
+                    existing_fast = stored_fast
+            if not existing_fast and is_fast_interval_collection(self.explainer.interval_learner):
+                existing_fast = tuple(self.explainer.interval_learner)
+            if existing_fast:
+                enriched_metadata["existing_fast_calibrators"] = tuple(existing_fast)
+        # Freeze nested metadata values for safety and keep the top-level
+        # metadata as an immutable mapping; plugins that need transient state
+        # should use ``plugin_state`` instead.
+        metadata_for_plugins = {
+            key: _freeze_context_value(value) for key, value in enriched_metadata.items()
+        }
+        plugin_config = (
+            self.explainer.plugin_manager.bind_plugin_config(
+                identifier,
+                plugin,
+                getattr(plugin, "plugin_meta", None),
+            )
+            if plugin is not None and identifier is not None
+            else {}
+        )
+        return IntervalCalibratorContext(
+            learner=self.explainer.learner,
+            calibration_splits=calibration_splits,
+            bins=_freeze_context_mapping(bins),
+            residuals=_freeze_context_mapping(residuals),
+            difficulty=_freeze_context_mapping(difficulty),
+            metadata=metadata_for_plugins,
+            fast_flags=_freeze_context_mapping(fast_flags),
+            plugin_config=plugin_config,
+        )
+
+    def obtain_interval_calibrator(
+        self,
+        *,
+        fast: bool,
+        metadata: Mapping[str, Any],
+    ) -> Tuple[Any, str | None]:
+        """Resolve and instantiate the interval calibrator for the active mode."""
+        self.ensure_interval_runtime_state()
+        hints = self.gather_interval_hints(fast=fast)
+        with logging_context(
+            explainer_id=getattr(self.explainer, "id", None),
+        ):
+            plugin, identifier = self.resolve_interval_plugin(fast=fast, hints=hints)
+            with logging_context(plugin_identifier=identifier):
+                context = self.build_interval_context(
+                    fast=fast,
+                    metadata=metadata,
+                    plugin=plugin,
+                    identifier=identifier,
+                )
+                try:
+                    calibrator = plugin.create(context, fast=fast)
+                except:  # noqa: E722
+                    if not isinstance(sys.exc_info()[1], Exception):
+                        raise
+                    exc = sys.exc_info()[1]
+                    raise ConfigurationError(
+                        f"Interval plugin execution failed for {'fast' if fast else 'default'} mode: {exc}"
+                    ) from exc
+                self.validate_interval_calibrator(
+                    calibrator=calibrator,
+                    context=context,
+                    identifier=identifier,
+                    fast=fast,
+                    plugin=plugin,
+                )
+        self.capture_interval_calibrators(
+            context=context,
+            calibrator=calibrator,
+            fast=fast,
+        )
+        self._record_interval_calibration_features(context=context, fast=fast)
+        key = "fast" if fast else "default"
+        self.explainer.plugin_manager.interval_plugin_identifiers[key] = identifier
+        self.explainer.plugin_manager.telemetry_interval_sources[key] = identifier
+        metadata_dict = dict(context.metadata)
+        if fast:
+            if isinstance(calibrator, FastIntervalCalibrator):
+                calibrators_tuple = calibrator.calibrators
+            elif isinstance(calibrator, Sequence) and not isinstance(calibrator, (str, bytes)):
+                calibrators_tuple = tuple(calibrator)
+            else:
+                calibrators_tuple = (calibrator,)
+            metadata_dict["fast_calibrators"] = calibrators_tuple
+            metadata_dict["existing_fast_calibrators"] = calibrators_tuple
+        else:
+            metadata_dict["calibrator"] = calibrator
+        # persist captured metadata for future invocations without sharing references
+        self.explainer.plugin_manager.interval_context_metadata[key] = dict(metadata_dict)
+        return calibrator, identifier
+
+    def capture_interval_calibrators(
+        self,
+        *,
+        context: IntervalCalibratorContext,
+        calibrator: Any,
+        fast: bool,
+    ) -> None:
+        """Record the returned calibrator inside the interval context metadata."""
+        plugin_state = getattr(context, "plugin_state", None)
+        if not isinstance(plugin_state, MutableMapping):  # pragma: no cover - defensive
+            return
+
+        if fast:
+            if isinstance(calibrator, Sequence) and not isinstance(
+                calibrator, (str, bytes, bytearray)
+            ):
+                plugin_state.setdefault("fast_calibrators", tuple(calibrator))
+            elif calibrator is not None:
+                plugin_state.setdefault("fast_calibrators", (calibrator,))
+        else:
+            plugin_state.setdefault("calibrator", calibrator)
+
+    def validate_interval_calibrator(
+        self,
+        *,
+        calibrator: Any,
+        context: IntervalCalibratorContext,
+        identifier: str | None,
+        fast: bool,
+        plugin: Any = None,
+    ) -> None:
+        """Validate interval calibrator protocol conformance.
+
+        Skips validation for untrusted plugins (they can return anything).
+        Enforces protocol compliance for trusted plugins and builtins.
+        """
+        # Check if plugin is untrusted - if so, skip protocol validation
+        if plugin is not None:
+            plugin_meta = getattr(plugin, "plugin_meta", {})
+            is_trusted = plugin_meta.get("trusted", True)
+            if not is_trusted:
+                # Untrusted plugins can return anything
+                return
+
+        task = str(context.metadata.get("task") or context.metadata.get("mode") or "")
+        expected = (
+            RegressionIntervalCalibrator
+            if "regression" in task
+            else ClassificationIntervalCalibrator
+        )
+
+        # For FAST mode: allow Sequence, FastIntervalCalibrator, or protocol-compliant single objects
+        if fast:
+            if calibrator is None:
+                mode = "fast"
+                label = (
+                    identifier or getattr(calibrator, "plugin_meta", {}).get("name") or "<unknown>"
+                )
+                raise ConfigurationError(
+                    f"Interval plugin '{label}' returned None for {mode} mode."
+                )
+
+            # Accept FastIntervalCalibrator or Sequence (validate items now)
+            if isinstance(calibrator, (FastIntervalCalibrator, list, tuple)):
+                # Deep validation: check each item in the sequence
+                for idx, item in enumerate(calibrator):
+                    if not isinstance(item, expected):
+                        mode = "fast"
+                        label = f"{identifier or '<unknown>'}[{idx}]"
+                        expected_name = expected.__name__
+                        actual = type(item).__name__
+                        raise ConfigurationError(
+                            f"Interval calibrator at index {idx} in '{label}' is non-compliant for {mode} mode "
+                            f"(expected {expected_name}, got {actual})."
+                        )
+                    self._validate_interval_output_sample(
+                        calibrator=item,
+                        context=context,
+                        identifier=f"{identifier or '<unknown>'}[{idx}]",
+                    )
+                return
+
+            # Also accept protocol-compliant single objects
+            if isinstance(calibrator, expected):
+                self._validate_interval_output_sample(
+                    calibrator=calibrator,
+                    context=context,
+                    identifier=identifier,
+                )
+                return
+
+            # Otherwise it's invalid
+            mode = "fast"
+            label = identifier or getattr(calibrator, "plugin_meta", {}).get("name") or "<unknown>"
+            expected_name = f"FastIntervalCalibrator | Sequence[{expected.__name__}]"
+            actual = type(calibrator).__name__
+            raise ConfigurationError(
+                f"Interval plugin '{label}' returned a non-compliant calibrator for {mode} mode "
+                f"(expected {expected_name}, got {actual})."
+            )
+        else:
+            # For non-FAST mode: single protocol-compliant calibrator
+            if calibrator is None or not isinstance(calibrator, expected):
+                label = (
+                    identifier or getattr(calibrator, "plugin_meta", {}).get("name") or "<unknown>"
+                )
+                mode = "default"
+                expected_name = expected.__name__
+                actual = type(calibrator).__name__ if calibrator is not None else "None"
+                raise ConfigurationError(
+                    f"Interval plugin '{label}' returned a non-compliant calibrator for {mode} mode "
+                    f"(expected {expected_name}, got {actual})."
+                )
+            self._validate_interval_output_sample(
+                calibrator=calibrator,
+                context=context,
+                identifier=identifier,
+            )
+
+    def _validate_interval_output_sample(
+        self,
+        *,
+        calibrator: Any,
+        context: IntervalCalibratorContext,
+        identifier: str | None,
+    ) -> None:
+        """Validate a cheap probability sample for VennAbers-style calibrators."""
+        predict_proba = getattr(calibrator, "predict_proba", None)
+        if predict_proba is None:
+            return
+        try:
+            params = inspect.signature(predict_proba).parameters
+        except (TypeError, ValueError):
+            return
+        if "output_interval" not in params:
+            return
+        if not context.calibration_splits:
+            return
+        try:
+            validation_x = context.calibration_splits[0][0]
+        except (IndexError, TypeError):
+            return
+
+        kwargs: dict[str, Any] = {"output_interval": False}
+        if "bins" in params:
+            bins = context.bins.get("calibration")
+            if bins is not None:
+                kwargs["bins"] = bins
+        result = predict_proba(validation_x, **kwargs)
+        validate_interval_calibrator_output(
+            result,
+            context,
+            identifier=identifier,
+            output_interval=False,
+        )

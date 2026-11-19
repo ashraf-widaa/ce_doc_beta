@@ -1,0 +1,624 @@
+"""Tests for the narrative plot plugin."""
+
+from types import SimpleNamespace
+
+import numpy as np
+import pytest
+from sklearn.datasets import load_diabetes, load_iris
+from sklearn.ensemble import RandomForestClassifier, RandomForestRegressor
+from sklearn.model_selection import train_test_split
+
+from calibrated_explanations import CalibratedExplainer, WrapCalibratedExplainer
+from calibrated_explanations.viz import NarrativePlotPlugin
+from calibrated_explanations.utils.exceptions import SerializationError, ValidationError
+from calibrated_explanations.core.narrative_generator import NarrativeGenerator, load_template_file
+
+
+# Fixtures for test data and models
+@pytest.fixture
+def iris_data():
+    """Load and split iris dataset."""
+    x, y = load_iris(return_X_y=True)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+    return x_train, x_test, y_train, y_test
+
+
+@pytest.fixture
+def diabetes_data():
+    """Load and split diabetes dataset."""
+    x, y = load_diabetes(return_X_y=True)
+    x_train, x_test, y_train, y_test = train_test_split(x, y, test_size=0.3, random_state=42)
+    return x_train, x_test, y_train, y_test
+
+
+@pytest.fixture
+def classification_explainer(iris_data):
+    """Create a classification explainer."""
+    x_train, x_test, y_train, y_test = iris_data
+    # Use binary classification (classes 0 and 1 only)
+    mask = y_train < 2
+    x_train_binary = x_train[mask]
+    y_train_binary = y_train[mask]
+
+    model = RandomForestClassifier(n_estimators=10, random_state=42)
+    model.fit(x_train_binary, y_train_binary)
+
+    explainer = CalibratedExplainer(
+        model, x_train_binary, y_train_binary, feature_names=[f"feature_{i}" for i in range(4)]
+    )
+    return explainer
+
+
+@pytest.fixture
+def regression_explainer(diabetes_data):
+    """Create a regression explainer."""
+    x_train, x_test, y_train, y_test = diabetes_data
+
+    model = RandomForestRegressor(n_estimators=10, random_state=42)
+    model.fit(x_train, y_train)
+
+    explainer = CalibratedExplainer(
+        model,
+        x_train,
+        y_train,
+        mode="regression",
+        feature_names=[f"feature_{i}" for i in range(10)],
+    )
+    return explainer
+
+
+# Test basic functionality
+
+
+def test_narrative_plugin_with_custom_template():
+    """Test plugin initialization with custom template path."""
+    plugin = NarrativePlotPlugin(template_path="custom_template.yaml")
+    assert plugin.template_path == "custom_template.yaml"
+
+
+def test_narrative_plugin_uses_packaged_yaml_template_by_default():
+    """Test the packaged YAML template remains the documented default."""
+    plugin = NarrativePlotPlugin()
+    assert plugin.template_path.endswith("explain_template.yaml")
+
+
+# Test with regression
+def test_narrative_plugin_regression_factual(regression_explainer, diabetes_data):
+    """Test narrative generation for regression."""
+    _, x_test, _, _ = diabetes_data
+
+    explanations = regression_explainer.explain_factual(x_test[:3])
+
+    plugin = NarrativePlotPlugin()
+    result = plugin.plot(explanations, expertise_level="intermediate", output="dict")
+
+    assert len(result) == 3
+    assert result[0]["problem_type"] == "regression"
+    assert "factual_explanation_intermediate" in result[0]
+
+
+# Test alternative explanations
+def test_narrative_plugin_alternative_explanations(regression_explainer, diabetes_data):
+    """Test narrative generation for alternative explanations."""
+    _, x_test, _, _ = diabetes_data
+
+    explanations = regression_explainer.explore_alternatives(x_test[:2])
+
+    plugin = NarrativePlotPlugin()
+    result = plugin.plot(explanations, expertise_level="beginner", output="dict")
+
+    assert len(result) == 2
+    # Should have alternative_explanation instead of factual_explanation
+    assert "alternative_explanation_beginner" in result[0]
+    assert "factual_explanation_beginner" not in result[0]
+
+
+# Test output formats
+def test_narrative_plugin_dataframe_output(classification_explainer, iris_data):
+    """Test dataframe output format."""
+    pytest.importorskip("pandas")
+
+    _, x_test, _, _ = iris_data
+    x_test_binary = x_test[iris_data[3] < 2][:2]
+
+    explanations = classification_explainer.explain_factual(x_test_binary)
+
+    plugin = NarrativePlotPlugin()
+    result = plugin.plot(explanations, expertise_level="beginner", output="dataframe")
+
+    import pandas as pd
+
+    assert isinstance(result, pd.DataFrame)
+    assert len(result) == 2
+    assert "instance_index" in result.columns
+    assert "factual_explanation_beginner" in result.columns
+
+
+def test_narrative_plugin_text_output(classification_explainer, iris_data):
+    """Test text output format."""
+    _, x_test, _, _ = iris_data
+    x_test_binary = x_test[iris_data[3] < 2][:2]
+
+    explanations = classification_explainer.explain_factual(x_test_binary)
+
+    plugin = NarrativePlotPlugin()
+    result = plugin.plot(explanations, expertise_level="beginner", output="text")
+
+    assert isinstance(result, str)
+    assert "Instance 0" in result
+    assert "Instance 1" in result
+
+
+def test_narrative_generator_emits_caution_and_uncertainty_tags():
+    generator = NarrativeGenerator()
+    generator.templates = {
+        "narrative_templates": {
+            "binary_classification": {
+                "factual": {
+                    "advanced": "\n".join(
+                        [
+                            "Lead: {label} {calibrated_pred}",
+                            "POS {feature_name}: {feature_weight} [{feature_weight_low}, {feature_weight_high}]",
+                            "NEG {feature_name}: {feature_weight} [{feature_weight_low}, {feature_weight_high}]",
+                            "UNC {feature_name}: {feature_weight}",
+                        ]
+                    )
+                }
+            }
+        }
+    }
+    rules_dict = {
+        "rule": ["age >= 30", "income <= 5", "savings >= 1"],
+        "feature": [0, 1, 2],
+        "weight": [0.5, -0.4, 0.2],
+        "weight_low": [0.3, -0.5, -0.1],
+        "weight_high": [0.7, -0.2, 0.6],
+        "value": [42, 3, 2],
+        "predict": [0.65, 0.25, 0.85],
+        "predict_low": [0.60, 0.20, 0.05],
+        "predict_high": [0.70, 0.35, 0.90],
+        "base_predict": [0.8],
+        "base_predict_low": [0.1],
+        "base_predict_high": [0.95],
+        "classes": 1,
+    }
+    explanation = SimpleNamespace(
+        get_rules=lambda: rules_dict,
+        get_class_labels=lambda: {1: "Positive"},
+    )
+
+    narrative = generator.generate_narrative(
+        explanation,
+        problem_type="binary_classification",
+        explanation_type="factual",
+        expertise_level="advanced",
+        feature_names=["age", "income", "savings"],
+    )
+
+    assert narrative.startswith("[!] Use caution")
+    assert "POS age" in narrative
+    assert "NEG income" in narrative
+    assert "UNC savings" in narrative
+    assert "[!] highly uncertain" in narrative
+    assert "[!] direction uncertain" in narrative
+
+
+def test_load_template_file_validates_format(tmp_path):
+    bad_json = tmp_path / "template.json"
+    bad_json.write_text("{broken", encoding="utf-8")
+
+    with pytest.raises(SerializationError):
+        load_template_file(str(bad_json))
+
+    bad_format = tmp_path / "template.txt"
+    bad_format.write_text("noop", encoding="utf-8")
+
+    with pytest.raises(SerializationError):
+        load_template_file(str(bad_format))
+
+
+def test_load_template_file_requires_yaml_dependency(tmp_path, monkeypatch):
+    yaml_file = tmp_path / "template.yaml"
+    yaml_file.write_text("key: value", encoding="utf-8")
+
+    import calibrated_explanations.core.narrative_generator as generator_module
+
+    monkeypatch.setattr(generator_module, "yaml", None)
+
+    with pytest.raises(SerializationError):
+        load_template_file(str(yaml_file))
+
+
+def test_narrative_plugin_html_output(classification_explainer, iris_data):
+    """Test HTML output format."""
+    _, x_test, _, _ = iris_data
+    x_test_binary = x_test[iris_data[3] < 2][:2]
+
+    explanations = classification_explainer.explain_factual(x_test_binary)
+
+    plugin = NarrativePlotPlugin()
+    result = plugin.plot(explanations, expertise_level="beginner", output="html")
+
+    assert isinstance(result, str)
+    assert "<table" in result
+    assert "</table>" in result
+    assert "instance_index" in result.lower()
+
+
+def test_should_escape_markup_when_feature_label_contains_html():
+    """User-supplied labels are HTML-escaped in html output only (#222)."""
+    # Arrange
+    rng = np.random.default_rng(0)
+    x = rng.random((160, 2))
+    x[:, 1] = (x[:, 1] > 0.5).astype(float)
+    y = ((x[:, 0] + x[:, 1]) > 1.0).astype(int)
+    feature_name = "<img src=x onerror=alert(1)>"
+    categorical_value = '<b>"on"</b>'
+    class_label = "pos&'q'"
+    wrapper = WrapCalibratedExplainer(RandomForestClassifier(n_estimators=10, random_state=0))
+    wrapper.fit(x[:80], y[:80])
+    wrapper.calibrate(
+        x[80:150],
+        y[80:150],
+        feature_names=[feature_name, "b&c"],
+        categorical_features=[1],
+        categorical_labels={1: {0: "off", 1: categorical_value}},
+        class_labels={0: "<i>neg</i>", 1: class_label},
+    )
+    explanations = wrapper.explain_factual(x[150:152])
+
+    # Act
+    html_out = explanations.to_narrative(output_format="html", expertise_level="beginner")
+    text_out = explanations.to_narrative(output_format="text", expertise_level="beginner")
+
+    # Assert
+    for raw in (feature_name, categorical_value, class_label, "b&c"):
+        assert raw not in html_out
+        assert raw in text_out
+    for escaped in (
+        "&lt;img src=x onerror=alert(1)&gt;",
+        "&lt;b&gt;&quot;on&quot;&lt;/b&gt;",
+        "pos&amp;&#x27;q&#x27;",
+        "b&amp;c",
+    ):
+        assert escaped in html_out
+    assert "<br>" in html_out
+    assert "&lt;br&gt;" not in html_out
+
+
+# Test error handling
+def test_narrative_plugin_invalid_expertise_level(classification_explainer, iris_data):
+    """Test error handling for invalid expertise level."""
+
+    _, x_test, _, _ = iris_data
+    x_test_binary = x_test[iris_data[3] < 2][:1]
+
+    explanations = classification_explainer.explain_factual(x_test_binary)
+
+    plugin = NarrativePlotPlugin()
+
+    with pytest.raises(ValidationError, match="Invalid expertise level"):
+        plugin.plot(
+            explanations,
+            expertise_level="expert",  # Invalid level
+            output="dict",
+        )
+
+
+def test_narrative_plugin_invalid_output_format(classification_explainer, iris_data):
+    """Test error handling for invalid output format."""
+
+    _, x_test, _, _ = iris_data
+    x_test_binary = x_test[iris_data[3] < 2][:1]
+
+    explanations = classification_explainer.explain_factual(x_test_binary)
+
+    plugin = NarrativePlotPlugin()
+
+    with pytest.raises(ValidationError, match="Invalid output format"):
+        plugin.plot(
+            explanations,
+            expertise_level="beginner",
+            output="json",  # Invalid format
+        )
+
+
+def test_narrative_plugin_missing_pandas_for_dataframe(
+    classification_explainer, iris_data, monkeypatch
+):
+    """Test error when pandas is not available for dataframe output."""
+    from calibrated_explanations.viz import narrative_plugin
+
+    # Simulate pandas not being available
+    monkeypatch.setattr(narrative_plugin, "_PANDAS_AVAILABLE", False)
+
+    _, x_test, _, _ = iris_data
+    x_test_binary = x_test[iris_data[3] < 2][:2]
+
+    explanations = classification_explainer.explain_factual(x_test_binary)
+
+    with pytest.raises(ImportError, match="Pandas is required"):
+        explanations.plot(style="narrative", output="dataframe")
+
+
+# Test integration with explanations.plot()
+def test_narrative_via_explanations_plot(classification_explainer, iris_data):
+    """Test calling narrative plugin via explanations.plot() method."""
+    _, x_test, _, _ = iris_data
+    x_test_binary = x_test[iris_data[3] < 2][:2]
+
+    explanations = classification_explainer.explain_factual(x_test_binary)
+
+    result = explanations.plot(style="narrative", expertise_level="beginner", output="dict")
+
+    assert isinstance(result, list)
+    assert len(result) == 2
+    assert "factual_explanation_beginner" in result[0]
+
+
+# Test feature names
+
+
+# Test with multiple expertise levels as tuple
+
+
+# Test edge cases
+
+
+def test_narrative_plugin_template_fallback(enable_fallbacks, tmp_path, monkeypatch):
+    """Ensure missing templates fall back to the default path.
+
+    This test explicitly validates template fallback behavior.
+    """
+    default_template = tmp_path / "templates" / "explain_template.yaml"
+    default_template.parent.mkdir(parents=True, exist_ok=True)
+    default_template.write_text("stub", encoding="utf-8")
+
+    captured = {}
+
+    class FakeNarrator:
+        def __init__(self, template):
+            captured["template"] = template
+
+        def generate_narrative(
+            self,
+            explanation,
+            problem_type,
+            explanation_type,
+            expertise_level,
+            threshold,
+            feature_names,
+        ):
+            return f"{explanation_type}:{expertise_level}:{problem_type}"
+
+    monkeypatch.setattr(
+        NarrativePlotPlugin,
+        "_get_default_template_path",
+        staticmethod(lambda: str(default_template)),
+    )
+    monkeypatch.setattr(
+        "calibrated_explanations.viz.narrative_plugin.NarrativeGenerator",
+        FakeNarrator,
+    )
+
+    class StubExplainer:
+        def __init__(self):
+            self.mode = "classification"
+            self.explainer = SimpleNamespace(feature_names=["f0"])
+
+        def is_multiclass(self):
+            return False
+
+    explanations = SimpleNamespace(
+        explanations=[SimpleNamespace(y_threshold=None)],
+        calibrated_explainer=StubExplainer(),
+        y_threshold=None,
+    )
+    plugin = NarrativePlotPlugin()
+    with pytest.warns(UserWarning, match=r"fall.*back|template"):
+        result = plugin.plot(explanations, template_path="missing.yaml", output="dict")
+
+    assert captured["template"] == str(default_template)
+    assert result[0]["problem_type"] == "binary_classification"
+    assert "factual_explanation_beginner" in result[0]
+
+
+def test_narrative_plugin_absolute_template_fallback(enable_fallbacks, tmp_path, monkeypatch):
+    """Ensure missing absolute template paths fall back to the default path."""
+    default_template = tmp_path / "templates" / "explain_template.yaml"
+    default_template.parent.mkdir(parents=True, exist_ok=True)
+    default_template.write_text("stub", encoding="utf-8")
+
+    captured = {}
+
+    class FakeNarrator:
+        def __init__(self, template):
+            captured["template"] = template
+
+        def generate_narrative(
+            self,
+            explanation,
+            problem_type,
+            explanation_type,
+            expertise_level,
+            threshold,
+            feature_names,
+            conjunction_separator,
+            align_weights,
+        ):
+            return f"{explanation_type}:{expertise_level}:{problem_type}"
+
+    monkeypatch.setattr(
+        NarrativePlotPlugin,
+        "_get_default_template_path",
+        staticmethod(lambda: str(default_template)),
+    )
+    monkeypatch.setattr(
+        "calibrated_explanations.viz.narrative_plugin.NarrativeGenerator",
+        FakeNarrator,
+    )
+
+    explanations = SimpleNamespace(
+        explanations=[SimpleNamespace(y_threshold=None)],
+        calibrated_explainer=SimpleNamespace(
+            mode="classification",
+            explainer=SimpleNamespace(feature_names=["f0"]),
+            is_multiclass=lambda: False,
+        ),
+        y_threshold=None,
+    )
+    plugin = NarrativePlotPlugin()
+    missing_absolute = tmp_path / "missing" / "template.yaml"
+
+    with pytest.warns(UserWarning, match=r"fall.*back|template"):
+        result = plugin.plot(
+            explanations,
+            template_path=str(missing_absolute.resolve()),
+            output="dict",
+        )
+
+    assert captured["template"] == str(default_template)
+    assert result[0]["problem_type"] == "binary_classification"
+
+
+def test_narrative_plugindetect_problem_type_variants():
+    """Cover detection branches and exception handling."""
+    plugin = NarrativePlotPlugin()
+
+    class Explainer:
+        def __init__(self, mode):
+            self.mode = mode
+
+        def is_multiclass(self):
+            return True
+
+    explanations = SimpleNamespace(
+        explanations=[], calibrated_explainer=Explainer("classification"), y_threshold=None
+    )
+    assert plugin.detect_problem_type(explanations) == "multiclass_classification"
+
+    explanations.calibrated_explainer.is_multiclass = lambda: False
+    assert plugin.detect_problem_type(explanations) == "binary_classification"
+
+    explanations.y_threshold = 0.5
+    assert plugin.detect_problem_type(explanations) == "probabilistic_regression"
+
+    explanations.y_threshold = None
+    explanations.calibrated_explainer.mode = "regression"
+    assert plugin.detect_problem_type(explanations) == "regression"
+
+    def broken_multiclass():
+        raise RuntimeError("boom")
+
+    explanations.calibrated_explainer.mode = "other"
+    explanations.calibrated_explainer.is_multiclass = broken_multiclass
+    assert plugin.detect_problem_type(explanations) == "regression"
+
+    explanations.calibrated_explainer = SimpleNamespace()
+    assert plugin.detect_problem_type(explanations) == "regression"
+
+
+def test_narrative_plugin_feature_name_helpers(monkeypatch):
+    """Verify feature-name extraction and alternative detection."""
+    plugin = NarrativePlotPlugin()
+    explainer = SimpleNamespace(
+        explainer=SimpleNamespace(feature_names=["a", "b"]), feature_names=None
+    )
+    explanations = SimpleNamespace(
+        explanations=[SimpleNamespace()],
+        calibrated_explainer=explainer,
+    )
+    assert plugin.get_feature_names(explanations) == ["a", "b"]
+
+    explainer.explainer = SimpleNamespace()
+    explainer.feature_names = ("x",)
+    assert plugin.get_feature_names(explanations) == ("x",)
+
+    explainer.feature_names = None
+    assert plugin.get_feature_names(explanations) is None
+
+    class AltExplanations(list):
+        pass
+
+    alt = AltExplanations()
+    alt.__class__.__name__ = "AlternativeExplanations"
+    assert plugin.is_alternative(alt) is True
+
+    alt = SimpleNamespace(is_alternative=lambda: True)
+    assert plugin.is_alternative(alt) is True
+
+
+def test_detect_problem_type_classification_non_multiclass():
+    """Verify classification mode returns binary when is_multiclass is False."""
+    plugin = NarrativePlotPlugin()
+    explainer = SimpleNamespace(mode="classification", is_multiclass=lambda: False)
+    explanations = SimpleNamespace(
+        y_threshold=None,
+        calibrated_explainer=explainer,
+        explanations=[SimpleNamespace()],
+    )
+    result = plugin.detect_problem_type(explanations)
+    assert result == "binary_classification"
+
+
+def test_detect_problem_type_multiclass_exception_fallback():
+    """Verify is_multiclass exception triggers fallback path."""
+    plugin = NarrativePlotPlugin()
+    explainer = SimpleNamespace(mode="classification")
+
+    def bad_multiclass():
+        raise TypeError("not callable right")
+
+    explainer.is_multiclass = bad_multiclass
+    explanations = SimpleNamespace(
+        y_threshold=None,
+        calibrated_explainer=explainer,
+        explanations=[SimpleNamespace()],
+    )
+    result = plugin.detect_problem_type(explanations)
+    assert result in ("multiclass_classification", "binary_classification")
+
+
+def test_detect_problem_type_outer_exception_returns_regression():
+    """Verify outer exception fallback returns regression."""
+    plugin = NarrativePlotPlugin()
+
+    class BadExplainer:
+        @property
+        def mode(self):
+            raise RuntimeError("total failure")
+
+    explanations = SimpleNamespace(
+        y_threshold=None,
+        calibrated_explainer=BadExplainer(),
+        explanations=[SimpleNamespace()],
+    )
+    result = plugin.detect_problem_type(explanations)
+    assert result == "regression"
+
+
+def test_get_feature_names_returns_none_on_broken_explainer():
+    """Verify feature name extraction returns None when explainer raises."""
+    plugin = NarrativePlotPlugin()
+
+    class BrokenExplainer:
+        @property
+        def feature_names(self):
+            raise RuntimeError("boom")
+
+    explanations = SimpleNamespace(calibrated_explainer=BrokenExplainer())
+    result = plugin.get_feature_names(explanations)
+    assert result is None
+
+
+def test_get_feature_names_fallback_to_underlying():
+    """Verify feature names fall through to underlying explainer."""
+    plugin = NarrativePlotPlugin()
+    underlying = SimpleNamespace(feature_names=["x", "y", "z"])
+    explainer = SimpleNamespace(
+        feature_names=None,
+        explainer=underlying,
+    )
+    explanations = SimpleNamespace(calibrated_explainer=explainer)
+    result = plugin.get_feature_names(explanations)
+    assert result == ["x", "y", "z"]

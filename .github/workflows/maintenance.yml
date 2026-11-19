@@ -1,0 +1,82 @@
+# Responsibility: the only workflow permitted to request write scopes.
+# Manually dispatched performance-baseline refresh that never pushes to main:
+# it opens a reviewable PR on a unique branch and requires a human-provided
+# reason. Safe to re-run; generated files are clearly identified.
+name: Maintenance
+on:
+  workflow_dispatch:
+    inputs:
+      reason:
+        description: "Why is the micro performance baseline being updated?"
+        required: true
+        type: string
+
+permissions:
+  contents: read
+
+concurrency:
+  group: maintenance
+  cancel-in-progress: false
+
+env:
+  FORCE_JAVASCRIPT_ACTIONS_TO_NODE24: 'true'
+
+jobs:
+  update-baseline:
+    name: Update micro performance baseline
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: ./.github/actions/setup-ce-python
+        with:
+          python-version: '3.11'
+          extras: 'dev'
+      - name: Generate new micro baseline (generated files under tests/benchmarks/)
+        id: gen
+        run: |
+          set -euo pipefail
+          DATE_TAG=$(date -u +%Y%m%d)
+          mkdir -p tests/benchmarks
+          OLD=$(ls tests/benchmarks/micro_*.json 2>/dev/null | sort | tail -n 1 || true)
+          python scripts/perf/micro_bench_perf.py --explain-backend legacy > tests/benchmarks/micro_${DATE_TAG}.json
+          echo "date_tag=$DATE_TAG" >> $GITHUB_OUTPUT
+
+          NEW=tests/benchmarks/micro_${DATE_TAG}.json
+          echo "Reason: ${{ github.event.inputs.reason }}" > tests/benchmarks/perf_diff.txt
+          echo "Old micro baseline: $OLD" >> tests/benchmarks/perf_diff.txt
+          echo "New micro baseline: $NEW" >> tests/benchmarks/perf_diff.txt
+          if [ -n "$OLD" ]; then
+            python scripts/perf/check_perf_micro.py "$OLD" "$NEW" tests/benchmarks/perf_thresholds.json >> tests/benchmarks/perf_diff.txt || true
+          else
+            echo "No existing micro baseline found." >> tests/benchmarks/perf_diff.txt
+          fi
+          cat tests/benchmarks/perf_diff.txt
+      - name: Upload baseline artifacts
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v6
+        with:
+          name: new-micro-baseline-${{ steps.gen.outputs.date_tag }}
+          path: |
+            tests/benchmarks/micro_${{ steps.gen.outputs.date_tag }}.json
+            tests/benchmarks/perf_diff.txt
+          retention-days: 30
+      - name: Open reviewable PR with the new baseline
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v7
+        with:
+          commit-message: "chore: update micro performance baseline ${{ steps.gen.outputs.date_tag }}"
+          title: "Update micro performance baseline ${{ steps.gen.outputs.date_tag }}"
+          body: |
+            Reason: ${{ github.event.inputs.reason }}
+
+            Generated files:
+            - tests/benchmarks/micro_${{ steps.gen.outputs.date_tag }}.json
+            - tests/benchmarks/perf_diff.txt (comparison summary)
+          branch: chore/update-baseline-${{ steps.gen.outputs.date_tag }}-${{ github.run_id }}
+          base: main
+          add-paths: |
+            tests/benchmarks/micro_${{ steps.gen.outputs.date_tag }}.json
+            tests/benchmarks/perf_diff.txt
+          labels: performance, baseline-update

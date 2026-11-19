@@ -1,0 +1,309 @@
+import types
+from pathlib import Path
+
+import numpy as np
+import pytest
+import warnings
+
+with warnings.catch_warnings():
+    warnings.simplefilter("ignore", DeprecationWarning)
+    from calibrated_explanations.viz import plots as plotting
+
+from calibrated_explanations.viz import build_regression_bars_spec, matplotlib_adapter
+from calibrated_explanations.utils.exceptions import ValidationError
+
+
+pytest.importorskip("matplotlib")
+pytestmark = pytest.mark.viz
+
+
+def test_plot_probabilistic_requires_idx_when_interval(monkeypatch):
+    """PlotSpec-backed probabilistic plots must enforce the interval guard."""
+
+    monkeypatch.setattr(plotting, "_require_matplotlib", lambda: None)
+
+    explanation = types.SimpleNamespace(
+        y_minmax=(0.0, 1.0),
+        prediction={"classes": 1},
+        get_class_labels=lambda: ["neg", "pos"],
+        is_thresholded=lambda: False,
+        get_mode=lambda: "classification",
+        is_one_sided=lambda: False,
+    )
+    setattr(explanation, "_get_explainer", lambda: None)
+
+    with pytest.raises(AssertionError):
+        plotting.plot_probabilistic(
+            explanation,
+            instance=np.array([0.2, 0.4]),
+            predict={"predict": 0.6, "low": 0.2, "high": 0.8},
+            feature_weights={
+                "predict": np.array([0.1, -0.1]),
+                "low": np.array([0.0, 0.0]),
+                "high": np.array([0.2, 0.2]),
+            },
+            features_to_plot=[0, 1],
+            num_to_show=2,
+            column_names=["f0", "f1"],
+            title="interval",
+            path="",
+            show=True,
+            interval=True,
+            idx=None,
+            save_ext=None,
+            use_legacy=False,
+        )
+
+
+@pytest.mark.platform_dependent
+def testplot_regression_default_save_paths_include_title(monkeypatch, tmp_path):
+    """PlotSpec regression helper should save to multiple formats when path specified.
+
+    Refactored from brittle os.path.join assertion to semantic
+    assertions on file formats and presence. Tests that:
+    - Files are created in the specified directory
+    - Files use expected formats (svg, pdf, png)
+    - Files contain the title in their names
+
+    Note: Does NOT test exact path strings (platform-dependent, fragile).
+    Uses pathlib.Path for cross-platform compatibility.
+
+    Marked as @pytest.mark.platform_dependent because path concatenation
+    behavior may vary across Windows/POSIX systems despite pathlib usage.
+    """
+
+    render_calls: list[dict] = []
+    saved_paths: list[str] = []
+
+    class FakeFigure:
+        def savefig(self, path, **kwargs):
+            saved_paths.append(path)
+
+    def fake_render(spec, **kwargs):  # pragma: no cover - spy helper
+        render_calls.append({"show": kwargs.get("show"), "save_path": kwargs.get("save_path")})
+        return FakeFigure() if kwargs.get("return_fig") else None
+
+    monkeypatch.setattr(
+        "calibrated_explanations.viz.matplotlib_adapter.render",
+        fake_render,
+    )
+    monkeypatch.setattr(plotting, "plt", types.SimpleNamespace(close=lambda fig: None))
+
+    explanation = types.SimpleNamespace(y_minmax=(0.0, 1.0))
+    plotting.plot_regression(
+        explanation,
+        instance=np.array([0.3]),
+        predict={"predict": 0.5, "low": 0.2, "high": 0.8},
+        feature_weights=np.array([0.1]),
+        features_to_plot=[0],
+        num_to_show=1,
+        column_names=["f0"],
+        title="reg",
+        path=str(tmp_path) + "/",
+        show=True,
+        interval=False,
+        idx=None,
+        save_ext=None,
+        use_legacy=False,
+    )
+
+    # The figure is rendered once (shown, not saved by the adapter) ...
+    assert render_calls == [{"show": True, "save_path": None}]
+
+    # ... and every default format is saved from that figure (format-independent)
+    assert len(saved_paths) >= 3, "Should save in at least 3 formats"
+
+    # Verify all saved paths exist and contain expected format indicators
+    # (NOTE: The code concatenates title + ext where ext is "svg", "pdf", "png"
+    # so the resulting filenames are "regsvg", "regpdf", "regpng" without dots)
+    format_indicators = {"svg", "pdf", "png"}
+    found_indicators = set()
+    for path_str in saved_paths:
+        if path_str is not None:
+            path = Path(path_str)
+            # Verify path is under tmp_path (semantic, not string comparison)
+            try:
+                path.relative_to(tmp_path)
+            except ValueError:
+                pytest.fail(f"Path {path} is not under tmp_path {tmp_path}")
+
+            # Verify filename contains title
+            assert "reg" in path.name, f"Path {path.name} should contain title 'reg'"
+
+            # Check which format indicators appear in the filename
+            for indicator in format_indicators:
+                if indicator in path.name:
+                    found_indicators.add(indicator)
+
+    # Verify at least the expected formats are present in the filenames
+    assert len(found_indicators) >= 3, (
+        f"Should find indicators for 3 formats, got {found_indicators}"
+    )
+
+
+def test_plotspec_sorting_abs_means_distance_from_zero():
+    # Ensure 'abs' sorts by |value - 0| (distance from zero)
+    predict = {"predict": 0.0}
+    vals = np.array([-0.05, 0.2, -0.3, 0.1])
+    fw = {"predict": vals, "low": vals - 0.01, "high": vals + 0.01}
+    feats = list(range(len(vals)))
+    cols = [f"f{i}" for i in feats]
+    spec = build_regression_bars_spec(
+        title=None,
+        predict=predict,
+        feature_weights=fw,
+        features_to_plot=feats,
+        column_names=cols,
+        instance=None,
+        y_minmax=None,
+        interval=True,
+        sort_by="abs",
+        ascending=False,
+    )
+    bars = spec.body.bars  # type: ignore[union-attr]
+    distances = [abs(b.value - 0.0) for b in bars]
+    assert distances == sorted(distances, reverse=True)
+
+
+def test_probabilistic_builder_rejects_truncated_labels():
+    from calibrated_explanations.viz import build_probabilistic_bars_spec
+
+    predict = {"predict": 0.4}
+    with pytest.raises(ValidationError):
+        build_probabilistic_bars_spec(
+            title=None,
+            predict=predict,
+            feature_weights=[0.1, -0.2],
+            features_to_plot=[0, 1],
+            column_names=["a"],
+            instance=[1.0, 2.0],
+            y_minmax=None,
+            interval=False,
+        )
+
+
+def test_matplotlib_adapter_auto_height_tracks_bars():
+    nfeat = 6
+    predict = {"predict": 0.4, "low": 0.1, "high": 0.7}
+    vals = np.linspace(-0.3, 0.4, nfeat)
+    spec = build_regression_bars_spec(
+        title=None,
+        predict=predict,
+        feature_weights={"predict": vals, "low": vals - 0.1, "high": vals + 0.1},
+        features_to_plot=list(range(nfeat)),
+        column_names=[f"f{i}" for i in range(nfeat)],
+        instance=list(np.linspace(0.0, 1.0, nfeat)),
+        y_minmax=(0.0, 1.0),
+        interval=True,
+    )
+    fig = matplotlib_adapter.render(spec, show=False, save_path=None, return_fig=True)
+    try:
+        height = fig.get_size_inches()[1]
+        expected = (0.5 * max(1, nfeat) + 0.5) + 0.8
+        assert height == pytest.approx(expected, rel=0.05)
+    finally:
+        from matplotlib import pyplot as plt
+
+        plt.close(fig)
+
+
+def test_plot_probabilistic_clamps_infinite_bounds(monkeypatch, tmp_path):
+    sentinel_spec = object()
+    captured: dict[str, dict] = {}
+
+    def fake_builder(**kwargs):
+        captured["predict"] = dict(kwargs["predict"])
+        return sentinel_spec
+
+    def fake_render(spec, **kwargs):
+        return None
+
+    monkeypatch.setattr(
+        "calibrated_explanations.viz.builders.build_probabilistic_bars_spec", fake_builder
+    )
+    monkeypatch.setattr("calibrated_explanations.viz.matplotlib_adapter.render", fake_render)
+    monkeypatch.setattr(plotting, "_require_matplotlib", lambda: None)
+
+    class Explanation:
+        y_minmax = (0.0, 1.0)
+        prediction = {"classes": 1}
+
+        def get_class_labels(self):
+            return ["neg", "pos"]
+
+    plotting.plot_probabilistic(
+        Explanation(),
+        instance=[0.2, 0.3],
+        predict={"predict": 0.6, "low": -np.inf, "high": np.inf},
+        feature_weights=[0.1, -0.2],
+        features_to_plot=[0, 1],
+        num_to_show=2,
+        column_names=["f0", "f1"],
+        title="clamp",
+        path=str(tmp_path) + "/",
+        show=False,
+        interval=False,
+        idx=None,
+        save_ext=[".png"],
+        use_legacy=False,
+    )
+
+    assert captured["predict"]["low"] == pytest.approx(0.0)
+    assert captured["predict"]["high"] == pytest.approx(1.0)
+
+
+def testplot_alternative_sanitises_non_finite_payloads(monkeypatch):
+    import calibrated_explanations.plotting as plotting
+
+    recorded: dict[str, dict] = {}
+    sentinel = object()
+
+    def fake_builder(**kwargs):
+        recorded.update(kwargs)
+        return sentinel
+
+    render_calls: list[dict] = []
+
+    def fake_render(spec, **kwargs):
+        render_calls.append({"spec": spec, **kwargs})
+
+    monkeypatch.setattr(
+        "calibrated_explanations.viz.builders.build_alternative_regression_spec", fake_builder
+    )
+    monkeypatch.setattr("calibrated_explanations.viz.matplotlib_adapter.render", fake_render)
+    monkeypatch.setattr(plotting, "_require_matplotlib", lambda: None)
+
+    explanation = types.SimpleNamespace(
+        y_minmax=(0.0, 1.0),
+        prediction={"classes": 1},
+        is_thresholded=lambda: False,
+        get_mode=lambda: "regression",
+        get_class_labels=lambda: ["neg", "pos"],
+    )
+    setattr(explanation, "_get_explainer", lambda: None)
+
+    plotting.plot_alternative(
+        explanation=explanation,
+        instance=np.array([0.1, 0.2, 0.3]),
+        predict={"predict": 0.5, "low": -np.inf, "high": np.inf},
+        feature_predict={
+            "predict": np.array([0.2, -0.1, 0.05]),
+            "low": np.array([-np.inf, -0.2, 0.0]),
+            "high": np.array([np.inf, 0.1, 0.3]),
+        },
+        features_to_plot=[0, "1", -5],
+        num_to_show=3,
+        column_names=["f0", "f1", "f2"],
+        title="alt",
+        path=None,
+        show=True,
+        save_ext=None,
+        use_legacy=False,
+    )
+
+    assert recorded["predict"]["low"] == 0.0
+    assert recorded["predict"]["high"] == 1.0
+    assert recorded["feature_weights"]["low"][0] == 0.0
+    assert recorded["feature_weights"]["high"][0] == 1.0
+    assert recorded["features_to_plot"] == [0, 1]
+    assert render_calls[0]["spec"] is sentinel

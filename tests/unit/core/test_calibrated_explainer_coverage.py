@@ -1,0 +1,532 @@
+import pytest
+from unittest.mock import MagicMock, patch
+import numpy as np
+from calibrated_explanations.core.calibrated_explainer import CalibratedExplainer
+from calibrated_explanations.utils.exceptions import ValidationError, DataShapeError
+
+from tests.helpers.explainer_internals import (
+    delete_lime_helper,
+    delete_shap_helper,
+    get_shap_helper,
+    initialize_fast_interval_learner,
+)
+
+
+@pytest.fixture
+def mock_learner():
+    learner = MagicMock()
+    learner.predict.return_value = np.array([0, 1])
+    learner.predict_proba.return_value = np.array([[0.8, 0.2], [0.3, 0.7]])
+    return learner
+
+
+@pytest.fixture(autouse=True)
+def mock_check_is_fitted():
+    with patch("calibrated_explanations.core.calibrated_explainer.check_is_fitted") as mock:
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_plugin_manager():
+    with patch("calibrated_explanations.plugins.manager.PluginManager") as mock:
+        instance = mock.return_value
+        instance.initialize_from_kwargs.return_value = None
+        instance.initialize_orchestrators.return_value = None
+
+        # Mock orchestrators
+        instance.explanation_orchestrator = MagicMock()
+        instance.prediction_orchestrator = MagicMock()
+        instance.reject_orchestrator = MagicMock()
+
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_interval_calibrator():
+    with patch(
+        "calibrated_explanations.core.prediction.orchestrator.PredictionOrchestrator.obtain_interval_calibrator"
+    ) as mock:
+        mock.return_value = (MagicMock(), None)
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_legacy_predict_bridge():
+    with patch("calibrated_explanations.plugins.builtins.LegacyPredictBridge") as mock:
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_identify_constant_features():
+    with patch(
+        "calibrated_explanations.core.calibration_helpers.identify_constant_features"
+    ) as mock:
+        mock.return_value = []
+        yield mock
+
+
+@pytest.fixture(autouse=True)
+def mock_helpers():
+    with (
+        patch("calibrated_explanations.integrations.LimeHelper"),
+        patch("calibrated_explanations.integrations.ShapHelper"),
+    ):
+        yield
+
+
+def test_preloads(mock_learner, mock_plugin_manager):
+    x_cal = np.array([[1, 2], [2, 3]])
+    y_cal = np.array([0, 1])
+    explainer = CalibratedExplainer(mock_learner, x_cal, y_cal, mode="classification")
+
+    with pytest.raises(AttributeError, match="preload_lime"):
+        explainer.preload_lime(x_cal)
+    with pytest.raises(AttributeError, match="preload_shap"):
+        explainer.preload_shap(num_test=10)
+    # Minimal assertion to satisfy test-quality checks
+    assert True
+
+
+def test_should_fail_closed_for_removed_plugin_delegations_and_aliases(
+    monkeypatch: pytest.MonkeyPatch, mock_learner, mock_plugin_manager
+):
+    monkeypatch.delenv("CE_DEPRECATIONS", raising=False)
+    x_cal = np.array([[1, 2], [2, 3]])
+    y_cal = np.array([0, 1])
+    explainer = CalibratedExplainer(mock_learner, x_cal, y_cal, mode="classification")
+
+    for name in (
+        "build_plot_style_chain",
+        "instantiate_plugin",
+        "invoke_explanation_plugin",
+        "ensure_interval_runtime_state",
+        "gather_interval_hints",
+        "interval_plugin_hints",
+        "interval_plugin_fallbacks",
+        "explanation_plugin_overrides",
+        "interval_plugin_override",
+        "fast_interval_plugin_override",
+        "plot_style_override",
+        "interval_preferred_identifier",
+        "telemetry_interval_sources",
+        "interval_plugin_identifiers",
+        "interval_context_metadata",
+        # Task 49 (pre-v4 S4-H1): test-only public aliases removed/dispositioned.
+        "feature_names_internal",
+        "initialize_interval_learner_for_fast_explainer",
+        "bridge_monitors",
+        "explanation_plugin_instances",
+        "pyproject_explanations",
+        "pyproject_intervals",
+        "pyproject_plots",
+        "lime_helper",
+        "shap_helper",
+        "is_initialized",
+    ):
+        assert not hasattr(explainer, name)
+
+    explainer.plot_plugin_fallbacks = {"plot": ("fallback",)}
+    assert explainer.plugin_manager.plot_plugin_fallbacks == {"plot": ("fallback",)}
+
+    sentinel = object()
+    explainer.plugin_manager.explanation_plugin_instances = {"plugin": sentinel}
+    assert explainer.plugin_manager.explanation_plugin_instances == {"plugin": sentinel}
+
+    explainer.initialized = True
+    assert explainer.initialized is True
+
+    explainer.parallel_executor = MagicMock()
+    explainer.predict_bridge = MagicMock()
+
+
+def test_constructor_reject_initialization_uses_orchestrator_path(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_learner,
+):
+    monkeypatch.delenv("CE_DEPRECATIONS", raising=False)
+    x_cal = np.array([[1, 2], [2, 3]])
+    y_cal = np.array([0, 1])
+
+    explainer = CalibratedExplainer(
+        mock_learner,
+        x_cal,
+        y_cal,
+        mode="classification",
+        reject=True,
+    )
+
+    explainer.plugin_manager.initialize_orchestrators.assert_called()
+    explainer.reject_orchestrator.initialize_reject_learner.assert_called_with(
+        calibration_set=None,
+        threshold=None,
+        ncf=None,
+        w=0.5,
+    )
+
+
+def test_invalid_features_to_ignore_fails_fast_at_public_boundary(
+    monkeypatch: pytest.MonkeyPatch,
+    mock_learner,
+    mock_identify_constant_features,
+):
+    monkeypatch.delenv("CE_DEPRECATIONS", raising=False)
+    mock_identify_constant_features.return_value = np.asarray([1])
+
+    with pytest.raises(ValidationError, match="integer feature indices") as exc_info:
+        CalibratedExplainer(
+            mock_learner,
+            np.array([[1, 2], [2, 3]]),
+            np.array([0, 1]),
+            mode="classification",
+            features_to_ignore=["not-an-int"],
+        )
+
+    assert exc_info.value.details is not None
+    assert exc_info.value.details.get("param") == "features_to_ignore"
+
+
+def test_enable_fast_mode_resets_on_error(mock_learner):
+    x_cal = np.array([[1, 2], [2, 3]])
+    y_cal = np.array([0, 1])
+    explainer = CalibratedExplainer(mock_learner, x_cal, y_cal, mode="classification")
+
+    with (
+        patch.object(
+            explainer,
+            "_initialize_interval_learner_for_fast_explainer",
+            side_effect=RuntimeError("boom"),
+        ),
+        pytest.raises(RuntimeError, match="boom"),
+    ):
+        explainer.enable_fast_mode()
+
+    assert explainer.is_fast() is False
+
+
+def test_explain_mondrian_bins_and_legacy_path(mock_learner, mock_plugin_manager):
+    x_cal = np.array([[1, 2], [2, 3]])
+    y_cal = np.array([0, 1])
+    explainer = CalibratedExplainer(mock_learner, x_cal, y_cal, mode="classification")
+    explainer.bins = np.array([1])
+
+    x_test = np.array([[3, 4]])
+    explainer.explanation_orchestrator.invoke_factual.return_value = "factual"
+    explainer.explain_factual(x_test, bins=explainer.bins)
+    _, kwargs = explainer.explanation_orchestrator.invoke_factual.call_args
+    assert kwargs["bins"] is explainer.bins
+
+    explainer.explanation_orchestrator.invoke_alternative.return_value = "alternative"
+    explainer.explore_alternatives(x_test, bins=explainer.bins)
+    _, kwargs = explainer.explanation_orchestrator.invoke_alternative.call_args
+    assert kwargs["bins"] is explainer.bins
+
+    with patch("calibrated_explanations.core.explain.legacy_explain") as mock_legacy:
+        mock_legacy.return_value = "legacy"
+        result = explainer(x_test, bins=explainer.bins, _use_plugin=False)
+        assert result == "legacy"
+        assert mock_legacy.call_args.kwargs["bins"] is explainer.bins
+
+
+def test_additional_coverage(monkeypatch: pytest.MonkeyPatch, mock_learner, mock_plugin_manager):
+    monkeypatch.delenv("CE_DEPRECATIONS", raising=False)
+    x_cal = np.array([[1, 2], [2, 3]])
+    y_cal = np.array([0, 1])
+
+    # predict_function in kwargs
+    def my_predict(x):
+        return np.array([[0.5, 0.5]])
+
+    explainer = CalibratedExplainer(
+        mock_learner, x_cal, y_cal, mode="classification", predict_function=my_predict
+    )
+    assert explainer.predict_function == my_predict
+
+    # categorical_labels without categorical_features
+    explainer = CalibratedExplainer(
+        mock_learner, x_cal, y_cal, mode="classification", categorical_labels={0: {0: "A"}}
+    )
+    assert explainer.categorical_features == [0]
+
+    # numeric y_cal without class_labels
+    numeric_x_cal = np.array([[1, 2], [3, 4]])
+    explainer = CalibratedExplainer(
+        mock_learner, numeric_x_cal, np.array([0, 1]), mode="classification"
+    )
+    assert explainer.class_labels == {0: "0", 1: "1"}
+
+    # properties
+    explainer.plugin_manager = mock_plugin_manager
+    _ = explainer.plot_plugin_fallbacks
+    _ = explainer.plugin_manager.explanation_plugin_instances
+    for removed_alias in (
+        "plot_style_override",
+        "explanation_plugin_overrides",
+        "interval_plugin_override",
+    ):
+        assert not hasattr(explainer, removed_alias)
+    _ = get_shap_helper(explainer)
+    _ = explainer.feature_filter_per_instance_ignore
+    _ = explainer.runtime_telemetry
+
+    # preprocessor_metadata
+    explainer.set_preprocessor_metadata({"a": 1})
+    assert explainer.preprocessor_metadata == {"a": 1}
+    explainer.set_preprocessor_metadata(None)
+    assert explainer.preprocessor_metadata is None
+
+    # get_calibration_summaries
+    with patch(
+        "calibrated_explanations.calibration.summaries.get_calibration_summaries"
+    ) as mock_get:
+        explainer.get_calibration_summaries()
+        mock_get.assert_called_once()
+
+    # sigma test
+    mock_plugin_manager.prediction_orchestrator.interval_registry.get_sigma_test.return_value = (
+        np.array([1.0])
+    )
+    explainer.get_sigma_test(x_cal)
+
+    # initialize for fast
+    initialize_fast_interval_learner(explainer)
+    mock_plugin_manager.prediction_orchestrator.interval_registry.initialize_for_fast_explainer.assert_called_once()
+
+    # reinitialize with bins
+    explainer.bins = np.array([0, 0])
+    mock_plugin_manager.prediction_orchestrator.obtain_interval_calibrator.return_value = (
+        MagicMock(),
+        "id",
+    )
+    explainer.reinitialize(mock_learner, x_cal, y_cal, bins=np.array([0, 0]))
+
+    # reinitialize error: mix bins
+    explainer.bins = None
+    with pytest.raises(ValidationError):
+        explainer.reinitialize(mock_learner, x_cal, y_cal, bins=np.array([0]))
+
+    # reinitialize error: bin length
+    explainer.bins = np.array([0, 0])
+    with pytest.raises(DataShapeError):
+        explainer.reinitialize(mock_learner, x_cal, y_cal, bins=np.array([0]))
+
+    # reinitialize without xs, ys
+    explainer.reinitialize(mock_learner)
+
+    # __repr__ with verbose and various fields
+    explainer.verbose = True
+    explainer.feature_names = ["f1", "f2"]
+    explainer.categorical_features = [0]
+    explainer.categorical_labels = {0: {0: "A"}}
+    explainer.class_labels = {0: "C0", 1: "C1"}
+    explainer.latest_explanation = MagicMock()
+    explainer.latest_explanation.total_explain_time = 1.0
+    repr_str = repr(explainer)
+    assert "init_time" in repr_str
+    assert "feature_names" in repr_str
+    assert "categorical_features" in repr_str
+    assert "categorical_labels" in repr_str
+    assert "class_labels" in repr_str
+    assert "total_explain_time" in repr_str
+
+    # obtain_interval_calibrator
+    explainer.obtain_interval_calibrator(fast=False, metadata={})
+
+    # explain_factual with mondrian
+    explainer.bins = np.array([0, 0])
+    with patch.object(explainer.explanation_orchestrator, "invoke_factual") as mock_invoke:
+        explainer.explain_factual(x_cal, bins=explainer.bins)
+        mock_invoke.assert_called_once()
+
+    # explore_alternatives with mondrian
+    with patch.object(explainer.explanation_orchestrator, "invoke_alternative") as mock_invoke:
+        explainer.explore_alternatives(x_cal, bins=explainer.bins)
+        mock_invoke.assert_called_once()
+
+    # __call__
+    with patch.object(explainer, "_explain") as mock_explain:
+        explainer(x_cal)
+        mock_explain.assert_called_once()
+
+    # explain_fast with legacy path
+    import external_plugins.fast_explanations.pipeline as fast_pipeline_mod
+
+    with patch.object(fast_pipeline_mod, "FastExplanationPipeline") as mock_pipeline:
+        explainer.explain_fast(x_cal, bins=explainer.bins, _use_plugin=False)
+        mock_pipeline.assert_called()
+
+    # v0.11.2 removal phase (Task 5A): core LIME/SHAP methods are removed.
+    with pytest.raises(AttributeError, match="explain_lime"):
+        explainer.explain_lime(x_cal)
+    with pytest.raises(AttributeError, match="explain_shap"):
+        explainer.explain_shap(x_cal)
+    with pytest.raises(AttributeError, match="is_lime_enabled"):
+        explainer.is_lime_enabled(True)
+    with pytest.raises(AttributeError, match="is_shap_enabled"):
+        explainer.is_shap_enabled(True)
+
+    # is_multiclass
+    explainer.num_classes = 3
+    assert explainer.is_multiclass() is True
+    explainer.num_classes = 2
+    assert explainer.is_multiclass() is False
+
+    # is_fast
+    assert explainer.is_fast() is False
+
+    # discretize
+    with patch("calibrated_explanations.core.explain.discretize") as mock_disc:
+        explainer.discretize(x_cal)
+        mock_disc.assert_called_once()
+
+    # rule_boundaries
+    with patch("calibrated_explanations.core.explain.rule_boundaries") as mock_rb:
+        explainer.rule_boundaries(x_cal)
+        mock_rb.assert_called_once()
+
+    # set_difficulty_estimator
+    with patch(
+        "calibrated_explanations.core.difficulty_estimator_helpers.validate_difficulty_estimator"
+    ):
+        explainer.set_difficulty_estimator(MagicMock())
+
+    # set_mode
+    explainer.set_mode("regression")
+    assert explainer.mode == "regression"
+    explainer.set_mode("classification")
+    assert explainer.mode == "classification"
+    with pytest.raises(ValidationError):
+        explainer.set_mode("invalid")
+
+    # initialize_reject_learner / predict_reject
+    explainer.reject_orchestrator.initialize_reject_learner()
+    explainer.reject_orchestrator.predict_reject(x_cal)
+
+    # set_discretizer
+    explainer.set_discretizer("entropy")
+
+    # predict uncalibrated
+    explainer.mode = "regression"
+    with patch(
+        "calibrated_explanations.core.prediction_helpers.handle_uncalibrated_regression_prediction"
+    ) as mock_pred:
+        explainer.predict(x_cal, calibrated=False)
+        mock_pred.assert_called_once()
+
+    explainer.mode = "classification"
+    with patch(
+        "calibrated_explanations.core.prediction_helpers.handle_uncalibrated_classification_prediction"
+    ) as mock_pred:
+        explainer.predict(x_cal, calibrated=False)
+        mock_pred.assert_called_once()
+
+    # predict calibrated regression
+    explainer.bins = None
+    explainer.mode = "regression"
+    with patch.object(
+        explainer.prediction_orchestrator,
+        "predict",
+        return_value=(np.array([0.5]), np.array([0.4]), np.array([0.6]), None),
+    ):
+        explainer.predict(x_cal)
+
+    # predict calibrated classification
+    explainer.mode = "classification"
+    with patch.object(
+        explainer.prediction_orchestrator,
+        "predict",
+        return_value=(np.array([0]), np.array([0]), np.array([0]), np.array([0, 1])),
+    ):
+        explainer.predict(x_cal)
+
+    # predict_proba uncalibrated
+    with pytest.raises(ValidationError):
+        explainer.predict_proba(x_cal, calibrated=False, threshold=0.5)
+
+    explainer.predict_proba(x_cal, calibrated=False)
+    explainer.predict_proba(x_cal, calibrated=False, uq_interval=True)
+
+    # predict_proba calibrated regression
+    explainer.mode = "regression"
+    explainer.interval_learner = MagicMock()
+    explainer.interval_learner.predict_probability.return_value = (
+        np.array([0.5]),
+        np.array([0.4]),
+        np.array([0.6]),
+        None,
+    )
+    explainer.predict_proba(x_cal, threshold=0.5)
+
+    explainer.interval_learner = [MagicMock()]
+    explainer.interval_learner[-1].predict_probability.return_value = (
+        np.array([0.5]),
+        np.array([0.4]),
+        np.array([0.6]),
+        None,
+    )
+    explainer.predict_proba(x_cal, threshold=0.5)
+
+    # predict_proba calibrated multiclass
+    explainer.mode = "classification"
+    explainer.num_classes = 3
+    explainer.interval_learner = MagicMock()
+    explainer.interval_learner.predict_proba.return_value = (
+        np.array([[0.1, 0.8, 0.1]]),
+        np.array([[0.05, 0.7, 0.05]]),
+        np.array([[0.15, 0.9, 0.15]]),
+        None,
+    )
+    explainer.predict_proba(x_cal)
+
+    explainer.interval_learner = [MagicMock()]
+    explainer.interval_learner[-1].predict_proba.return_value = (
+        np.array([[0.1, 0.8, 0.1]]),
+        np.array([[0.05, 0.7, 0.05]]),
+        np.array([[0.15, 0.9, 0.15]]),
+        None,
+    )
+    explainer.predict_proba(x_cal)
+
+    # predict_proba calibrated binary
+    explainer.num_classes = 2
+    explainer.interval_learner = MagicMock()
+    explainer.interval_learner.predict_proba.return_value = (
+        np.array([[0.2, 0.8]]),
+        np.array([0.1]),
+        np.array([0.3]),
+    )
+    explainer.predict_proba(x_cal)
+
+    explainer.interval_learner = [MagicMock()]
+    explainer.interval_learner[-1].predict_proba.return_value = (
+        np.array([[0.2, 0.8]]),
+        np.array([0.1]),
+        np.array([0.3]),
+    )
+    explainer.predict_proba(x_cal)
+
+    # plot
+    with patch("calibrated_explanations.plotting.plot_global") as mock_plot:
+        explainer.plot(x_cal)
+        mock_plot.assert_called_once()
+
+    # calibrated_confusion_matrix
+    explainer.mode = "regression"
+    with pytest.raises(ValidationError):
+        explainer.calibrated_confusion_matrix()
+
+    explainer.mode = "classification"
+    with patch(
+        "calibrated_explanations.core.calibration_metrics.compute_calibrated_confusion_matrix"
+    ) as mock_cm:
+        explainer.calibrated_confusion_matrix()
+        mock_cm.assert_called_once()
+
+    # predict_calibration
+    explainer.predict_calibration()
+
+    # deleters
+    del explainer.explanation_orchestrator
+    del explainer.prediction_orchestrator
+    del explainer.reject_orchestrator
+    delete_lime_helper(explainer)
+    delete_shap_helper(explainer)

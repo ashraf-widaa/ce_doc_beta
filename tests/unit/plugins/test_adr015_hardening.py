@@ -1,0 +1,410 @@
+"""Comprehensive test suite for ADR-015 explanation plugin integration hardening gaps."""
+
+import os
+import pytest
+from unittest.mock import MagicMock, patch
+from types import MappingProxyType
+
+from calibrated_explanations.plugins.explanations import (
+    ExplanationContext,
+    ExplanationBatch,
+)
+from calibrated_explanations.explanations.explanations import CalibratedExplanations
+from calibrated_explanations.utils.exceptions import ConfigurationError, ValidationError
+
+
+# Helper classes
+class FakeBridge:
+    """Pickleable bridge for testing."""
+
+    pass
+
+
+@pytest.fixture
+def mock_explainer():
+    """Create a mock CalibratedExplainer."""
+    explainer = MagicMock()
+    explainer.num_features = 5
+    explainer.mode = "classification"
+    return explainer
+
+
+# ==============================================================================
+# STEP 1: In-Tree FAST Explanation Plugin Tests
+# ==============================================================================
+
+
+class TestFastExplanationPluginRegistration:
+    """Verify in-tree FAST plugin registration (Step 1)."""
+
+
+# ==============================================================================
+# STEP 2: Canonical Collection Reconstruction Tests
+# ==============================================================================
+
+
+class TestCanonicalCollectionReconstruction:
+    """Verify canonical reconstruction of collections from batches (Step 2)."""
+
+    @pytest.fixture
+    def mock_batch_no_template(self, mock_explainer):
+        """Create an ExplanationBatch without embedded container template."""
+        from calibrated_explanations.explanations.explanation import FactualExplanation
+        import numpy as np
+
+        # Create mock explanation - minimal valid state
+        explanation = MagicMock(spec=FactualExplanation)
+        explanation.instance_index = 0
+
+        metadata = {
+            "calibrated_explainer": mock_explainer,
+            "x_test": np.array([[1, 2, 3, 4, 5]]),
+            "y_threshold": 0.5,
+            "bins": None,
+            "features_to_ignore": [],
+            "mode": "factual",
+            "interval_dependency": "core.interval.legacy",
+            "plot_dependency": "plot_spec.default",
+        }
+
+        instance_payload = {"explanation": explanation}
+
+        batch = ExplanationBatch(
+            container_cls=CalibratedExplanations,
+            explanation_cls=FactualExplanation,
+            instances=[instance_payload],
+            collection_metadata=metadata,
+        )
+        return batch
+
+    def test_from_batch_validates_explanation_type(self, mock_explainer):
+        """Test that from_batch validates explanation types."""
+        from calibrated_explanations.explanations.explanation import FactualExplanation
+        import numpy as np
+
+        metadata = {
+            "calibrated_explainer": mock_explainer,
+            "x_test": np.array([[1, 2, 3, 4, 5]]),
+        }
+
+        # Wrong explanation type
+        instance_payload = {"explanation": "not_an_explanation"}
+
+        batch = ExplanationBatch(
+            container_cls=CalibratedExplanations,
+            explanation_cls=FactualExplanation,
+            instances=[instance_payload],
+            collection_metadata=metadata,
+        )
+
+        with pytest.raises(ValidationError):
+            CalibratedExplanations.from_batch(batch)
+
+
+# ==============================================================================
+# STEP 3: Trust Enforcement Tests
+# ==============================================================================
+
+
+class TestTrustEnforcement:
+    """Verify trust enforcement in explanation plugin resolution (Step 3)."""
+
+    def test_untrusted_plugin_rejected_from_env_var(self, mock_explainer):
+        """Test that untrusted plugins from env vars are rejected."""
+        from calibrated_explanations.core.explain.orchestrator import ExplanationOrchestrator
+        from calibrated_explanations.plugins.registry import (
+            ExplanationPluginDescriptor,
+        )
+
+        mock_plugin = MagicMock()
+        mock_plugin.plugin_meta = {
+            "name": "test.untrusted",
+            "trusted": False,
+            "schema_version": 1,
+            "tasks": ["classification"],
+            "modes": ["factual"],
+            "capabilities": ["explain", "explanation:factual", "task:classification"],
+        }
+
+        with patch(
+            "calibrated_explanations.core.explain.orchestrator.find_explanation_descriptor"
+        ) as mock_find:
+            descriptor = MagicMock(spec=ExplanationPluginDescriptor)
+            descriptor.plugin = mock_plugin
+            descriptor.trusted = False
+            descriptor.metadata = mock_plugin.plugin_meta
+            mock_find.return_value = descriptor
+
+            orchestrator = ExplanationOrchestrator(mock_explainer)
+            mock_explainer.mode = "classification"
+            mock_explainer.plugin_manager.resolve_explanation_plugin_for_mode.side_effect = (
+                ConfigurationError("untrusted")
+            )
+
+            with pytest.raises(ConfigurationError, match="untrusted"):
+                orchestrator.resolve_plugin("factual")
+
+    def test_explicit_instance_override_warns_when_untrusted(self, mock_explainer):
+        """Explicit instance overrides should warn when untrusted."""
+        from calibrated_explanations.core.explain.orchestrator import ExplanationOrchestrator
+
+        mock_plugin = MagicMock()
+        mock_plugin.plugin_meta = {
+            "name": "test.untrusted.instance",
+            "trusted": False,
+            "schema_version": 1,
+            "tasks": ["classification"],
+            "modes": ["factual"],
+            "capabilities": ["explain", "explanation:factual", "task:classification"],
+        }
+
+        orchestrator = ExplanationOrchestrator(mock_explainer)
+        mock_explainer.mode = "classification"
+
+        def _resolve(*_args, **_kwargs):
+            import warnings
+
+            warnings.warn(
+                "Using untrusted explanation plugin 'test.untrusted.instance' via explicit override. "
+                "Ensure you trust the source of this plugin.",
+                UserWarning,
+                stacklevel=2,
+            )
+            return mock_plugin, "test.untrusted.instance"
+
+        mock_explainer.plugin_manager.resolve_explanation_plugin_for_mode.side_effect = _resolve
+
+        with pytest.warns(UserWarning, match="Using untrusted explanation plugin"):
+            plugin, identifier = orchestrator.resolve_plugin("factual")
+            assert identifier == "test.untrusted.instance"
+            assert plugin == mock_plugin
+
+
+# ==============================================================================
+# STEP 4: Environment Variable Alignment Tests
+# ==============================================================================
+
+
+class TestEnvironmentVariableAlignment:
+    """Verify alignment of env vars with ADR-015 (Step 4)."""
+
+    def test_mode_specific_env_vars_as_fallback(self):
+        """Test that mode-specific env vars work as fallbacks."""
+        from calibrated_explanations.plugins.manager import PluginManager
+
+        explainer = MagicMock()
+        pm = PluginManager(explainer)
+
+        with patch.dict(
+            os.environ,
+            {
+                "CE_EXPLANATION_PLUGIN_FACTUAL": "core.explanation.factual.sequential",
+                "CE_EXPLANATION_PLUGIN_FACTUAL_FALLBACKS": "core.explanation.factual",
+            },
+        ):
+            chain = pm.build_explanation_chain("factual", "core.explanation.factual.sequential")
+            # Both should appear in the chain
+            assert len(chain) > 0
+
+
+# ==============================================================================
+# STEP 5: Immutable Plugin Handles Tests
+# ==============================================================================
+
+
+class TestImmutablePluginHandles:
+    """Verify immutable handles in ExplanationContext (Step 5)."""
+
+    def test_explanation_context_helper_handles_is_mapping_proxy(self):
+        """Test that helper_handles is wrapped in MappingProxyType."""
+        bridge = MagicMock()
+        handles = {"explainer": MagicMock()}
+
+        context = ExplanationContext(
+            task="classification",
+            mode="factual",
+            feature_names=["f1", "f2"],
+            categorical_features=[],
+            categorical_labels={},
+            discretizer=None,
+            helper_handles=MappingProxyType(handles),
+            predict_bridge=bridge,
+            interval_settings={},
+            plot_settings={},
+        )
+
+        # Verify it's read-only
+        with pytest.raises(TypeError):
+            context.helper_handles["new_key"] = "value"
+
+    def test_explanation_context_is_frozen(self):
+        """Test that ExplanationContext is a frozen dataclass."""
+        bridge = MagicMock()
+        context = ExplanationContext(
+            task="classification",
+            mode="factual",
+            feature_names=["f1"],
+            categorical_features=[],
+            categorical_labels={},
+            discretizer=None,
+            helper_handles={},
+            predict_bridge=bridge,
+            interval_settings={},
+            plot_settings={},
+        )
+
+        # Should not be able to modify frozen fields
+        with pytest.raises((AttributeError, TypeError)):
+            context.task = "regression"
+
+    def test_explanation_context_plugin_config_is_deeply_immutable(self):
+        """Plugin config should freeze nested mappings and list-like values."""
+        bridge = MagicMock()
+        context = ExplanationContext(
+            task="classification",
+            mode="factual",
+            feature_names=["f1"],
+            categorical_features=[],
+            categorical_labels={},
+            discretizer=None,
+            helper_handles={},
+            predict_bridge=bridge,
+            interval_settings={},
+            plot_settings={},
+            plugin_config={"nested": {"labels": ["a", "b"]}},
+        )
+
+        assert context.plugin_config["nested"]["labels"] == ("a", "b")
+        with pytest.raises(TypeError):
+            context.plugin_config["new"] = True
+        with pytest.raises(TypeError):
+            context.plugin_config["nested"]["new"] = True
+
+
+# ==============================================================================
+# Gap C: ADR-026 context field freezing (unfrozen mutable containers)
+# ==============================================================================
+
+
+class TestExplanationContextMutableFieldFreezing:
+    """Verify that mutable containers passed to ExplanationContext are frozen (ADR-026 gap C)."""
+
+    def make_context(self, feature_names, categorical_features, helper_handles):
+        return ExplanationContext(
+            task="classification",
+            mode="factual",
+            feature_names=feature_names,
+            categorical_features=categorical_features,
+            categorical_labels={},
+            discretizer=None,
+            helper_handles=helper_handles,
+            predict_bridge=FakeBridge(),
+            interval_settings={},
+            plot_settings={},
+        )
+
+    def test_should_freeze_feature_names_list(self):
+        names = ["a", "b", "c"]
+        ctx = self.make_context(names, [], {})
+        names.append("d")
+        assert "d" not in ctx.feature_names
+
+    def test_should_freeze_categorical_features_list(self):
+        cats = [0, 2]
+        ctx = self.make_context(["x", "y", "z"], cats, {})
+        cats.append(5)
+        assert 5 not in ctx.categorical_features
+
+    def test_should_freeze_helper_handles_dict(self):
+        handles = {"h1": object()}
+        ctx = self.make_context(["x"], [], handles)
+        handles["h2"] = object()
+        assert "h2" not in ctx.helper_handles
+
+
+class TestIntervalCalibratorContextMutableFieldFreezing:
+    """Verify that mutable containers passed to IntervalCalibratorContext are frozen (ADR-026 gap C)."""
+
+    def make_context(self, **kwargs):
+        from calibrated_explanations.plugins.intervals import IntervalCalibratorContext
+
+        defaults = {
+            "learner": None,
+            "calibration_splits": [],
+            "bins": {},
+            "residuals": {},
+            "difficulty": {},
+            "metadata": {},
+            "fast_flags": {},
+        }
+        defaults.update(kwargs)
+        return IntervalCalibratorContext(**defaults)
+
+    def test_should_freeze_calibration_splits_list(self):
+        splits = [1, 2, 3]
+        ctx = self.make_context(calibration_splits=splits)
+        splits.append(4)
+        assert 4 not in ctx.calibration_splits
+        assert isinstance(ctx.calibration_splits, tuple)
+
+    def test_should_freeze_bins_dict(self):
+        bins = {"k": "v"}
+        ctx = self.make_context(bins=bins)
+        bins["new"] = "x"
+        assert "new" not in ctx.bins
+        from types import MappingProxyType
+
+        assert isinstance(ctx.bins, MappingProxyType)
+
+    def test_should_freeze_residuals_dict(self):
+        residuals = {"r": 0.1}
+        ctx = self.make_context(residuals=residuals)
+        residuals["new"] = 9.9
+        assert "new" not in ctx.residuals
+
+    def test_should_freeze_difficulty_dict(self):
+        diff = {"d": 0.5}
+        ctx = self.make_context(difficulty=diff)
+        diff["extra"] = 1.0
+        assert "extra" not in ctx.difficulty
+
+
+def test_explainer_handle_getattr_learner_delegates_without_warning():
+    """__getattr__('learner') delegates to the underlying explainer without a deprecation warning."""
+    import warnings
+    from types import SimpleNamespace
+
+    from calibrated_explanations.plugins.explanations import ExplainerHandle
+
+    learner = object()
+    handle = ExplainerHandle(SimpleNamespace(learner=learner), metadata={})
+
+    with warnings.catch_warnings():
+        warnings.simplefilter("error", DeprecationWarning)
+        result = handle.__getattr__("learner")
+
+    assert result is learner
+
+    def test_should_freeze_fast_flags_dict(self):
+        flags = {"flag": True}
+        ctx = self.make_context(fast_flags=flags)
+        flags["new_flag"] = False
+        assert "new_flag" not in ctx.fast_flags
+
+    def test_should_keep_plugin_state_mutable(self):
+        ctx = self.make_context()
+        ctx.plugin_state["transient"] = 42
+        assert ctx.plugin_state["transient"] == 42
+
+
+# ==============================================================================
+# Integration Tests
+# ==============================================================================
+
+
+class TestADR015IntegrationFlow:
+    """End-to-end tests for ADR-015 explanation plugin pipeline."""
+
+
+if __name__ == "__main__":
+    pytest.main([__file__, "-v"])

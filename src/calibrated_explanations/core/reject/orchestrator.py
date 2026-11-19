@@ -1,0 +1,2609 @@
+"""Orchestration layer for reject learner initialization and inference."""
+
+from __future__ import annotations
+
+import inspect
+import logging
+import numbers
+import threading
+import warnings
+from dataclasses import dataclass
+from math import isclose
+from typing import Any
+
+import numpy as np
+from crepes import ConformalClassifier
+from crepes.extras import hinge
+
+from ...api.params import reject_removed_reject_kwargs
+from ...explanations.reject import (
+    RejectContractWarning,
+    RejectDecisionArtifact,
+    RejectPayloadArtifact,
+    RejectResult,
+    RejectResultV2,
+    canonical_reject_ncf_w,
+    normalize_reject_ncf_choice,
+    reject_result_v2_to_legacy,
+)
+from ...utils.exceptions import ConfigurationError, ValidationError
+from ..difficulty_estimator_helpers import validate_difficulty_estimator_provenance
+from .policy import RejectPolicy
+
+# Module-level flag: emit the 100% ambiguity UserWarning at most once per process.
+# This keeps the contract stable regardless of caller-level warning filters or
+# repeated reject-policy execution inside the same interpreter session.
+_AMBIGUITY_WARNING_ISSUED = False
+_VALID_NCF = frozenset({"default", "ensured"})
+_DIFFICULTY_STRATEGIES = frozenset(
+    {
+        "experimental.difficulty_normalized",
+        "experimental.ambiguity_normalized_novelty_penalized",
+    }
+)
+_DEGRADED_MODE_ORDER = (
+    "reject_init_failure",
+    "predict_p_to_predict_set_fallback",
+    "bulk_to_per_instance_fallback",
+    "prediction_payload_failed",
+    "explanation_payload_failed",
+)
+
+
+@dataclass(frozen=True)
+class RejectPolicyResolution:
+    """Canonical reject-policy resolution result."""
+
+    policy: RejectPolicy
+    used_default: bool
+    fallback_used: bool
+    reason: str | None = None
+
+
+def _safe_length(value: Any) -> int:
+    """Return a safe non-negative length for array-like values."""
+    try:
+        return max(int(len(value)), 0)
+    except Exception:  # adr002_allow - best-effort contract fallback
+        return 0
+
+
+def _normalize_degraded_mode(markers: Any) -> tuple[str, ...]:
+    """Return deterministic degraded-mode markers preserving canonical order."""
+    if markers is None:
+        return ()
+    raw = [str(m) for m in markers if m]
+    if not raw:
+        return ()
+    unique = list(dict.fromkeys(raw))
+    ordered: list[str] = [m for m in _DEGRADED_MODE_ORDER if m in unique]
+    ordered.extend([m for m in unique if m not in ordered])
+    return tuple(ordered)
+
+
+def validate_reject_confidence(confidence: Any) -> float:
+    """Validate reject confidence and return canonical float in (0, 1)."""
+    try:
+        value = float(confidence)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            "confidence must be a float in the open interval (0, 1).",
+            details={"confidence": confidence},
+        ) from exc
+    if not 0.0 < value < 1.0:
+        raise ValidationError(
+            "confidence must be a float in the open interval (0, 1).",
+            details={"confidence": value},
+        )
+    return value
+
+
+def validate_reject_w(w: Any) -> float:
+    """Validate reject blending weight and return canonical float in [0, 1]."""
+    try:
+        value = float(w)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            "w must be a float in the closed interval [0, 1].",
+            details={"w": w},
+        ) from exc
+    if not 0.0 <= value <= 1.0:
+        raise ValidationError(
+            "w must be a float in the closed interval [0, 1].",
+            details={"w": value},
+        )
+    return value
+
+
+def reject_unknown_reject_kwargs(
+    kwargs: dict[str, Any], *, allowed: tuple[str, ...] = (), surface: str
+) -> None:
+    """Reject unexpected public kwargs on reject-policy entry points."""
+    unknown = sorted(name for name in kwargs if name not in allowed)
+    if not unknown:
+        return
+    raise ConfigurationError(
+        f"{surface} received unknown keyword arguments: {unknown}.",
+        details={
+            "surface": surface,
+            "unknown_kwargs": unknown,
+            "allowed_kwargs": list(allowed),
+        },
+    )
+
+
+def _thresholds_equal(lhs: Any, rhs: Any) -> bool:
+    """Return True when two threshold payloads are numerically equivalent."""
+    try:
+        left = np.asarray(lhs)
+        right = np.asarray(rhs)
+    except Exception:  # adr002_allow
+        return lhs == rhs
+    if left.shape != right.shape:
+        return False
+    with np.errstate(invalid="ignore"):
+        return bool(np.allclose(left, right, equal_nan=True))
+
+
+def validate_regression_reject_threshold(threshold: Any) -> float | tuple[float, float]:
+    """Validate a regression reject threshold and return its canonical value."""
+    if isinstance(threshold, tuple):
+        if len(threshold) != 2:
+            raise ValidationError(
+                "regression reject interval threshold must be a (low, high) tuple.",
+                details={"threshold": threshold},
+            )
+        low, high = threshold
+        if not isinstance(low, numbers.Real) or not isinstance(high, numbers.Real):
+            raise ValidationError(
+                "regression reject interval threshold bounds must be numeric.",
+                details={"threshold": threshold},
+            )
+        low_f = float(low)
+        high_f = float(high)
+        if not np.isfinite(low_f) or not np.isfinite(high_f) or low_f >= high_f:
+            raise ValidationError(
+                "regression reject interval threshold must satisfy finite low < high.",
+                details={"threshold": threshold},
+            )
+        return (low_f, high_f)
+
+    if isinstance(threshold, numbers.Real):
+        value = float(threshold)
+        if np.isfinite(value):
+            return value
+
+    raise ValidationError(
+        "regression reject threshold must be a scalar numeric threshold or a "
+        "(low, high) interval tuple; per-instance thresholds are not supported.",
+        details={"threshold": threshold},
+    )
+
+
+def regression_threshold_event_labels(
+    y: Any,
+    threshold: Any,
+) -> np.ndarray:
+    """Return binary event labels for thresholded-regression reject."""
+    event_threshold = validate_regression_reject_threshold(threshold)
+    y_arr = np.asarray(y, dtype=float).reshape(-1)
+    if isinstance(event_threshold, tuple):
+        low, high = event_threshold
+        return ((low < y_arr) & (y_arr <= high)).astype(int)
+    return (y_arr <= event_threshold).astype(int)
+
+
+def _interval_width_score(proba: np.ndarray) -> np.ndarray:
+    """Compute instance-level interval-width score from a 2-column VA output."""
+    proba = np.asarray(proba, dtype=float)
+    if proba.shape[1] < 2:
+        return np.zeros(len(proba))
+    return proba[:, 1] - proba[:, 0]
+
+
+def interval_width_score(proba: np.ndarray) -> np.ndarray:
+    """Public wrapper for interval-width reject scoring."""
+    return _interval_width_score(proba)
+
+
+def _margin_score(proba: np.ndarray) -> np.ndarray:
+    """Compute instance-level margin score (higher means less conforming)."""
+    proba = np.asarray(proba, dtype=float)
+    if proba.shape[1] < 2:
+        return np.zeros(len(proba))
+    sorted_proba = np.sort(proba, axis=1)[:, ::-1]
+    return 1.0 - (sorted_proba[:, 0] - sorted_proba[:, 1])
+
+
+def margin_score(proba: np.ndarray) -> np.ndarray:
+    """Public wrapper for margin-based reject scoring."""
+    return _margin_score(proba)
+
+
+def _default_ncf_kind(is_multiclass: bool) -> str:
+    """Return internal default score kind for the current task.
+
+    Hinge is used for all tasks including multiclass. In the multiclass case,
+    probabilities are binarized to [1-p_max, p_max] (correctness encoding:
+    col 0 = top-1 is not correct, col 1 = top-1 is correct). Hinge produces
+    column-specific scores (alpha[:,0]=p_max, alpha[:,1]=1-p_max), allowing the
+    conformal classifier to return {1} positive correctness-proxy singletons and
+    {0} negative correctness-proxy singletons. A {0} singleton aggregates all
+    non-top1 classes; it is not a K-class alternative-label prediction set.
+    Margin would produce a scalar broadcast identically to both columns, making
+    singletons geometrically impossible and causing 100% rejection.
+    """
+    return "hinge"
+
+
+def _default_score_cal(
+    proba: np.ndarray,
+    classes: np.ndarray,
+    labels: np.ndarray,
+    default_kind: str,
+) -> np.ndarray:
+    """Compute 1-D calibration scores for the internal default reject score."""
+    if default_kind == "hinge":
+        return hinge(proba, classes, labels)
+    if default_kind == "margin":
+        return _margin_score(proba)
+    raise ValidationError(
+        f"Unsupported internal default score kind {default_kind!r}.",
+        details={"default_kind": default_kind},
+    )
+
+
+def default_score_cal(
+    proba: np.ndarray,
+    classes: np.ndarray,
+    labels: np.ndarray,
+    default_kind: str,
+) -> np.ndarray:
+    """Public wrapper for default calibration-score computation."""
+    return _default_score_cal(proba, classes, labels, default_kind)
+
+
+def _default_score_test(proba: np.ndarray, default_kind: str) -> np.ndarray:
+    """Compute 2-D test scores for the internal default reject score."""
+    if default_kind == "hinge":
+        return hinge(proba)
+    if default_kind == "margin":
+        base = _margin_score(proba)
+        k = np.asarray(proba).shape[1]
+        return np.repeat(base[:, np.newaxis], k, axis=1)
+    raise ValidationError(
+        f"Unsupported internal default score kind {default_kind!r}.",
+        details={"default_kind": default_kind},
+    )
+
+
+def default_ncf_kind(is_multiclass: bool) -> str:
+    """Public wrapper for default NCF kind selection."""
+    return _default_ncf_kind(is_multiclass)
+
+
+def default_score_test(proba: np.ndarray, default_kind: str) -> np.ndarray:
+    """Public wrapper for default test-score computation."""
+    return _default_score_test(proba, default_kind)
+
+
+def compute_singleton_accounting(prediction_set: np.ndarray, significance: float) -> dict[str, Any]:
+    """Compute paper-aligned singleton accounting for conformal reject metadata."""
+    prediction_set = np.asarray(prediction_set, dtype=bool)
+    if prediction_set.ndim != 2:
+        raise ValidationError("prediction_set must be a 2D boolean array")
+    set_sizes = np.sum(prediction_set, axis=1)
+    n_total = int(set_sizes.shape[0])
+    n_empty = int(np.sum(set_sizes == 0))
+    n_singleton = int(np.sum(set_sizes == 1))
+    n_ambiguity = int(np.sum(set_sizes >= 2))
+    empty_rate = 0.0 if n_total == 0 else float(n_empty / n_total)
+    singleton_rate = 0.0 if n_total == 0 else float(n_singleton / n_total)
+    ambiguity_rate = 0.0 if n_total == 0 else float(n_ambiguity / n_total)
+    novelty_rate = empty_rate
+    raw = None
+    clamped = None
+    defined = n_singleton > 0
+    clamped_flag = False
+    if defined:
+        raw = float((n_total * float(significance) - n_empty) / n_singleton)
+        clamped = float(max(0.0, min(1.0, raw)))
+        clamped_flag = not isclose(raw, clamped)
+    return {
+        "prediction_set_size": set_sizes,
+        "n_total": n_total,
+        "n_empty": n_empty,
+        "n_singleton": n_singleton,
+        "n_ambiguity": n_ambiguity,
+        "empty_rate": empty_rate,
+        "singleton_rate": singleton_rate,
+        "ambiguity_rate": ambiguity_rate,
+        "novelty_rate": novelty_rate,
+        "singleton_error_rate_estimate_raw": raw,
+        "singleton_error_rate_estimate_clamped": clamped,
+        "singleton_error_rate_estimate_defined": defined,
+        "singleton_error_rate_estimate_clamped_flag": clamped_flag,
+    }
+
+
+def _normalize_stored_ncf(value: Any) -> str | None:
+    """Normalize persisted/legacy NCF names for re-init equality checks."""
+    if value is None:
+        return None
+    lowered = str(value).strip().lower()
+    if lowered in ("default", "hinge", "margin", "entropy"):
+        return "default"
+    if lowered == "ensured":
+        return "ensured"
+    return lowered
+
+
+def normalize_stored_ncf(value: Any) -> str | None:
+    """Public wrapper for persisted NCF normalization."""
+    return _normalize_stored_ncf(value)
+
+
+def _legacy_base_ncf(proba: np.ndarray, ncf: str) -> np.ndarray:
+    """Compute instance-level legacy NCF scores.
+
+    Parameters
+    ----------
+    proba : ndarray of shape (n, k)
+        Calibrated probability matrix.  In multiclass mode this is a binarized
+        ``(n, 2)`` matrix ``[1 - p_argmax, p_argmax]``, not the full K-class
+        distribution.  Consequently ``entropy`` and ``margin`` operate on this
+        two-column representation rather than the full K-class probabilities:
+
+        * ``entropy`` → binary entropy of ``p_argmax``.
+        * ``margin``  → ``2 * (1 - p_argmax)`` (confidence-based, not true
+          K-class margin).
+
+        For binary classification and regression the full probability matrix
+        is passed and the semantics match the documented definitions.
+
+        For Venn-Abers binary output, column 0 = predict_low and column 1 =
+        predict_high, so the width ``proba[:,1] - proba[:,0]`` is the
+        calibrated uncertainty interval (used by ``ensured``).
+    ncf : {'ensured', 'entropy', 'margin'}
+        Internal legacy non-conformity function type. The public reject-policy
+        boundary accepts only ``default`` and ``ensured``; ``entropy``,
+        ``hinge``, and ``margin`` now raise ``ValidationError`` before they
+        reach this helper.
+
+    Returns
+    -------
+    ndarray of shape (n,) with scores in [0, 1].
+    """
+    proba = np.asarray(proba, dtype=float)
+    if ncf == "ensured":
+        return _interval_width_score(proba)
+    if ncf == "entropy":
+        proba_clipped = np.clip(proba, 1e-12, 1.0)
+        k = max(proba.shape[1], 2)
+        return -np.sum(proba_clipped * np.log2(proba_clipped), axis=1) / np.log2(k)
+    if ncf == "margin":
+        return _margin_score(proba)
+    raise ValidationError(
+        f"Unsupported ncf type {ncf!r}; expected one of {sorted(_VALID_NCF)!r}",
+        details={"ncf": ncf},
+    )
+
+
+def legacy_base_ncf(proba: np.ndarray, ncf: str) -> np.ndarray:
+    """Public wrapper for legacy reject NCF score computation."""
+    return _legacy_base_ncf(proba, ncf)
+
+
+def _ncf_scores_cal(  # pylint: disable=invalid-name
+    proba: np.ndarray,
+    classes: np.ndarray,
+    labels: np.ndarray,
+    ncf: str,
+    w: float,
+    default_kind: str,
+) -> np.ndarray:
+    """Compute 1-D calibration non-conformity scores.
+
+    Returns
+    -------
+    ndarray of shape (n,)
+    """
+    default_score = _default_score_cal(proba, classes, labels, default_kind)
+    if ncf == "default":
+        return default_score
+    if ncf == "ensured":
+        interval = _interval_width_score(proba)
+        return (1.0 - w) * interval + w * default_score
+    return _legacy_base_ncf(proba, ncf)
+
+
+def _ncf_scores_test(  # pylint: disable=invalid-name
+    proba: np.ndarray,
+    ncf: str,
+    w: float,
+    default_kind: str,
+) -> np.ndarray:
+    """Compute 2-D test non-conformity scores (one column per class).
+
+    Returns
+    -------
+    ndarray of shape (n, k)
+    """
+    default_score = _default_score_test(proba, default_kind)
+    if ncf == "default":
+        return default_score
+    if ncf == "ensured":
+        interval = _interval_width_score(proba)
+        k = np.asarray(proba).shape[1]
+        return (1.0 - w) * np.repeat(interval[:, np.newaxis], k, axis=1) + w * default_score
+    base = _legacy_base_ncf(proba, ncf)  # (n,)
+    k = np.asarray(proba).shape[1]
+    return np.repeat(base[:, np.newaxis], k, axis=1)
+
+
+def _clip_difficulty_values(
+    values: Any,
+    min_value: float = 1e-6,
+    max_value: float | None = None,
+) -> np.ndarray:
+    """Return clipped difficulty values as a flat float array."""
+    try:
+        min_clip = float(min_value)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            "min_value must be a positive float for difficulty clipping.",
+            details={"min_value": min_value},
+        ) from exc
+    if min_clip <= 0.0:
+        raise ValidationError(
+            "min_value must be a positive float for difficulty clipping.",
+            details={"min_value": min_clip},
+        )
+
+    max_clip: float | None = None
+    if max_value is not None:
+        try:
+            max_clip = float(max_value)
+        except (TypeError, ValueError) as exc:
+            raise ValidationError(
+                "max_value must be a float when provided for difficulty clipping.",
+                details={"max_value": max_value},
+            ) from exc
+        if max_clip < min_clip:
+            raise ValidationError(
+                "max_value must be greater than or equal to min_value for difficulty clipping.",
+                details={"min_value": min_clip, "max_value": max_clip},
+            )
+
+    clipped = np.asarray(values, dtype=float).reshape(-1)
+    clipped = np.maximum(clipped, min_clip)
+    if max_clip is not None:
+        clipped = np.minimum(clipped, max_clip)
+    return clipped.astype(float, copy=False)
+
+
+def _difficulty_values(explainer: Any, x: Any) -> np.ndarray:
+    """Return validated per-instance difficulty values for a batch."""
+    n_instances = _safe_length(x)
+    difficulty_estimator = getattr(explainer, "difficulty_estimator", None)
+    if difficulty_estimator is None:
+        return np.ones(n_instances, dtype=float)
+
+    apply = getattr(difficulty_estimator, "apply", None)
+    if not callable(apply):
+        raise ValidationError(
+            "difficulty_estimator must define an apply(x) method.",
+            details={"difficulty_estimator_type": type(difficulty_estimator).__name__},
+        )
+
+    raw_values = apply(x)
+    try:
+        difficulty = np.asarray(raw_values, dtype=float).reshape(-1)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            "difficulty_estimator.apply(x) must return numeric difficulty values.",
+            details={"difficulty_type": type(raw_values).__name__},
+        ) from exc
+
+    if len(difficulty) != n_instances:
+        raise ValidationError(
+            "difficulty_estimator.apply(x) must return one value per instance.",
+            details={"expected_length": n_instances, "actual_length": int(len(difficulty))},
+        )
+    if not np.all(np.isfinite(difficulty)):
+        raise ValidationError(
+            "difficulty values must be finite.",
+            details={"difficulty": difficulty.tolist()},
+        )
+    if np.any(difficulty < 0.0):
+        raise ValidationError(
+            "difficulty values must be non-negative.",
+            details={"difficulty": difficulty.tolist()},
+        )
+    if np.any(difficulty == 0.0):
+        raise ValidationError(
+            "difficulty_estimator.apply() returned zero values; strictly positive values are"
+            " required for difficulty-normalized reject scoring.",
+            details={
+                "issue": "zero_difficulty",
+                "zero_count": int(np.sum(difficulty == 0.0)),
+                "min_value": float(np.min(difficulty)),
+            },
+        )
+    return _clip_difficulty_values(difficulty)
+
+
+def _normalize_scores_by_difficulty(scores: np.ndarray, difficulty: np.ndarray) -> np.ndarray:
+    """Normalize 1-D or 2-D reject scores by per-instance difficulty."""
+    score_array = np.asarray(scores, dtype=float)
+    difficulty_array = _clip_difficulty_values(difficulty)
+
+    if score_array.ndim == 1:
+        if score_array.shape[0] != difficulty_array.shape[0]:
+            raise ValidationError(
+                "difficulty must match the length of 1-D reject scores.",
+                details={
+                    "score_length": int(score_array.shape[0]),
+                    "difficulty_length": int(difficulty_array.shape[0]),
+                },
+            )
+        return score_array / difficulty_array
+
+    if score_array.ndim == 2:
+        if score_array.shape[0] != difficulty_array.shape[0]:
+            raise ValidationError(
+                "difficulty must match the number of rows in 2-D reject scores.",
+                details={
+                    "score_rows": int(score_array.shape[0]),
+                    "difficulty_length": int(difficulty_array.shape[0]),
+                },
+            )
+        return score_array / difficulty_array[:, np.newaxis]
+
+    raise ValidationError(
+        "scores must be a 1-D or 2-D array for difficulty normalization.",
+        details={"scores_ndim": int(score_array.ndim)},
+    )
+
+
+def _ncf_scores_cal_difficulty_normalized(  # pylint: disable=invalid-name
+    proba: np.ndarray,
+    classes: np.ndarray,
+    labels: np.ndarray,
+    ncf: str,
+    w: float,
+    default_kind: str,
+    explainer: Any,
+    x: Any,
+) -> np.ndarray:
+    """Compute calibration non-conformity scores normalized by difficulty."""
+    base_scores = _ncf_scores_cal(proba, classes, labels, ncf, w, default_kind)
+    difficulty = _difficulty_values(explainer, x)
+    return _normalize_scores_by_difficulty(base_scores, difficulty)
+
+
+def _ncf_scores_test_difficulty_normalized(  # pylint: disable=invalid-name
+    proba: np.ndarray,
+    ncf: str,
+    w: float,
+    default_kind: str,
+    explainer: Any,
+    x: Any,
+) -> np.ndarray:
+    """Compute test non-conformity scores normalized by difficulty."""
+    base_scores = _ncf_scores_test(proba, ncf, w, default_kind)
+    difficulty = _difficulty_values(explainer, x)
+    return _normalize_scores_by_difficulty(base_scores, difficulty)
+
+
+def _difficulty_normalized_reject_scores_enabled(explainer: Any) -> bool:
+    """Return whether experimental difficulty-normalized reject scoring is enabled."""
+    return bool(getattr(explainer, "_reject_difficulty_normalized", False))
+
+
+def _ambiguity_novelty_reject_scores_enabled(explainer: Any) -> bool:
+    """Return whether ambiguity-normalized novelty-penalized scoring is enabled."""
+    return bool(getattr(explainer, "_reject_ambiguity_novelty_normalized", False))
+
+
+def _novelty_values(explainer: Any, x: Any) -> np.ndarray:
+    """Return validated per-instance novelty scores for a batch.
+
+    The novelty estimator is experimental and optional. When absent, zeros are
+    returned so no novelty penalty is added.
+    """
+    n_instances = _safe_length(x)
+    novelty_estimator = getattr(explainer, "_reject_novelty_estimator", None)
+    if novelty_estimator is None:
+        return np.zeros(n_instances, dtype=float)
+
+    apply = getattr(novelty_estimator, "apply", None)
+    if not callable(apply):
+        raise ValidationError(
+            "novelty_estimator must define an apply(x) method.",
+            details={"novelty_estimator_type": type(novelty_estimator).__name__},
+        )
+
+    raw_values = apply(x)
+    try:
+        novelty = np.asarray(raw_values, dtype=float).reshape(-1)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            "novelty_estimator.apply(x) must return numeric novelty values.",
+            details={"novelty_type": type(raw_values).__name__},
+        ) from exc
+
+    if len(novelty) != n_instances:
+        raise ValidationError(
+            "novelty_estimator.apply(x) must return one value per instance.",
+            details={"expected_length": n_instances, "actual_length": int(len(novelty))},
+        )
+    if not np.all(np.isfinite(novelty)):
+        raise ValidationError(
+            "novelty values must be finite.",
+            details={"novelty": novelty.tolist()},
+        )
+    if np.any(novelty < 0.0):
+        raise ValidationError(
+            "novelty values must be non-negative.",
+            details={"novelty": novelty.tolist()},
+        )
+    return novelty.astype(float, copy=False)
+
+
+def _novelty_weight(explainer: Any) -> float:
+    """Return validated novelty penalty weight for experimental strategy."""
+    raw = getattr(explainer, "_reject_novelty_weight", 0.0)
+    try:
+        value = float(raw)
+    except (TypeError, ValueError) as exc:
+        raise ValidationError(
+            "novelty_weight must be a non-negative float.",
+            details={"novelty_weight": raw},
+        ) from exc
+    if value < 0.0:
+        raise ValidationError(
+            "novelty_weight must be a non-negative float.",
+            details={"novelty_weight": value},
+        )
+    return value
+
+
+def _apply_novelty_penalty(
+    scores: np.ndarray, novelty: np.ndarray, novelty_weight: float
+) -> np.ndarray:
+    """Add novelty penalty to 1-D or 2-D reject scores."""
+    score_array = np.asarray(scores, dtype=float)
+    novelty_array = np.asarray(novelty, dtype=float).reshape(-1)
+    if novelty_weight == 0.0:
+        return score_array
+
+    if score_array.ndim == 1:
+        if score_array.shape[0] != novelty_array.shape[0]:
+            raise ValidationError(
+                "novelty must match the length of 1-D reject scores.",
+                details={
+                    "score_length": int(score_array.shape[0]),
+                    "novelty_length": int(novelty_array.shape[0]),
+                },
+            )
+        return score_array + novelty_weight * novelty_array
+
+    if score_array.ndim == 2:
+        if score_array.shape[0] != novelty_array.shape[0]:
+            raise ValidationError(
+                "novelty must match the number of rows in 2-D reject scores.",
+                details={
+                    "score_rows": int(score_array.shape[0]),
+                    "novelty_length": int(novelty_array.shape[0]),
+                },
+            )
+        return score_array + novelty_weight * novelty_array[:, np.newaxis]
+
+    raise ValidationError(
+        "scores must be a 1-D or 2-D array for novelty penalty.",
+        details={"scores_ndim": int(score_array.ndim)},
+    )
+
+
+def _ncf_scores_cal_ambiguity_normalized_novelty_penalized(  # pylint: disable=invalid-name
+    proba: np.ndarray,
+    classes: np.ndarray,
+    labels: np.ndarray,
+    ncf: str,
+    w: float,
+    default_kind: str,
+    explainer: Any,
+    x: Any,
+) -> np.ndarray:
+    """Compute calibration scores: alpha_base / d_amb (no novelty term on calibration side).
+
+    The novelty penalty must NOT be applied to calibration scores.  Adding it to calibration
+    nonconformity scores raises the ICP quantile threshold, which makes prediction sets larger
+    (more classes pass the p-value test) and increases ambiguity — the opposite of the
+    strategy's intent.  The penalty is applied asymmetrically to test scores only via
+    _ncf_scores_test_ambiguity_normalized_novelty_penalized.
+    """
+    return _ncf_scores_cal_difficulty_normalized(
+        proba,
+        classes,
+        labels,
+        ncf,
+        w,
+        default_kind,
+        explainer,
+        x,
+    )
+
+
+def _ncf_scores_test_ambiguity_normalized_novelty_penalized(  # pylint: disable=invalid-name
+    proba: np.ndarray,
+    ncf: str,
+    w: float,
+    default_kind: str,
+    explainer: Any,
+    x: Any,
+) -> np.ndarray:
+    """Compute test scores: alpha_base / d_amb + lambda * d_nov."""
+    normalized = _ncf_scores_test_difficulty_normalized(
+        proba,
+        ncf,
+        w,
+        default_kind,
+        explainer,
+        x,
+    )
+    novelty = _novelty_values(explainer, x)
+    return _apply_novelty_penalty(normalized, novelty, _novelty_weight(explainer))
+
+
+def resolve_policy_spec(reject_policy_kw: Any, explainer: Any) -> Any:
+    """Resolve reject policy inputs to a canonical policy value.
+
+    This function accepts:
+      - RejectPolicy enum members
+      - RejectPolicySpec instances
+      - dict payloads produced by RejectPolicySpec.to_dict()
+            - plain policy strings ("flag", "only_rejected", ...)
+      - None (returned unchanged)
+
+    Returns
+    -------
+    RejectPolicy | None
+        The canonical RejectPolicy value, or None when input is None.
+
+    Raises
+    ------
+    ValidationError
+        When the input cannot be parsed into a known policy/spec.
+    """
+    from ...explanations.reject import RejectPolicySpec  # pylint: disable=import-outside-toplevel
+
+    if reject_policy_kw is None:
+        return None
+
+    if isinstance(reject_policy_kw, RejectPolicy):
+        return reject_policy_kw
+
+    spec: RejectPolicySpec | None = None
+    if isinstance(reject_policy_kw, RejectPolicySpec):
+        spec = reject_policy_kw
+    elif isinstance(reject_policy_kw, dict):
+        try:
+            spec = RejectPolicySpec.from_dict(reject_policy_kw)
+        except ValueError as exc:
+            raise ValidationError(str(exc), details={"payload": reject_policy_kw}) from exc
+        except ValidationError as exc:
+            raise ValidationError(
+                "Invalid RejectPolicySpec dict; expected keys 'policy','ncf','w'.",
+                details={"payload": reject_policy_kw},
+            ) from exc
+    elif isinstance(reject_policy_kw, str):
+        stripped = reject_policy_kw.strip()
+        if stripped.startswith("{"):
+            raise ValidationError(
+                "JSON string reject policy payloads are unsupported; pass a dict or RejectPolicySpec.",
+                details={"payload": reject_policy_kw},
+            )
+        try:
+            return RejectPolicy(stripped.lower())
+        except ValueError as exc:
+            raise ValidationError(
+                "Unknown reject policy string.",
+                details={"policy": reject_policy_kw},
+            ) from exc
+    else:
+        raise ValidationError(
+            "Unsupported reject_policy input type.",
+            details={"type": type(reject_policy_kw).__name__, "value": repr(reject_policy_kw)},
+        )
+
+    if spec is not None:
+        stored_ncf = _normalize_stored_ncf(getattr(explainer, "reject_ncf", None))
+        stored_w = getattr(explainer, "reject_ncf_w", None)
+        effective_spec_w = canonical_reject_ncf_w(spec.ncf, float(spec.w))
+        effective_stored_w = (
+            None
+            if stored_w is None or stored_ncf is None
+            else canonical_reject_ncf_w(str(stored_ncf), float(stored_w))
+        )
+        if (
+            stored_ncf != spec.ncf
+            or effective_stored_w is None
+            or not isclose(
+                float(effective_stored_w), float(effective_spec_w), rel_tol=1e-9, abs_tol=0.0
+            )
+        ):
+            reject_orchestrator = getattr(explainer, "reject_orchestrator", None)
+            if reject_orchestrator is None:
+                plugin_manager = getattr(explainer, "plugin_manager", None)
+                if plugin_manager is None:
+                    raise ValidationError(
+                        "Reject orchestrator is unavailable for policy initialization.",
+                        details={"reason": "missing_plugin_manager"},
+                    )
+                plugin_manager.initialize_orchestrators()
+                reject_orchestrator = getattr(explainer, "reject_orchestrator", None)
+            if reject_orchestrator is None:
+                raise ValidationError(
+                    "Reject orchestrator is unavailable for policy initialization.",
+                    details={"reason": "missing_reject_orchestrator"},
+                )
+            if getattr(explainer, "mode", "classification") == "regression":
+                # For regression, the reject learner cannot be built without a call-time
+                # threshold. Store the NCF settings now so the strategy can read them
+                # via reject_ncf/reject_ncf_w; the learner is built inside the strategy
+                # or _resolve_regression_effective_threshold when threshold is available.
+                _normalized_ncf = normalize_reject_ncf_choice(spec.ncf)
+                explainer.reject_ncf = _normalized_ncf
+                explainer.reject_ncf_w = canonical_reject_ncf_w(_normalized_ncf, float(spec.w))
+                explainer.reject_ncf_auto_selected = False
+            else:
+                reject_orchestrator.initialize_reject_learner(ncf=spec.ncf, w=effective_spec_w)
+        return spec.policy
+
+    raise ValidationError(
+        "Failed to resolve reject_policy to a canonical form.",
+        details={"input": repr(reject_policy_kw)},
+    )
+
+
+def resolve_effective_reject_policy(
+    reject_policy_kw: Any,
+    explainer: Any,
+    *,
+    default_policy: Any = RejectPolicy.NONE,
+    logger: logging.Logger | None = None,
+) -> RejectPolicyResolution:
+    """Resolve explicit/default reject policy to a canonical effective policy.
+
+    Behavior contract
+    -----------------
+    - Explicit invalid per-call inputs fail fast with ``ValidationError``.
+    - Invalid explainer defaults fall back to ``RejectPolicy.NONE`` and emit
+      both a ``UserWarning`` and an INFO log event.
+    """
+    used_default = reject_policy_kw is None
+    candidate_policy = default_policy if used_default else reject_policy_kw
+    active_logger = logger or logging.getLogger(__name__)
+
+    try:
+        resolved = resolve_policy_spec(candidate_policy, explainer)
+    except ValidationError as exc:
+        if not used_default:
+            raise
+        message = "Invalid default_reject_policy; falling back to RejectPolicy.NONE."
+        active_logger.info("%s %s", message, str(exc))
+        warnings.warn(f"{message} {exc!s}", RejectContractWarning, stacklevel=3)
+        return RejectPolicyResolution(
+            policy=RejectPolicy.NONE,
+            used_default=True,
+            fallback_used=True,
+            reason="invalid_default_reject_policy",
+        )
+
+    resolved_policy = RejectPolicy.NONE if resolved is None else RejectPolicy(resolved)
+
+    return RejectPolicyResolution(
+        policy=resolved_policy,
+        used_default=used_default,
+        fallback_used=False,
+        reason=None,
+    )
+
+
+class RejectOrchestrator:
+    """Coordinate reject learner lifecycle and predictions."""
+
+    def __init__(self, explainer: Any) -> None:
+        self.explainer = explainer
+        self._logger = logging.getLogger(__name__)
+        # Lightweight registry for reject strategies. Keys are string identifiers
+        # (e.g., 'builtin.default') and values are callables with the same
+        # signature as `apply_policy` that return a `RejectResult`.
+        self._strategies: dict[str, Any] = {}
+        self._strategies_lock = threading.RLock()
+        # Register the builtin default strategy preserving existing semantics
+        # under the well-known identifier `builtin.default`.
+        self.register_strategy("builtin.default", self._builtin_strategy)
+
+        # Register the experimental difficulty-normalized strategy
+        self.register_strategy(
+            "experimental.difficulty_normalized",
+            self._experimental_difficulty_normalized_strategy,
+        )
+
+        # Register the experimental ambiguity-normalized novelty-penalized strategy
+        self.register_strategy(
+            "experimental.ambiguity_normalized_novelty_penalized",
+            self._experimental_ambiguity_normalized_novelty_penalized_strategy,
+        )
+
+        # Multiclass-only top-1 selective strategy. This intentionally treats
+        # {0} proxy singletons as non-accepted, but only when callers ask for it.
+        self.register_strategy(
+            "experimental.multiclass_top1_correctness",
+            self._experimental_multiclass_top1_correctness_strategy,
+        )
+
+    def _experimental_multiclass_top1_correctness_strategy(
+        self,
+        policy: RejectPolicy,
+        x,
+        explain_fn=None,
+        bins=None,
+        confidence=0.95,
+        threshold=None,
+        **kwargs,
+    ):
+        """Multiclass-only strategy accepting only {1} correctness-proxy singletons."""
+        if not bool(self.explainer.is_multiclass()):  # pylint: disable=protected-access
+            raise ValidationError(
+                'strategy="experimental.multiclass_top1_correctness" is only valid '
+                "for multiclass classification.",
+                details={
+                    "strategy": "experimental.multiclass_top1_correctness",
+                    "task_mode": getattr(self.explainer, "mode", None),
+                },
+            )
+        breakdown = self.predict_reject_breakdown(
+            x,
+            bins=bins,
+            confidence=confidence,
+            threshold=threshold,
+        )
+        prediction_set_raw = breakdown.get("prediction_set")
+        if prediction_set_raw is None:
+            raise ValidationError(
+                'strategy="experimental.multiclass_top1_correctness" requires '
+                "prediction_set metadata.",
+                details={"strategy": "experimental.multiclass_top1_correctness"},
+            )
+        prediction_set = np.asarray(prediction_set_raw, dtype=bool)
+        if prediction_set.ndim != 2 or prediction_set.shape[1] != 2:
+            raise ValidationError(
+                'strategy="experimental.multiclass_top1_correctness" expects the '
+                "multiclass binary correctness proxy with two prediction-set columns.",
+                details={
+                    "strategy": "experimental.multiclass_top1_correctness",
+                    "prediction_set_shape": tuple(prediction_set.shape),
+                },
+            )
+
+        set_sizes = np.asarray(breakdown["prediction_set_size"], dtype=int)
+        positive_singleton = (set_sizes == 1) & prediction_set[:, 1]
+        proxy_negative_singleton = (set_sizes == 1) & prediction_set[:, 0]
+        top1_rejected = ~positive_singleton
+        n_total = int(len(top1_rejected))
+        reject_rate = 0.0 if n_total == 0 else float(np.mean(top1_rejected))
+
+        multiclass_breakdown = dict(breakdown)
+        multiclass_breakdown.update(
+            {
+                "rejected": top1_rejected,
+                "reject_rate": reject_rate,
+                "raw_reject_counts": {
+                    **dict(breakdown.get("raw_reject_counts") or {}),
+                    "rejected": int(np.sum(top1_rejected)),
+                    "positive_singleton": int(np.sum(positive_singleton)),
+                    "proxy_negative_singleton": int(np.sum(proxy_negative_singleton)),
+                },
+            }
+        )
+        metadata_overrides = {
+            "reject_strategy": "experimental.multiclass_top1_correctness",
+            "reject_decision_rule": "multiclass_top1_correctness_proxy",
+            "task_mode": "multiclass",
+            "multiclass_semantics": "binary_correctness_proxy",
+            "paper_aligned": False,
+            "multiclass_paper_aligned": False,
+            "positive_singleton_mask": positive_singleton,
+            "proxy_negative_singleton_mask": proxy_negative_singleton,
+            "positive_singleton_rate": (
+                0.0 if n_total == 0 else float(np.mean(positive_singleton))
+            ),
+            "proxy_negative_singleton_rate": (
+                0.0 if n_total == 0 else float(np.mean(proxy_negative_singleton))
+            ),
+            "non_accepted_rate": reject_rate,
+            "validity_claim": (
+                "multiclass binary correctness proxy; {0} aggregates all non-top1 "
+                "classes and is not a K-class conformal label-set reject"
+            ),
+        }
+        return self._builtin_strategy(
+            policy,
+            x,
+            explain_fn=explain_fn,
+            bins=bins,
+            confidence=confidence,
+            threshold=threshold,
+            _precomputed_breakdown=multiclass_breakdown,
+            _metadata_overrides=metadata_overrides,
+            **kwargs,
+        )
+
+    def _experimental_ambiguity_normalized_novelty_penalized_strategy(
+        self,
+        policy: RejectPolicy,
+        x,
+        explain_fn=None,
+        bins=None,
+        confidence=0.95,
+        threshold=None,
+        **kwargs,
+    ):
+        """Experimental strategy: alpha_base/d_amb + lambda*d_nov."""
+        novelty_weight = kwargs.pop("novelty_weight", None)
+        novelty_estimator = kwargs.pop("novelty_estimator", None)
+        ambiguity_estimator = kwargs.pop("ambiguity_estimator", None)
+        if novelty_weight is None:
+            novelty_weight = 0.0
+        if novelty_estimator is None:
+            novelty_estimator = getattr(self.explainer, "_reject_novelty_estimator", None)
+        if ambiguity_estimator is None:
+            ambiguity_estimator = getattr(self.explainer, "difficulty_estimator", None)
+
+        prev_flag = getattr(self.explainer, "_reject_ambiguity_novelty_normalized", False)
+        prev_novelty_estimator = getattr(self.explainer, "_reject_novelty_estimator", None)
+        prev_novelty_weight = getattr(self.explainer, "_reject_novelty_weight", 0.0)
+        prev_ambiguity_estimator = getattr(self.explainer, "difficulty_estimator", None)
+
+        self.explainer._reject_ambiguity_novelty_normalized = True
+        self.explainer._reject_novelty_estimator = novelty_estimator
+        self.explainer._reject_novelty_weight = novelty_weight
+        self.explainer.difficulty_estimator = ambiguity_estimator
+        try:
+            result = self._experimental_difficulty_normalized_strategy(
+                policy,
+                x,
+                explain_fn=explain_fn,
+                bins=bins,
+                confidence=confidence,
+                threshold=threshold,
+                **kwargs,
+            )
+
+            metadata = getattr(result, "metadata", None)
+            if isinstance(metadata, dict):
+                ambiguity_stats: dict[str, float] = {}
+                novelty_stats: dict[str, float] = {}
+                if ambiguity_estimator is not None and hasattr(ambiguity_estimator, "apply"):
+                    try:
+                        ambiguity_values = np.asarray(
+                            ambiguity_estimator.apply(x), dtype=float
+                        ).reshape(-1)
+                        ambiguity_stats = {
+                            "ambiguity_difficulty_min": float(np.min(ambiguity_values)),
+                            "ambiguity_difficulty_max": float(np.max(ambiguity_values)),
+                            "ambiguity_difficulty_mean": float(np.mean(ambiguity_values)),
+                        }
+                    except Exception:  # adr002_allow
+                        self._logger.info(
+                            "Ambiguity-difficulty metadata collection failed.",
+                            exc_info=True,
+                        )
+                if novelty_estimator is not None and hasattr(novelty_estimator, "apply"):
+                    try:
+                        novelty_values = np.asarray(
+                            novelty_estimator.apply(x), dtype=float
+                        ).reshape(-1)
+                        novelty_stats = {
+                            "novelty_score_min": float(np.min(novelty_values)),
+                            "novelty_score_max": float(np.max(novelty_values)),
+                            "novelty_score_mean": float(np.mean(novelty_values)),
+                        }
+                    except Exception:  # adr002_allow
+                        self._logger.info(
+                            "Novelty-score metadata collection failed.",
+                            exc_info=True,
+                        )
+
+                metadata.update(
+                    {
+                        "reject_strategy": "experimental.ambiguity_normalized_novelty_penalized",
+                        "difficulty_normalized": True,
+                        "novelty_penalized": True,
+                        "novelty_weight": float(novelty_weight),
+                        "base_ncf": getattr(self.explainer, "reject_ncf", None),
+                        **ambiguity_stats,
+                        **novelty_stats,
+                    }
+                )
+            return result
+        finally:
+            self.explainer._reject_ambiguity_novelty_normalized = prev_flag
+            self.explainer._reject_novelty_estimator = prev_novelty_estimator
+            self.explainer._reject_novelty_weight = prev_novelty_weight
+            self.explainer.difficulty_estimator = prev_ambiguity_estimator
+
+    def _experimental_difficulty_normalized_strategy(
+        self,
+        policy: RejectPolicy,
+        x,
+        explain_fn=None,
+        bins=None,
+        confidence=0.95,
+        threshold=None,
+        **kwargs,
+    ):
+        """Experimental strategy: difficulty-normalized reject conformal classification."""
+        result_schema_raw = kwargs.pop("result_schema", "legacy")
+        result_schema = str(result_schema_raw).strip().lower()
+        return_v2 = result_schema in {"v2", "2", "2.0"}
+        include_prediction_set_kw = kwargs.pop("include_prediction_set", None)
+        include_prediction_payload = kwargs.pop("include_prediction_payload", explain_fn is None)
+        confidence = validate_reject_confidence(confidence)
+        try:
+            policy = RejectPolicy(policy)
+        except Exception:  # adr002_allow
+            policy = RejectPolicy.NONE
+
+        # If NONE, return a simple envelope indicating no action
+        if policy is RejectPolicy.NONE:
+            if return_v2:
+                raise ValidationError(
+                    "RejectResultV2 is only available for non-NONE reject policies.",
+                    details={"policy": policy.value},
+                )
+            return RejectResult(
+                prediction=None, explanation=None, rejected=None, policy=policy, metadata=None
+            )
+
+        # Enable difficulty-normalized scoring for this call
+        prev_flag = getattr(self.explainer, "_reject_difficulty_normalized", False)
+        prev_reject_learner = getattr(self.explainer, "reject_learner", None)
+        prev_reject_threshold = getattr(self.explainer, "reject_threshold", None)
+        prev_reject_ncf = getattr(self.explainer, "reject_ncf", None)
+        prev_reject_ncf_w = getattr(self.explainer, "reject_ncf_w", None)
+        prev_reject_ncf_auto_selected = getattr(self.explainer, "reject_ncf_auto_selected", None)
+        self.explainer._reject_difficulty_normalized = True
+        try:
+            provenance_policy = (
+                str(getattr(self.explainer, "reject_difficulty_provenance_policy", "permissive"))
+                .strip()
+                .lower()
+            )
+            strict_provenance = provenance_policy == "strict"
+            provenance_report = validate_difficulty_estimator_provenance(
+                getattr(self.explainer, "difficulty_estimator", None),
+                strict=strict_provenance,
+                logger=self._logger,
+            )
+            # Always rebuild the ConformalClassifier here, even when a reject_learner
+            # already exists.  The caller may have changed difficulty_estimator between
+            # calls (e.g. the evaluation suite does set_difficulty_estimator per arm), so
+            # a cached learner built under the previous estimator would produce wrong
+            # normalized calibration scores.  The finally block restores the previous
+            # learner so callers are not affected.
+            self.initialize_reject_learner(
+                threshold=threshold,
+                ncf=prev_reject_ncf,
+                w=prev_reject_ncf_w if prev_reject_ncf_w is not None else 0.5,
+            )
+
+            # Use the same logic as the builtin strategy, but ensure normalization is active
+            breakdown = self.predict_reject_breakdown(
+                x, bins=bins, confidence=confidence, threshold=threshold
+            )
+            degraded_mode_markers = list(breakdown.get("degraded_mode") or ())
+            include_prediction_set = (
+                bool(include_prediction_set_kw)
+                if include_prediction_set_kw is not None
+                else (policy is RejectPolicy.FLAG)
+            )
+            rejected = breakdown["rejected"]
+            error_rate = breakdown["error_rate"]
+            reject_rate = breakdown["reject_rate"]
+
+            prediction = None
+            explanation = None
+
+            if include_prediction_payload and policy in (
+                RejectPolicy.FLAG,
+                RejectPolicy.ONLY_REJECTED,
+                RejectPolicy.ONLY_ACCEPTED,
+            ):
+                try:
+                    prediction_kwargs = dict(kwargs)
+                    if getattr(self.explainer, "mode", "classification") == "regression":
+                        prediction_kwargs["threshold"] = threshold
+                    prediction = self.explainer.prediction_orchestrator.predict(
+                        x, **prediction_kwargs
+                    )
+                except Exception as exc:  # adr002_allow
+                    self._logger.info(
+                        "Reject policy prediction failed; returning prediction=None.",
+                        exc_info=True,
+                    )
+                    warnings.warn(
+                        f"Reject policy prediction failed; returning prediction=None ({exc!s}).",
+                        RejectContractWarning,
+                        stacklevel=2,
+                    )
+                    prediction = None
+                    degraded_mode_markers.append("prediction_payload_failed")
+
+            matched_count = None
+            source_indices: list[int] = list(range(len(rejected)))
+            if policy is RejectPolicy.ONLY_REJECTED:
+                source_indices = [i for i, r in enumerate(rejected) if r]
+            elif policy is RejectPolicy.ONLY_ACCEPTED:
+                source_indices = [i for i, r in enumerate(rejected) if not r]
+            if policy in (RejectPolicy.ONLY_REJECTED, RejectPolicy.ONLY_ACCEPTED):
+                matched_count = len(source_indices)
+
+            if explain_fn is not None:
+                try:
+                    if policy is RejectPolicy.FLAG:
+                        explanation = explain_fn(x, **kwargs)
+                    elif (
+                        policy is RejectPolicy.ONLY_REJECTED or policy is RejectPolicy.ONLY_ACCEPTED
+                    ):
+                        idx = source_indices
+                        if idx:
+                            subset = (
+                                np.asarray(x)[idx]
+                                if isinstance(x, np.ndarray)
+                                else [x[i] for i in idx]
+                            )
+                            explanation = explain_fn(subset, **kwargs)
+                        else:
+                            explanation = None
+                except Exception as exc:  # adr002_allow
+                    self._logger.info(
+                        "Reject policy explanation failed; returning explanation=None.",
+                        exc_info=True,
+                    )
+                    warnings.warn(
+                        f"Reject policy explanation failed; returning explanation=None ({exc!s}).",
+                        RejectContractWarning,
+                        stacklevel=2,
+                    )
+                    explanation = None
+                    degraded_mode_markers.append("explanation_payload_failed")
+                    if kwargs.get("_reject_raise", False):
+                        raise
+
+            # Compute difficulty stats for metadata
+            difficulty_estimator = getattr(self.explainer, "difficulty_estimator", None)
+            difficulty_stats = {}
+            if difficulty_estimator is not None and hasattr(difficulty_estimator, "apply"):
+                try:
+                    difficulty_values = np.asarray(
+                        difficulty_estimator.apply(x), dtype=float
+                    ).reshape(-1)
+                    difficulty_stats = {
+                        "difficulty_min": float(np.min(difficulty_values)),
+                        "difficulty_max": float(np.max(difficulty_values)),
+                        "difficulty_mean": float(np.mean(difficulty_values)),
+                    }
+                except Exception:  # adr002_allow
+                    self._logger.info(
+                        "Difficulty metadata collection failed; omitting difficulty stats.",
+                        exc_info=True,
+                    )
+
+            # Metadata
+            metadata = self._build_contract_metadata(
+                policy=policy,
+                rejected=rejected,
+                source_indices=source_indices,
+                original_count=len(rejected),
+                effective_confidence=confidence,
+                effective_threshold=threshold,
+                init_ok=True,
+                init_error=False,
+                fallback_used=bool(breakdown.get("fallback_used", False)),
+                degraded_mode=degraded_mode_markers,
+                base_metadata={
+                    "error_rate": error_rate,
+                    "error_rate_defined": breakdown.get("error_rate_defined", True),
+                    "reject_rate": reject_rate,
+                    "ambiguity_rate": breakdown.get("ambiguity_rate"),
+                    "novelty_rate": breakdown.get("novelty_rate"),
+                    "ambiguity_mask": breakdown.get("ambiguity"),
+                    "novelty_mask": breakdown.get("novelty"),
+                    "prediction_set_size": breakdown.get("prediction_set_size"),
+                    "prediction_set": (
+                        breakdown.get("prediction_set") if include_prediction_set else None
+                    ),
+                    "epsilon": breakdown.get("epsilon"),
+                    "raw_total_examples": breakdown.get("raw_total_examples"),
+                    "raw_reject_counts": breakdown.get("raw_reject_counts"),
+                    "reject_ncf": getattr(self.explainer, "reject_ncf", None),
+                    "reject_ncf_w": getattr(self.explainer, "reject_ncf_w", None),
+                    "reject_ncf_auto_selected": getattr(
+                        self.explainer, "reject_ncf_auto_selected", None
+                    ),
+                    "matched_count": matched_count,
+                    "source_indices": source_indices,
+                    "original_count": int(len(rejected)),
+                    "effective_confidence": confidence,
+                    "effective_threshold": threshold,
+                    "threshold_source": None,
+                    "schema_version": "2.0",
+                    "effective_w": validate_reject_w(
+                        getattr(self.explainer, "reject_ncf_w", 0.0)
+                        if getattr(self.explainer, "reject_ncf_w", None) is not None
+                        else 0.0
+                    ),
+                    # Experimental metadata
+                    "reject_strategy": "experimental.difficulty_normalized",
+                    "difficulty_normalized": True,
+                    "base_ncf": getattr(self.explainer, "reject_ncf", None),
+                    "base_default_kind": _default_ncf_kind(bool(self.explainer.is_multiclass())),
+                    "normalization_epsilon": 1e-6,
+                    "difficulty_estimator_provenance_available": (
+                        provenance_report.provenance_available
+                    ),
+                    "difficulty_estimator_provenance_warning_emitted": (
+                        provenance_report.warning_emitted
+                    ),
+                    "difficulty_estimator_provenance_validation_mode": (
+                        provenance_report.validation_mode
+                    ),
+                    "difficulty_estimator_fit_source": provenance_report.fit_source,
+                    "difficulty_estimator_uses_calibration_labels": (
+                        provenance_report.uses_calibration_labels
+                    ),
+                    "difficulty_estimator_uses_calibration_residuals": (
+                        provenance_report.uses_calibration_residuals
+                    ),
+                    "difficulty_estimator_cross_fitted": provenance_report.cross_fitted,
+                    **difficulty_stats,
+                },
+            )
+            decision = self._build_decision_artifact(
+                rejected=np.asarray(rejected, dtype=bool),
+                breakdown=breakdown,
+                confidence=confidence,
+                include_prediction_set=include_prediction_set,
+                fallback_used=bool(metadata.get("fallback_used", False)),
+                degraded_mode=tuple(metadata.get("degraded_mode", ())),
+            )
+            payload = self._build_payload_artifact(
+                policy=policy,
+                source_indices=source_indices,
+                original_count=len(rejected),
+                matched_count=matched_count,
+                prediction=prediction,
+                explanation=explanation,
+            )
+            result_v2 = RejectResultV2(
+                schema_version="2.0",
+                policy=policy,
+                decision=decision,
+                payload=payload,
+                metadata=metadata,
+            )
+            if return_v2:
+                return result_v2
+            return reject_result_v2_to_legacy(result_v2, emit_deprecation_warning=False)
+        finally:
+            self.explainer._reject_difficulty_normalized = prev_flag
+            self.explainer.reject_learner = prev_reject_learner
+            self.explainer.reject_threshold = prev_reject_threshold
+            self.explainer.reject_ncf = prev_reject_ncf
+            self.explainer.reject_ncf_w = prev_reject_ncf_w
+            self.explainer.reject_ncf_auto_selected = prev_reject_ncf_auto_selected
+
+    def __getstate__(self) -> dict:
+        """Support pickling by excluding unpicklable attributes (RLock/loggers).
+
+        When the orchestrator is used with multiprocessing or joblib, instances
+        may be pickled. Exclude the thread lock and logger and recreate them
+        during unpickling to avoid "cannot pickle '_thread.RLock' object".
+        """
+        state = self.__dict__.copy()
+        state.pop("_strategies_lock", None)
+        state.pop("_logger", None)
+        return state
+
+    def __setstate__(self, state: dict) -> None:
+        """Restore state and recreate unpicklable attributes."""
+        self.__dict__.update(state)
+        self._strategies_lock = threading.RLock()
+        self._logger = logging.getLogger(__name__)
+
+    @staticmethod
+    def _filter_kwargs(func: Any, kwargs: dict[str, Any]) -> dict[str, Any]:
+        try:
+            signature = inspect.signature(func)
+        except (TypeError, ValueError):
+            return kwargs
+        return {k: v for k, v in kwargs.items() if k in signature.parameters}
+
+    def _resolve_regression_effective_threshold(
+        self, threshold: Any
+    ) -> tuple[Any | None, str | None]:
+        """Resolve effective threshold for reject-enabled calls.
+
+        Regression contract:
+        - Call threshold is mandatory.
+        - Stored reject_threshold is never used as fallback.
+        """
+        if self.explainer.mode != "regression":
+            return None, None
+        if threshold is None:
+            raise ValidationError("reject learner unavailable for regression without threshold")
+
+        effective_threshold = validate_regression_reject_threshold(threshold)
+        threshold_source = "call"
+        current_threshold = getattr(self.explainer, "reject_threshold", None)
+        learner_missing = getattr(self.explainer, "reject_learner", None) is None
+        mismatch = current_threshold is None or not _thresholds_equal(
+            current_threshold, effective_threshold
+        )
+        if learner_missing or mismatch:
+            if not learner_missing and mismatch:
+                self._logger.info(
+                    "Reject threshold mismatch detected; reinitializing reject learner with call threshold."
+                )
+                warnings.warn(
+                    "Reject threshold mismatch detected; reinitializing reject learner "
+                    "with call threshold.",
+                    UserWarning,
+                    stacklevel=3,
+                )
+            self.initialize_reject_learner(
+                threshold=effective_threshold,
+                ncf=getattr(self.explainer, "reject_ncf", None),
+                w=(
+                    getattr(self.explainer, "reject_ncf_w", 0.5)
+                    if getattr(self.explainer, "reject_ncf_w", None) is not None
+                    else 0.5
+                ),
+            )
+            threshold_source = "call_reinitialized" if mismatch else "call"
+        return effective_threshold, threshold_source
+
+    def initialize_reject_learner(  # pylint: disable=invalid-name
+        self, calibration_set=None, threshold=None, ncf=None, w=0.5
+    ):
+        """Initialize the reject learner with calibration data and NCF settings.
+
+        Parameters
+        ----------
+        calibration_set : tuple (x_cal, y_cal) or None
+            Calibration data. Uses the explainer's calibration set when None.
+        threshold : float, tuple[float, float], or None
+            Decision threshold for **regression only**. **Required** when the
+            explainer is in regression mode — omitting it raises
+            ``ValidationError``.
+
+            The threshold defines a binary event. Scalar thresholds use
+            ``y <= threshold``; interval thresholds use ``low < y <= high``.
+            The framework converts regression into threshold-binarized
+            conformal classification (``P(event)``). This is
+            **not** conformal prediction interval regression; it is conformal
+            prediction for a user-defined regression event. Per-instance
+            threshold arrays are not supported. For classification this
+            parameter is unused and should remain ``None``.
+        ncf : str or None, default None
+            Non-conformity function type: 'default' or 'ensured'. The
+            internal default score is task-dependent: margin for multiclass
+            and hinge for binary/regression. Legacy 'entropy' input is
+            accepted and silently mapped to 'default'. Explicit 'hinge' and
+            'margin' inputs are rejected.
+        w : float, default 0.5
+            Blending weight in [0, 1] used only when ``ncf='ensured'``.
+            ``score = (1-w) * interval_width + w * default_score``.
+            Ignored for ``ncf='default'``. ``w=0.0`` raises
+            ``ValidationError``; ``w < 0.1`` emits a ``UserWarning``.
+
+        Raises
+        ------
+        ValidationError
+            If ``threshold`` is ``None`` and the explainer is in regression
+            mode, if ``ncf`` is not a recognised value, if explicit
+            ``ncf='hinge'`` or ``ncf='margin'`` is supplied, or if ``w=0.0``
+            with ``ncf='ensured'``.
+        """
+        validated_w = validate_reject_w(w)
+        bins_cal = self.explainer.bins if calibration_set is None else None
+        if calibration_set is None:
+            x_cal, y_cal = self.explainer.x_cal, self.explainer.y_cal
+        elif isinstance(calibration_set, (tuple, list)) and len(calibration_set) == 2:
+            x_cal, y_cal = calibration_set
+        else:
+            raise ValidationError("calibration_set must be a (x_cal, y_cal) pair or None")
+
+        # Resolve user NCF; internal default score remains task-dependent.
+        ncf_explicit = ncf is not None
+        if ncf is None:
+            ncf = "default"
+        try:
+            ncf = normalize_reject_ncf_choice(ncf)
+        except ValueError as exc:
+            raise ValidationError(
+                str(exc),
+                details={"ncf": ncf},
+            ) from exc
+        if ncf not in _VALID_NCF:
+            raise ValidationError(
+                f"ncf must be one of {sorted(_VALID_NCF)!r}; got {ncf!r}",
+                details={"ncf": ncf},
+            )
+        if ncf == "ensured":
+            if validated_w == 0.0:
+                raise ValidationError(
+                    "w=0.0 with ncf='ensured' is not allowed. Use w > 0.0 (recommended w >= 0.1).",
+                    details={"w": validated_w, "ncf": ncf},
+                )
+            if validated_w < 0.1:
+                warnings.warn(
+                    f"ncf='ensured' with w={validated_w} (near 0) may produce unstable reject "
+                    "behavior. Consider w >= 0.1.",
+                    UserWarning,
+                    stacklevel=2,
+                )
+
+        self.explainer.reject_threshold = None
+        self.explainer.reject_ncf = ncf
+        self.explainer.reject_ncf_w = canonical_reject_ncf_w(ncf, validated_w)
+        self.explainer.reject_ncf_auto_selected = not ncf_explicit
+        default_kind = _default_ncf_kind(
+            bool(self.explainer.is_multiclass())  # pylint: disable=protected-access
+        )
+
+        if self.explainer.mode == "regression":
+            if threshold is None:
+                raise ValidationError("reject learner unavailable for regression without threshold")
+            threshold = validate_regression_reject_threshold(threshold)
+            proba_1, _, _, _ = self.explainer.interval_learner.predict_probability(
+                x_cal, y_threshold=threshold, bins=bins_cal
+            )
+            proba = np.array([[1 - proba_1[i], proba_1[i]] for i in range(len(proba_1))])
+            calibration_bins = regression_threshold_event_labels(y_cal, threshold)
+            self.explainer.reject_threshold = threshold
+        elif self.explainer.is_multiclass():  # pylint: disable=protected-access
+            proba, predicted_labels = self.explainer.interval_learner.predict_proba(
+                x_cal, bins=bins_cal
+            )
+            proba = np.array(
+                [[1 - proba[i, c], proba[i, c]] for i, c in enumerate(predicted_labels)]
+            )
+            calibration_bins = (predicted_labels == y_cal).astype(int)
+        else:
+            proba = self.explainer.interval_learner.predict_proba(x_cal, bins=bins_cal)
+            calibration_bins = y_cal
+
+        effective_w = canonical_reject_ncf_w(ncf, validated_w)
+        if _ambiguity_novelty_reject_scores_enabled(self.explainer):
+            alphas_cal = _ncf_scores_cal_ambiguity_normalized_novelty_penalized(
+                proba,
+                np.unique(calibration_bins),
+                calibration_bins,
+                ncf,
+                effective_w,
+                default_kind,
+                self.explainer,
+                x_cal,
+            )
+        elif _difficulty_normalized_reject_scores_enabled(self.explainer):
+            alphas_cal = _ncf_scores_cal_difficulty_normalized(
+                proba,
+                np.unique(calibration_bins),
+                calibration_bins,
+                ncf,
+                effective_w,
+                default_kind,
+                self.explainer,
+                x_cal,
+            )
+        else:
+            alphas_cal = _ncf_scores_cal(
+                proba,
+                np.unique(calibration_bins),
+                calibration_bins,
+                ncf,
+                effective_w,
+                default_kind,
+            )
+        self.explainer.reject_learner = ConformalClassifier().fit(alphas=alphas_cal, bins=bins_cal)
+        _ = ncf_explicit  # used above; suppress unused-variable warning
+        return self.explainer.reject_learner
+
+    def _compute_prediction_set(
+        self, x, bins=None, confidence: float = 0.95, threshold=None
+    ) -> tuple[np.ndarray, float, tuple[str, ...]]:
+        confidence = validate_reject_confidence(confidence)
+        if bins is not None:
+            bins = np.asarray(bins)
+
+        if self.explainer.mode == "regression":
+            if threshold is None:
+                raise ValidationError("reject learner unavailable for regression without threshold")
+            threshold = validate_regression_reject_threshold(threshold)
+            proba_1, _, _, _ = self.explainer.interval_learner.predict_probability(
+                x, y_threshold=threshold, bins=bins
+            )
+            proba = np.array([[1 - proba_1[i], proba_1[i]] for i in range(len(proba_1))])
+        elif self.explainer.is_multiclass():  # pylint: disable=protected-access
+            proba, predicted_labels = self.explainer.interval_learner.predict_proba(x, bins=bins)
+            proba = np.array(
+                [[1 - proba[i, c], proba[i, c]] for i, c in enumerate(predicted_labels)]
+            )
+        else:
+            proba = self.explainer.interval_learner.predict_proba(x, bins=bins)
+
+        ncf = getattr(self.explainer, "reject_ncf", "default")
+        ncf_w = getattr(self.explainer, "reject_ncf_w", 1.0)
+        default_kind = _default_ncf_kind(
+            bool(self.explainer.is_multiclass())  # pylint: disable=protected-access
+        )
+        if _ambiguity_novelty_reject_scores_enabled(self.explainer):
+            alphas_test = np.asarray(
+                _ncf_scores_test_ambiguity_normalized_novelty_penalized(
+                    proba,
+                    ncf,
+                    ncf_w,
+                    default_kind,
+                    self.explainer,
+                    x,
+                )
+            )
+        elif _difficulty_normalized_reject_scores_enabled(self.explainer):
+            alphas_test = np.asarray(
+                _ncf_scores_test_difficulty_normalized(
+                    proba,
+                    ncf,
+                    ncf_w,
+                    default_kind,
+                    self.explainer,
+                    x,
+                )
+            )
+        else:
+            alphas_test = np.asarray(_ncf_scores_test(proba, ncf, ncf_w, default_kind))
+
+        seed = getattr(self.explainer, "seed", None)
+        epsilon = 1 - confidence
+        degraded_mode_markers: list[str] = []
+
+        prediction_set = None
+        # Preferred: compute p-values once (deterministic) and threshold at epsilon.
+        # This guarantees prediction sets are nested as confidence increases.
+        if hasattr(self.explainer.reject_learner, "predict_p"):
+            predict_p_kwargs = {
+                "bins": bins,
+                "all_classes": True,
+                "smoothing": False,
+                "seed": seed,
+            }
+            predict_p_kwargs = self._filter_kwargs(
+                self.explainer.reject_learner.predict_p, predict_p_kwargs
+            )
+            try:
+                p_values = self.explainer.reject_learner.predict_p(alphas_test, **predict_p_kwargs)
+                p_values = np.asarray(p_values, dtype=float)
+                # Match crepes.ConformalClassifier.predict_set semantics for
+                # deterministic p-values: labels on the significance boundary
+                # are included in the conformal prediction set.
+                prediction_set = p_values >= epsilon
+            except Exception as exc:  # adr002_allow
+                self._logger.info(
+                    "Reject predict_p failed; falling back to predict_set.",
+                    exc_info=True,
+                )
+                warnings.warn(
+                    (
+                        "Reject prediction fallback engaged: predict_p failed "
+                        f"({exc!s}); using predict_set."
+                    ),
+                    RejectContractWarning,
+                    stacklevel=2,
+                )
+                degraded_mode_markers.append("predict_p_to_predict_set_fallback")
+
+        # Fallback: use predict_set directly but force smoothing=False for determinism.
+        if prediction_set is None:
+            # Provide a classes_array hint for conformal implementations
+            # that expect an explicit classes argument (tests use a Dummy
+            # Conformal that requires `classes_array`). Derive from the
+            # probability matrix where possible.
+            classes_array = None
+            try:
+                if hasattr(proba, "ndim") and proba.ndim == 2:
+                    classes_array = np.arange(proba.shape[1])
+            except Exception:  # adr002_allow - defensive fallback for classes derivation
+                classes_array = None
+
+            predict_set_kwargs = {
+                "bins": bins,
+                "confidence": confidence,
+                "smoothing": False,
+                "seed": seed,
+                "classes_array": classes_array,
+            }
+            predict_set_kwargs = self._filter_kwargs(
+                self.explainer.reject_learner.predict_set, predict_set_kwargs
+            )
+            try:
+                prediction_set = self.explainer.reject_learner.predict_set(
+                    alphas_test, **predict_set_kwargs
+                )
+                prediction_set = np.asarray(prediction_set, dtype=bool)
+            except Exception as exc:  # adr002_allow
+                self._logger.info(
+                    "Reject predict_set bulk call failed; using per-instance fallback.",
+                    exc_info=True,
+                )
+                warnings.warn(
+                    (
+                        "Reject prediction fallback engaged: bulk predict_set failed "
+                        f"({exc!s}); using per-instance calls."
+                    ),
+                    RejectContractWarning,
+                    stacklevel=2,
+                )
+                prediction_set = None
+                degraded_mode_markers.append("bulk_to_per_instance_fallback")
+
+        expected_rows = len(alphas_test)
+        if (
+            prediction_set is None
+            or prediction_set.ndim != 2
+            or prediction_set.shape[0] != expected_rows
+        ):
+            if prediction_set is not None:
+                self._logger.info(
+                    "Reject predict_set returned unexpected shape %s; using per-instance fallback.",
+                    getattr(prediction_set, "shape", None),
+                )
+                warnings.warn(
+                    (
+                        "Reject prediction fallback engaged: predict_set returned unexpected "
+                        "shape; using per-instance calls."
+                    ),
+                    RejectContractWarning,
+                    stacklevel=2,
+                )
+                degraded_mode_markers.append("bulk_to_per_instance_fallback")
+            collected: list[np.ndarray] = []
+            for i in range(expected_rows):
+                per_bins = None
+                if bins is not None and np.ndim(bins) == 1 and len(bins) == expected_rows:
+                    per_bins = bins[i]
+                if hasattr(self.explainer.reject_learner, "predict_p"):
+                    kwargs_i = {
+                        "bins": per_bins,
+                        "all_classes": True,
+                        "smoothing": False,
+                        "seed": seed,
+                    }
+                    kwargs_i = self._filter_kwargs(
+                        self.explainer.reject_learner.predict_p, kwargs_i
+                    )
+                    per_p = self.explainer.reject_learner.predict_p(
+                        alphas_test[i : i + 1],
+                        **kwargs_i,
+                    )
+                    per_p = np.asarray(per_p, dtype=float).reshape(-1)
+                    collected.append((per_p >= epsilon).astype(bool))
+                else:
+                    # Ensure per-instance calls also receive a classes_array
+                    # hint when the conformal implementation expects it.
+                    kwargs_i = {
+                        "bins": per_bins,
+                        "confidence": confidence,
+                        "smoothing": False,
+                        "seed": seed,
+                        "classes_array": classes_array,
+                    }
+                    kwargs_i = self._filter_kwargs(
+                        self.explainer.reject_learner.predict_set, kwargs_i
+                    )
+                    per_set = self.explainer.reject_learner.predict_set(
+                        alphas_test[i : i + 1],
+                        **kwargs_i,
+                    )
+                    collected.append(np.asarray(per_set, dtype=bool).reshape(-1))
+            prediction_set = np.vstack(collected).astype(bool)
+
+        return (
+            prediction_set.astype(bool),
+            float(epsilon),
+            _normalize_degraded_mode(degraded_mode_markers),
+        )
+
+    def predict_reject_breakdown(
+        self, x, bins=None, confidence: float = 0.95, threshold=None
+    ) -> dict[str, Any]:
+        """Return reject decision plus ambiguity/novelty breakdown.
+
+        Parameters
+        ----------
+        x : array-like
+            Test instances.
+        bins : array-like or None, default=None
+            Mondrian categories.
+        confidence : float, default=0.95
+            Reject coverage target: the minimum calibrated probability required to
+            *accept* a prediction. Same semantics as in ``predict_reject``.
+            Not to be confused with ``confidence_level`` (regression interval width)
+            or ``significance`` (guarded conformity threshold, where
+            ``significance = 1 - confidence``).
+            See ``docs/foundations/concepts/parameter-reference.md``.
+        threshold : float or None, default=None
+            Regression threshold; required for regression mode, otherwise ignored.
+
+        Notes
+        -----
+        For nested conformal prediction sets, as confidence increases, the
+        *ambiguity* rate (multi-label sets) is non-decreasing while the
+        *novelty* rate (empty sets) is non-increasing.
+        """
+        confidence = validate_reject_confidence(confidence)
+        # Backwards compatibility: if a subclass has overridden the legacy
+        # `predict_reject` method (tests and some mocks do this), prefer its
+        # lightweight result shape. This keeps the mocking pattern in unit
+        # tests working without requiring a full ConformalClassifier.
+        legacy_predict = getattr(type(self), "predict_reject", None)
+        if legacy_predict is not None and legacy_predict is not RejectOrchestrator.predict_reject:
+            try:
+                try:
+                    legacy_res = self.predict_reject(
+                        x, bins=bins, confidence=confidence, threshold=threshold
+                    )
+                except TypeError:
+                    # Backward compatibility for legacy overrides that have not
+                    # adopted the new threshold parameter.
+                    legacy_res = self.predict_reject(x, bins=bins, confidence=confidence)
+                # Expected legacy shape: (rejected_array, error_rate, reject_rate)
+                if isinstance(legacy_res, tuple) and len(legacy_res) >= 1:
+                    rejected = np.asarray(legacy_res[0], dtype=bool)
+                    error_rate = legacy_res[1] if len(legacy_res) > 1 else None
+                    reject_rate = (
+                        legacy_res[2]
+                        if len(legacy_res) > 2
+                        else float(np.mean(rejected))
+                        if len(rejected) > 0
+                        else 0.0
+                    )
+                else:
+                    # Fallback to full computation when legacy result is unexpected
+                    raise ValidationError(
+                        "legacy predict_reject returned unexpected shape",
+                        details={"legacy_result_length": len(legacy_res)},
+                    )
+
+                # Build minimal breakdown from the boolean rejected mask.
+                # We cannot infer true ambiguity/novelty without full prediction
+                # sets, so represent rejected instances as "novelty" (empty set)
+                # and non-rejected as singletons. This satisfies test expectations
+                # around subset sizing and reject rates while remaining conservative.
+                set_sizes = np.where(rejected, 0, 1)
+                ambiguity = set_sizes >= 2
+                novelty = set_sizes == 0
+                num_instances = len(x)
+                singleton = int(np.sum(set_sizes == 1))
+                empty = int(np.sum(novelty))
+
+                # preserve any reject_rate returned by the legacy method; fall
+                # back to computed mean only when absent
+                reject_rate = (
+                    reject_rate
+                    if "reject_rate" in locals() and reject_rate is not None
+                    else (0.0 if num_instances == 0 else float(np.mean(rejected)))
+                )
+                ambiguity_rate = 0.0 if num_instances == 0 else float(np.mean(ambiguity))
+                novelty_rate = 0.0 if num_instances == 0 else float(np.mean(novelty))
+
+                # Clamp error_rate from legacy override to [0, 1]; it may be
+                # None (undefined) when the legacy method could not compute it.
+                legacy_error_rate_defined = error_rate is not None
+                if legacy_error_rate_defined and isinstance(error_rate, (int, float)):
+                    error_rate = max(0.0, min(1.0, float(error_rate)))
+                else:
+                    error_rate = 0.0
+                    legacy_error_rate_defined = False
+
+                return {
+                    "rejected": rejected,
+                    "ambiguity": ambiguity,
+                    "novelty": novelty,
+                    "prediction_set_size": set_sizes,
+                    "reject_rate": reject_rate,
+                    "ambiguity_rate": ambiguity_rate,
+                    "novelty_rate": novelty_rate,
+                    "error_rate": error_rate,
+                    "error_rate_defined": legacy_error_rate_defined,
+                    "epsilon": 1.0 - float(confidence),
+                    "raw_total_examples": int(len(rejected)),
+                    "raw_reject_counts": {
+                        "rejected": int(np.sum(rejected)),
+                        "ambiguity_mask": int(np.sum(ambiguity)),
+                        "novelty_mask": int(np.sum(novelty)),
+                        "prediction_set_size": int(np.sum(set_sizes)),
+                    },
+                    "fallback_used": False,
+                    "degraded_mode": (),
+                }
+            except Exception as exc:  # adr002_allow - graceful fallback for legacy override
+                # If the legacy override misbehaves, fall through to full computation
+                self._logger.debug(
+                    "Legacy predict_reject override misbehaved: %s", exc, exc_info=True
+                )
+
+        prediction_set, epsilon, degraded_mode = self._compute_prediction_set(
+            x, bins=bins, confidence=confidence, threshold=threshold
+        )
+        accounting = compute_singleton_accounting(prediction_set, epsilon)
+        set_sizes = accounting["prediction_set_size"]
+        rejected = set_sizes != 1
+        ambiguity = set_sizes >= 2
+        novelty = set_sizes == 0
+
+        num_instances = len(x)
+        reject_rate = 0.0 if num_instances == 0 else float(np.mean(rejected))
+
+        # Warn when the score distribution has been flattened so severely that every
+        # instance becomes an ambiguous multi-label prediction set. The module-level
+        # flag keeps the UserWarning to one emission per process.
+        if num_instances > 0 and float(np.mean(ambiguity)) >= 1.0:
+            global _AMBIGUITY_WARNING_ISSUED
+            _msg = (
+                "All test instances were rejected as ambiguous (multi-label prediction sets). "
+                "This typically means the nonconformity score distribution has been flattened "
+                "by VA probability rescaling at low confidence, making every p-value exceed "
+                "epsilon for every class.  Consider raising confidence or disabling "
+                "difficulty_estimator at this confidence level."
+            )
+            self._logger.warning(_msg)
+            if not _AMBIGUITY_WARNING_ISSUED:
+                _AMBIGUITY_WARNING_ISSUED = True
+                warnings.warn(_msg, UserWarning, stacklevel=1)
+
+        error_rate = (
+            float(accounting["singleton_error_rate_estimate_clamped"])
+            if accounting["singleton_error_rate_estimate_defined"]
+            else 0.0
+        )
+        error_rate_defined = bool(accounting["singleton_error_rate_estimate_defined"])
+
+        return {
+            "rejected": rejected,
+            "ambiguity": ambiguity,
+            "novelty": novelty,
+            "prediction_set_size": set_sizes,
+            "prediction_set": prediction_set,
+            "reject_rate": reject_rate,
+            "ambiguity_rate": accounting["ambiguity_rate"],
+            "novelty_rate": accounting["novelty_rate"],
+            "error_rate": error_rate,
+            "error_rate_defined": error_rate_defined,
+            "singleton_error_rate_estimate": accounting["singleton_error_rate_estimate_clamped"],
+            "singleton_error_rate_estimate_raw": accounting["singleton_error_rate_estimate_raw"],
+            "singleton_error_rate_estimate_clamped": accounting[
+                "singleton_error_rate_estimate_clamped"
+            ],
+            "singleton_error_rate_estimate_defined": accounting[
+                "singleton_error_rate_estimate_defined"
+            ],
+            "singleton_error_rate_estimate_clamped_flag": accounting[
+                "singleton_error_rate_estimate_clamped_flag"
+            ],
+            "singleton_error_rate_estimate_method": "epsilon_plugin",
+            "singleton_error_rate_estimate_significance": epsilon,
+            "singleton_validity_mode": "epsilon_plugin",
+            "decision_epsilon": epsilon,
+            "decision_confidence": confidence,
+            "singleton_bound_epsilon": epsilon,
+            "singleton_bound_confidence": confidence,
+            "singleton_bound_uses_separate_prediction_sets": False,
+            "smoothing": False,
+            "exact_validity_claimed": False,
+            "validity_claim": "deterministic split-conformal singleton plug-in estimate; not an empirical error rate",
+            "epsilon": epsilon,
+            "raw_total_examples": int(num_instances),
+            "n_total": accounting["n_total"],
+            "n_empty": accounting["n_empty"],
+            "n_singleton": accounting["n_singleton"],
+            "n_ambiguity": accounting["n_ambiguity"],
+            "empty_rate": accounting["empty_rate"],
+            "singleton_rate": accounting["singleton_rate"],
+            "raw_reject_counts": {
+                "rejected": int(np.sum(rejected)),
+                "ambiguity_mask": int(np.sum(ambiguity)),
+                "novelty_mask": int(np.sum(novelty)),
+                "prediction_set_size": int(np.sum(set_sizes)),
+            },
+            "fallback_used": bool(degraded_mode),
+            "degraded_mode": degraded_mode,
+        }
+
+    def predict_reject(self, x, bins=None, reject_confidence=0.95, threshold=None, **kwargs):
+        """Predict whether to reject the explanations for the test data.
+
+        Parameters
+        ----------
+        x : array-like
+            Test instances to evaluate.
+        bins : array-like or None, default=None
+            Mondrian categories; forwarded to the reject scorer.
+        reject_confidence : float, default=0.95
+            Reject coverage target: the minimum calibrated probability required to
+            *accept* a prediction. A prediction is rejected when its conformal
+            p-value falls below ``1 - reject_confidence``.
+            Not to be confused with ``confidence_level`` (regression coverage derived
+            from ``low_high_percentiles``) or with ``GuardedOptions.confidence``
+            (guarded conformity p-value threshold).
+            See ``docs/foundations/concepts/parameter-reference.md``.
+        threshold : float or None, default=None
+            Regression threshold; required when the underlying explainer is in
+            regression mode, otherwise ignored.
+
+        Returns
+        -------
+        tuple[np.ndarray, float, float]
+            ``(rejected, error_rate, reject_rate)`` where ``rejected`` is a boolean
+            array of shape (n_samples,), ``error_rate`` is the fraction of accepted
+            predictions that are incorrect, and ``reject_rate`` is the fraction of
+            instances rejected.
+        """
+        reject_removed_reject_kwargs(kwargs)
+        reject_unknown_reject_kwargs(kwargs, surface="predict_reject")
+        breakdown = self.predict_reject_breakdown(
+            x, bins=bins, confidence=reject_confidence, threshold=threshold
+        )
+        return breakdown["rejected"], breakdown["error_rate"], breakdown["reject_rate"]
+
+    def apply_policy(
+        self,
+        policy: RejectPolicy,
+        x,
+        explain_fn=None,
+        bins=None,
+        reject_confidence=0.95,
+        threshold=None,
+        **kwargs,
+    ):
+        """Apply a `RejectPolicy` to inputs and optionally produce predictions/explanations.
+
+        Parameters
+        ----------
+        policy : RejectPolicy
+            Selected by the caller.
+        x :
+            Input instances.
+        explain_fn : callable, optional
+            Callable `explain_fn(x_subset, **kwargs)` returning explanations.
+        bins :
+            Passed to reject prediction.
+        reject_confidence : float, default=0.95
+            Reject coverage target: the minimum calibrated probability required to
+            *accept* a prediction. Same semantics as in ``predict_reject``.
+            Not to be confused with ``confidence_level`` (regression interval width)
+            or ``GuardedOptions.confidence`` (guarded conformity threshold).
+            See ``docs/foundations/concepts/parameter-reference.md``.
+
+        Returns
+        -------
+        RejectResult
+            Envelope with `prediction`, `explanation`, `rejected`, `policy`, and metadata.
+        """
+        reject_removed_reject_kwargs(kwargs)
+        if explain_fn is None:
+            reject_unknown_reject_kwargs(
+                kwargs,
+                allowed=(
+                    "strategy",
+                    "result_schema",
+                    "interval_summary",
+                    "include_prediction_set",
+                    "include_prediction_payload",
+                    "novelty_estimator",
+                    "novelty_weight",
+                    "ambiguity_estimator",
+                    "_precomputed_breakdown",
+                    "_metadata_overrides",
+                    "_reject_raise",
+                ),
+                surface="apply_policy",
+            )
+        confidence = validate_reject_confidence(reject_confidence)
+        # Allow callers to select a strategy identifier via the `strategy` kwarg.
+        # By default, resolve to `builtin.default` which preserves legacy semantics.
+        strategy_name = kwargs.pop("strategy", None)
+        if (
+            strategy_name in _DIFFICULTY_STRATEGIES
+            and getattr(self.explainer, "difficulty_estimator", None) is None
+        ):
+            raise ConfigurationError(
+                f'strategy="{strategy_name}" requires difficulty_estimator to be set'
+                " on the explainer.",
+                details={"strategy": strategy_name, "requirement": "difficulty_estimator"},
+            )
+        strategy = self.resolve_strategy(strategy_name)
+        return strategy(
+            policy,
+            x,
+            explain_fn=explain_fn,
+            bins=bins,
+            confidence=confidence,
+            threshold=threshold,
+            **kwargs,
+        )
+
+    # --- Registry helpers -------------------------------------------------
+    def register_strategy(self, name: str, fn: Any) -> None:
+        """Register a reject strategy callable under *name*.
+
+        The callable must accept the same parameters as `apply_policy` and
+        return a `RejectResult`.
+        """
+        if not isinstance(name, str) or not name:
+            raise ValidationError("strategy name must be a non-empty string")
+        if not callable(fn):
+            raise ValidationError("strategy must be callable")
+        with self._strategies_lock:
+            self._strategies[name] = fn
+
+    def resolve_strategy(self, identifier: str | None):
+        """Resolve a registered strategy by identifier.
+
+        If *identifier* is None, return the builtin default strategy.
+        Raises KeyError when an unknown identifier is requested.
+        """
+        with self._strategies_lock:
+            if identifier is None:
+                # default fallback
+                try:
+                    return self._strategies["builtin.default"]
+                except KeyError as exc:
+                    raise KeyError("builtin.default strategy not registered") from exc
+            if identifier in self._strategies:
+                return self._strategies[identifier]
+            raise KeyError(f"Reject strategy '{identifier}' is not registered")
+
+    def _build_contract_metadata(
+        self,
+        *,
+        policy: RejectPolicy,
+        rejected: Any | None,
+        source_indices: list[int] | None,
+        original_count: int | None,
+        effective_confidence: float | None,
+        effective_threshold: Any | None,
+        init_ok: bool,
+        init_error: bool,
+        fallback_used: bool,
+        degraded_mode: Any,
+        base_metadata: dict[str, Any] | None = None,
+    ) -> dict[str, Any]:
+        """Build canonical reject metadata contract for non-NONE policies."""
+        metadata = dict(base_metadata or {})
+        normalized_modes = _normalize_degraded_mode(degraded_mode)
+        original_count_int = (
+            int(original_count) if original_count is not None else _safe_length(rejected)
+        )
+
+        rejected_count: int
+        if rejected is None:
+            rejected_count = int(metadata.get("rejected_count", 0) or 0)
+        else:
+            rejected_count = int(np.sum(np.asarray(rejected, dtype=bool)))
+        accepted_count = max(int(original_count_int) - int(rejected_count), 0)
+        reject_rate = (
+            float(rejected_count) / float(original_count_int) if original_count_int > 0 else 0.0
+        )
+
+        if source_indices is None:
+            source_indices = [] if rejected is None else list(range(original_count_int))
+
+        inferred_fallback = bool(fallback_used or normalized_modes or init_error or (not init_ok))
+        metadata.update(
+            {
+                "policy": policy.value,
+                "reject_rate": reject_rate,
+                "accepted_count": accepted_count,
+                "rejected_count": rejected_count,
+                "effective_confidence": effective_confidence,
+                "effective_threshold": effective_threshold,
+                "source_indices": [int(v) for v in source_indices],
+                "original_count": int(original_count_int),
+                "init_ok": bool(init_ok),
+                "fallback_used": inferred_fallback,
+                "init_error": bool(init_error),
+                "degraded_mode": normalized_modes,
+            }
+        )
+        return metadata
+
+    @staticmethod
+    def _build_decision_artifact(
+        *,
+        rejected: np.ndarray,
+        breakdown: dict[str, Any],
+        confidence: float,
+        include_prediction_set: bool,
+        fallback_used: bool,
+        degraded_mode: tuple[str, ...],
+    ) -> RejectDecisionArtifact:
+        """Build strict decision artifact decoupled from payload-shaping policy."""
+        ambiguity = np.asarray(
+            breakdown.get("ambiguity", np.zeros(len(rejected), dtype=bool)),
+            dtype=bool,
+        )
+        novelty = np.asarray(
+            breakdown.get("novelty", np.zeros(len(rejected), dtype=bool)),
+            dtype=bool,
+        )
+        prediction_set_size = np.asarray(
+            breakdown.get("prediction_set_size", np.ones(len(rejected), dtype=int)),
+            dtype=int,
+        )
+        prediction_set = None
+        if include_prediction_set:
+            prediction_set_raw = breakdown.get("prediction_set")
+            if prediction_set_raw is not None:
+                prediction_set = np.asarray(prediction_set_raw, dtype=bool)
+        return RejectDecisionArtifact(
+            rejected=np.array(rejected, copy=True),
+            ambiguity_mask=np.array(ambiguity, copy=True),
+            novelty_mask=np.array(novelty, copy=True),
+            prediction_set_size=np.array(prediction_set_size, copy=True),
+            prediction_set=None if prediction_set is None else np.array(prediction_set, copy=True),
+            epsilon=float(breakdown.get("epsilon", 1.0 - confidence)),
+            confidence=float(confidence),
+            reject_rate=float(breakdown.get("reject_rate", 0.0)),
+            ambiguity_rate=float(breakdown.get("ambiguity_rate", 0.0)),
+            novelty_rate=float(breakdown.get("novelty_rate", 0.0)),
+            error_rate=float(breakdown.get("error_rate", 0.0)),
+            error_rate_defined=bool(breakdown.get("error_rate_defined", False)),
+            fallback_used=bool(fallback_used),
+            degraded_mode=tuple(degraded_mode),
+        )
+
+    @staticmethod
+    def _build_payload_artifact(
+        *,
+        policy: RejectPolicy,
+        source_indices: list[int],
+        original_count: int,
+        matched_count: int | None,
+        prediction: Any,
+        explanation: Any,
+    ) -> RejectPayloadArtifact:
+        """Build strict payload artifact decoupled from reject decision."""
+        return RejectPayloadArtifact(
+            policy=policy,
+            source_indices=tuple(int(v) for v in source_indices),
+            original_count=int(original_count),
+            matched_count=None if matched_count is None else int(matched_count),
+            prediction=prediction,
+            explanation=explanation,
+        )
+
+    # --- Builtin strategy (preserve previous apply_policy impl) -----------
+    def _builtin_strategy(
+        self,
+        policy: RejectPolicy,
+        x,
+        explain_fn=None,
+        bins=None,
+        confidence=0.95,
+        threshold=None,
+        **kwargs,
+    ):
+        """Builtin strategy that preserves the previous `apply_policy` semantics."""
+        result_schema_raw = kwargs.pop("result_schema", "legacy")
+        result_schema = str(result_schema_raw).strip().lower()
+        return_v2 = result_schema in {"v2", "2", "2.0"}
+        precomputed_breakdown = kwargs.pop("_precomputed_breakdown", None)
+        metadata_overrides = dict(kwargs.pop("_metadata_overrides", {}) or {})
+        include_prediction_set_kw = kwargs.pop("include_prediction_set", None)
+        include_prediction_payload = kwargs.pop("include_prediction_payload", explain_fn is None)
+        confidence = validate_reject_confidence(confidence)
+        try:
+            policy = RejectPolicy(policy)
+        except Exception:  # adr002_allow
+            policy = RejectPolicy.NONE
+
+        # If NONE, return a simple envelope indicating no action
+        if policy is RejectPolicy.NONE:
+            if return_v2:
+                raise ValidationError(
+                    "RejectResultV2 is only available for non-NONE reject policies.",
+                    details={"policy": policy.value},
+                )
+            return RejectResult(
+                prediction=None, explanation=None, rejected=None, policy=policy, metadata=None
+            )
+
+        original_count = _safe_length(x)
+        effective_threshold = None
+        threshold_source = None
+        degraded_mode_markers: list[str] = []
+        try:
+            explainer_mode = getattr(self.explainer, "mode", "classification")
+            if explainer_mode == "regression":
+                effective_threshold, threshold_source = (
+                    self._resolve_regression_effective_threshold(threshold)
+                )
+            elif getattr(self.explainer, "reject_learner", None) is None:
+                self.initialize_reject_learner()
+        except ValidationError:
+            raise
+        except Exception as exc:  # adr002_allow
+            self._logger.info(
+                "Reject learner init failed; returning empty RejectResult.",
+                exc_info=True,
+            )
+            warnings.warn(
+                f"Reject initialization failed; reject policy will not run ({exc!s}).",
+                RejectContractWarning,
+                stacklevel=2,
+            )
+            degraded_mode_markers.append("reject_init_failure")
+            metadata = self._build_contract_metadata(
+                policy=policy,
+                rejected=None,
+                source_indices=[],
+                original_count=original_count,
+                effective_confidence=confidence,
+                effective_threshold=effective_threshold,
+                init_ok=False,
+                init_error=True,
+                fallback_used=True,
+                degraded_mode=degraded_mode_markers,
+                base_metadata={
+                    "error_message": str(exc),
+                    "error_rate": 0.0,
+                    "error_rate_defined": False,
+                    "ambiguity_rate": 0.0,
+                    "novelty_rate": 0.0,
+                    "matched_count": None,
+                    "threshold_source": threshold_source,
+                    "effective_w": validate_reject_w(
+                        getattr(self.explainer, "reject_ncf_w", 0.0)
+                        if getattr(self.explainer, "reject_ncf_w", None) is not None
+                        else 0.0
+                    ),
+                    "reject_ncf": getattr(self.explainer, "reject_ncf", None),
+                    "reject_ncf_w": getattr(self.explainer, "reject_ncf_w", None),
+                    "reject_ncf_auto_selected": getattr(
+                        self.explainer, "reject_ncf_auto_selected", None
+                    ),
+                },
+            )
+            legacy_result = RejectResult(
+                prediction=None,
+                explanation=None,
+                rejected=None,
+                policy=policy,
+                metadata=metadata,
+            )
+            if not return_v2:
+                return legacy_result
+            empty_rejected = np.zeros(original_count, dtype=bool)
+            decision = RejectDecisionArtifact(
+                rejected=empty_rejected,
+                ambiguity_mask=np.zeros(original_count, dtype=bool),
+                novelty_mask=np.zeros(original_count, dtype=bool),
+                prediction_set_size=np.zeros(original_count, dtype=int),
+                prediction_set=None,
+                epsilon=float(1.0 - confidence),
+                confidence=float(confidence),
+                reject_rate=0.0,
+                ambiguity_rate=0.0,
+                novelty_rate=0.0,
+                error_rate=0.0,
+                error_rate_defined=False,
+                fallback_used=True,
+                degraded_mode=tuple(_normalize_degraded_mode(degraded_mode_markers)),
+            )
+            payload = RejectPayloadArtifact(
+                policy=policy,
+                source_indices=(),
+                original_count=original_count,
+                matched_count=metadata.get("matched_count"),
+                prediction=None,
+                explanation=None,
+            )
+            metadata["schema_version"] = "2.0"
+            return RejectResultV2(
+                schema_version="2.0",
+                policy=policy,
+                decision=decision,
+                payload=payload,
+                metadata=metadata,
+            )
+
+        if precomputed_breakdown is None:
+            breakdown = self.predict_reject_breakdown(
+                x,
+                bins=bins,
+                confidence=confidence,
+                threshold=effective_threshold,
+            )
+        else:
+            breakdown = dict(precomputed_breakdown)
+        degraded_mode_markers.extend(list(breakdown.get("degraded_mode") or ()))
+        include_prediction_set = (
+            bool(include_prediction_set_kw)
+            if include_prediction_set_kw is not None
+            else (policy is RejectPolicy.FLAG)
+        )
+        rejected = breakdown["rejected"]
+        error_rate = breakdown["error_rate"]
+        reject_rate = breakdown["reject_rate"]
+
+        prediction = None
+        explanation = None
+
+        # Obtain predictions only when explicitly requested. Explanation-only
+        # reject paths do not require prediction payloads and can skip this
+        # expensive computation.
+        if include_prediction_payload and policy in (
+            RejectPolicy.FLAG,
+            RejectPolicy.ONLY_REJECTED,
+            RejectPolicy.ONLY_ACCEPTED,
+        ):
+            try:
+                # Use the prediction orchestrator directly. The explainer's
+                # public predict method is a thin facade over the same
+                # orchestrator and does not own reject orchestration.
+                prediction_kwargs = dict(kwargs)
+                if getattr(self.explainer, "mode", "classification") == "regression":
+                    prediction_kwargs["threshold"] = effective_threshold
+                prediction = self.explainer.prediction_orchestrator.predict(x, **prediction_kwargs)
+            except Exception as exc:  # adr002_allow
+                self._logger.info(
+                    "Reject policy prediction failed; returning prediction=None.",
+                    exc_info=True,
+                )
+                warnings.warn(
+                    f"Reject policy prediction failed; returning prediction=None ({exc!s}).",
+                    RejectContractWarning,
+                    stacklevel=2,
+                )
+                prediction = None
+                degraded_mode_markers.append("prediction_payload_failed")
+
+        # matched_count records how many instances matched the policy filter;
+        # None for FLAG (all instances processed), 0 when subset was empty.
+        matched_count = None
+        source_indices: list[int] = list(range(len(rejected)))
+        if policy is RejectPolicy.ONLY_REJECTED:
+            source_indices = [i for i, r in enumerate(rejected) if r]
+        elif policy is RejectPolicy.ONLY_ACCEPTED:
+            source_indices = [i for i, r in enumerate(rejected) if not r]
+        if policy in (RejectPolicy.ONLY_REJECTED, RejectPolicy.ONLY_ACCEPTED):
+            matched_count = len(source_indices)
+
+        # Obtain explanations via provided callable according to policy
+        if explain_fn is not None:
+            try:
+                if policy is RejectPolicy.FLAG:
+                    # Process all instances, tag rejection status
+                    explanation = explain_fn(x, **kwargs)
+                elif policy is RejectPolicy.ONLY_REJECTED:
+                    # Process only rejected instances
+                    idx = source_indices
+                    if idx:
+                        subset = (
+                            np.asarray(x)[idx] if isinstance(x, np.ndarray) else [x[i] for i in idx]
+                        )
+                        explanation = explain_fn(subset, **kwargs)
+                    else:
+                        explanation = None
+                elif policy is RejectPolicy.ONLY_ACCEPTED:
+                    # Process only non-rejected (accepted) instances
+                    idx = source_indices
+                    if idx:
+                        subset = (
+                            np.asarray(x)[idx] if isinstance(x, np.ndarray) else [x[i] for i in idx]
+                        )
+                        explanation = explain_fn(subset, **kwargs)
+                    else:
+                        explanation = None
+            except Exception as exc:  # adr002_allow
+                self._logger.info(
+                    "Reject policy explanation failed; returning explanation=None.",
+                    exc_info=True,
+                )
+                warnings.warn(
+                    f"Reject policy explanation failed; returning explanation=None ({exc!s}).",
+                    RejectContractWarning,
+                    stacklevel=2,
+                )
+                explanation = None
+                degraded_mode_markers.append("explanation_payload_failed")
+                if kwargs.get("_reject_raise", False):
+                    raise
+
+        base_metadata = {
+            "error_rate": error_rate,
+            "error_rate_defined": breakdown.get("error_rate_defined", True),
+            "reject_rate": reject_rate,
+            "ambiguity_rate": breakdown.get("ambiguity_rate"),
+            "novelty_rate": breakdown.get("novelty_rate"),
+            # Per-instance breakdown so callers can inspect ambiguity vs novelty
+            "ambiguity_mask": breakdown.get("ambiguity"),
+            "novelty_mask": breakdown.get("novelty"),
+            "prediction_set_size": breakdown.get("prediction_set_size"),
+            "prediction_set": (breakdown.get("prediction_set") if include_prediction_set else None),
+            "epsilon": breakdown.get("epsilon"),
+            "raw_total_examples": breakdown.get("raw_total_examples"),
+            "raw_reject_counts": breakdown.get("raw_reject_counts"),
+            # NCF provenance: which function was used and whether it was auto-selected
+            "reject_ncf": getattr(self.explainer, "reject_ncf", None),
+            "reject_ncf_w": getattr(self.explainer, "reject_ncf_w", None),
+            "reject_ncf_auto_selected": getattr(self.explainer, "reject_ncf_auto_selected", None),
+            # How many instances matched the policy filter (None for FLAG, 0 when empty)
+            "matched_count": matched_count,
+            "source_indices": source_indices,
+            "original_count": int(len(rejected)),
+            "effective_confidence": confidence,
+            "effective_threshold": effective_threshold,
+            "threshold_source": threshold_source,
+            "schema_version": "2.0",
+            "effective_w": validate_reject_w(
+                getattr(self.explainer, "reject_ncf_w", 0.0)
+                if getattr(self.explainer, "reject_ncf_w", None) is not None
+                else 0.0
+            ),
+        }
+        base_metadata.update(metadata_overrides)
+        metadata = self._build_contract_metadata(
+            policy=policy,
+            rejected=rejected,
+            source_indices=source_indices,
+            original_count=len(rejected),
+            effective_confidence=confidence,
+            effective_threshold=effective_threshold,
+            init_ok=True,
+            init_error=False,
+            fallback_used=bool(breakdown.get("fallback_used", False)),
+            degraded_mode=degraded_mode_markers,
+            base_metadata=base_metadata,
+        )
+        decision = self._build_decision_artifact(
+            rejected=np.asarray(rejected, dtype=bool),
+            breakdown=breakdown,
+            confidence=confidence,
+            include_prediction_set=include_prediction_set,
+            fallback_used=bool(metadata.get("fallback_used", False)),
+            degraded_mode=tuple(metadata.get("degraded_mode", ())),
+        )
+        payload = self._build_payload_artifact(
+            policy=policy,
+            source_indices=source_indices,
+            original_count=len(rejected),
+            matched_count=matched_count,
+            prediction=prediction,
+            explanation=explanation,
+        )
+        result_v2 = RejectResultV2(
+            schema_version="2.0",
+            policy=policy,
+            decision=decision,
+            payload=payload,
+            metadata=metadata,
+        )
+        if return_v2:
+            return result_v2
+        return reject_result_v2_to_legacy(result_v2, emit_deprecation_warning=False)

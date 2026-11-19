@@ -1,0 +1,252 @@
+import pytest
+import numpy as np
+from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from calibrated_explanations.core.prediction.interval_summary import IntervalSummary
+from calibrated_explanations.core.prediction.orchestrator import PredictionOrchestrator
+
+
+@pytest.fixture
+def mock_explainer():
+    explainer = MagicMock()
+    explainer.initialized = True
+    explainer.is_multiclass.return_value = False
+    explainer.is_fast.return_value = False
+    explainer.mode = "classification"
+    explainer.num_features = 10
+    explainer.categorical_features = []
+    explainer.bins = None
+    explainer.difficulty_estimator = None
+    # A real explainer always resolves interval_summary to a valid member before the
+    # orchestrator sees it (calibrated_explainer.py __init__); coerce_interval_summary
+    # now fail-fasts on unrecognized input, so the mock must reflect that invariant.
+    explainer.interval_summary = IntervalSummary.REGULARIZED_MEAN
+    explainer.plugin_manager.interval_plugin_hints = {}
+    explainer.plugin_manager.interval_plugin_fallbacks = {}
+    explainer.plugin_manager.interval_plugin_identifiers = {"default": None, "fast": None}
+    explainer.plugin_manager.telemetry_interval_sources = {"default": None, "fast": None}
+    explainer.plugin_manager.interval_preferred_identifier = {"default": None, "fast": None}
+    explainer.plugin_manager.interval_context_metadata = {"default": {}, "fast": {}}
+    explainer.plugin_manager.coerce_plugin_override.return_value = None
+    explainer.plugin_manager.fast_interval_plugin_override = None
+    explainer.plugin_manager.interval_plugin_override = None
+    explainer.perf_cache = None
+    return explainer
+
+
+@pytest.fixture
+def orchestrator(mock_explainer):
+    return PredictionOrchestrator(mock_explainer)
+
+
+def test_predict_impl_fast_binary_classification(orchestrator, mock_explainer):
+    """Test _predict_impl fast path for binary classification (lines 212-215)."""
+    mock_explainer.is_fast.return_value = True
+    mock_explainer.mode = "classification"
+    mock_explainer.is_multiclass.return_value = False
+
+    # Mock interval_learner as a list for fast mode (one per feature)
+    mock_learner = MagicMock()
+    mock_learner.predict_proba.return_value = (
+        np.array([[0.1, 0.9]]),  # predict
+        np.array([[0.05, 0.85]]),  # low
+        np.array([[0.15, 0.95]]),  # high
+    )
+    # Simulate list of learners
+    mock_explainer.interval_learner = [mock_learner] * 11  # index by feature
+
+    x = np.array([[1, 2]])
+    predict, low, high, classes = orchestrator.predict(x, feature=0)
+
+    assert predict[0] == 0.9
+    # low is (n_samples, n_classes), so low[0] is [0.05, 0.85]
+    assert np.allclose(low[0], np.array([0.05, 0.85]))
+
+    mock_learner.predict_proba.assert_called_once()
+
+
+def test_predict_impl_fast_probabilistic_regression(orchestrator, mock_explainer):
+    """Test _predict_impl fast path for probabilistic regression (lines 314-317)."""
+    mock_explainer.is_fast.return_value = True
+    mock_explainer.mode = "regression"
+
+    mock_learner = MagicMock()
+    mock_learner.predict_probability.return_value = (
+        np.array([0.5]),
+        np.array([0.4]),
+        np.array([0.6]),
+        None,
+    )
+    mock_explainer.interval_learner = [mock_learner] * 11
+
+    x = np.array([[1, 2]])
+    threshold = 0.5
+
+    result = orchestrator.predict(x, threshold=threshold, feature=0)
+
+    assert result[0][0] == 0.5
+    mock_learner.predict_probability.assert_called_once()
+
+
+def test_resolve_interval_plugin_object_override(orchestrator, mock_explainer):
+    """Test _resolve_interval_plugin with object override (lines 488-490)."""
+    mock_plugin = MagicMock()
+    mock_plugin.plugin_meta = {"name": "custom_plugin"}
+
+    mock_explainer.plugin_manager.coerce_plugin_override.return_value = mock_plugin
+
+    plugin, identifier = orchestrator.resolve_interval_plugin(fast=False)
+
+    assert plugin == mock_plugin
+    assert identifier == "custom_plugin"
+
+
+def test_resolve_interval_plugin_missing_in_chain(orchestrator, mock_explainer):
+    """Test _resolve_interval_plugin with missing plugin in chain (lines 560-565)."""
+    valid_plugin_mock = MagicMock()
+    valid_plugin_mock.plugin_meta = {
+        "name": "valid_plugin",
+        "schema_version": 1,
+        "modes": ("classification",),
+        "capabilities": ("interval:classification",),
+    }
+    mock_explainer.instantiate_plugin.side_effect = lambda plugin: plugin
+    mock_explainer.plugin_manager.resolve_interval_plugin.return_value = (
+        valid_plugin_mock,
+        "valid_plugin",
+    )
+
+    plugin, identifier = orchestrator.resolve_interval_plugin(fast=False)
+
+    assert identifier == "valid_plugin"
+    assert plugin is not None
+
+
+def test_obtain_interval_calibrator_fast_metadata(orchestrator, mock_explainer):
+    """Test obtain_interval_calibrator fast path metadata logic (lines 700-704)."""
+    mock_explainer.is_fast.return_value = True
+
+    mock_plugin = MagicMock()
+    mock_calibrator = MagicMock()
+    mock_plugin.create.return_value = mock_calibrator
+
+    with (
+        patch.object(
+            orchestrator, "resolve_interval_plugin", return_value=(mock_plugin, "test_plugin")
+        ),
+        patch.object(orchestrator, "validate_interval_calibrator"),
+    ):
+        calibrator, identifier = orchestrator.obtain_interval_calibrator(fast=True, metadata={})
+
+        assert calibrator == mock_calibrator
+        # Check if metadata was updated correctly
+        context_metadata = mock_explainer.plugin_manager.interval_context_metadata["fast"]
+        assert "fast_calibrators" in context_metadata
+        assert context_metadata["fast_calibrators"] == (mock_calibrator,)
+
+
+def test_get_interval_calibration_features_should_not_fallback_across_modes(
+    orchestrator, mock_explainer
+):
+    """Requesting a mode-specific snapshot must not silently return the other mode."""
+    default_features = np.array([[1.0, 2.0]])
+    orchestrator.set_interval_calibration_snapshot(default_features, fast=False)
+    mock_explainer.is_fast.return_value = True
+
+    assert orchestrator.get_interval_calibration_features() is None
+    assert orchestrator.get_interval_calibration_features(fast=True) is None
+    np.testing.assert_array_equal(
+        orchestrator.get_interval_calibration_features(fast=False), default_features
+    )
+
+
+def test_get_interval_calibration_features_should_support_noncallable_is_fast(
+    orchestrator, mock_explainer
+):
+    """Legacy explainers may expose ``is_fast`` as a boolean attribute."""
+    fast_features = np.array([[3.0, 4.0]])
+    orchestrator.set_interval_calibration_snapshot(fast_features, fast=True)
+    mock_explainer.is_fast = True
+
+    np.testing.assert_array_equal(orchestrator.get_interval_calibration_features(), fast_features)
+
+
+def test_refresh_interval_calibration_snapshot_should_copy_current_x_cal(
+    orchestrator, mock_explainer
+):
+    """Refreshing the default snapshot must copy the current explainer x_cal."""
+    x_cal = np.array([[5.0, 6.0]])
+    mock_explainer.x_cal = x_cal
+
+    orchestrator.refresh_interval_calibration_snapshot()
+
+    x_cal[0, 0] = -1.0
+    np.testing.assert_array_equal(
+        orchestrator.get_interval_calibration_features(fast=False), np.array([[5.0, 6.0]])
+    )
+
+
+def test_refresh_interval_calibration_snapshot_should_noop_without_x_cal(
+    orchestrator, mock_explainer
+):
+    """Refreshing should do nothing when the explainer exposes no calibration features."""
+    mock_explainer.x_cal = None
+
+    orchestrator.refresh_interval_calibration_snapshot()
+
+    assert orchestrator.get_interval_calibration_features(fast=False) is None
+
+
+def test_record_interval_calibration_features_should_ignore_empty_context(
+    orchestrator,
+):
+    """Recording should no-op when the interval context has no calibration splits."""
+    orchestrator.record_interval_calibration_features(
+        context=SimpleNamespace(calibration_splits=()), fast=False
+    )
+
+    assert orchestrator.get_interval_calibration_features(fast=False) is None
+    assert orchestrator.get_interval_calibration_features(fast=True) is None
+
+
+def test_record_interval_calibration_features_should_copy_context_features(
+    orchestrator,
+):
+    """Recording should store a copied feature matrix for the requested mode."""
+    features = np.array([[7.0, 8.0]])
+    context = SimpleNamespace(calibration_splits=((features, np.array([1.0])),))
+
+    orchestrator.record_interval_calibration_features(context=context, fast=True)
+
+    features[0, 0] = -1.0
+    np.testing.assert_array_equal(
+        orchestrator.get_interval_calibration_features(fast=True), np.array([[7.0, 8.0]])
+    )
+
+
+def test_should_freeze_mondrian_bins_at_request_construction_when_caller_mutates():
+    """ADR-026 gap 3: ExplanationRequest.bins must be frozen so caller mutation does not propagate.
+
+    Verifies that converting a mutable list/array to tuple at ExplanationRequest construction
+    means subsequent caller-side mutation cannot alter the stored bins.
+    """
+    from calibrated_explanations.plugins.explanations import ExplanationRequest
+
+    original_bins = [1, 2, 3]
+    request = ExplanationRequest(
+        threshold=None,
+        low_high_percentiles=None,
+        bins=original_bins,
+        features_to_ignore=[],
+    )
+
+    captured_bins = request.bins
+
+    # Mutate the caller-side list after construction
+    original_bins.append(999)
+
+    # The request's bins must not contain the mutation
+    assert 999 not in captured_bins
+    # And bins must be a tuple (immutable), not the original mutable list
+    assert isinstance(captured_bins, tuple)
+    assert captured_bins == (1, 2, 3)

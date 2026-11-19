@@ -1,0 +1,2907 @@
+"""Plotting utilities used by explanation objects and the wrap-first workflow.
+
+The public README surface still calls ``CalibratedExplanation.plot``; this
+module houses the implementation while ``calibrated_explanations._plots`` remains
+as a deprecated shim for backwards compatibility.
+"""
+
+from __future__ import annotations
+
+import configparser
+import contextlib
+import logging
+import os
+import sys
+import warnings
+from dataclasses import dataclass
+from pathlib import Path, PurePath
+from types import MappingProxyType
+from typing import Any, Dict, List, Mapping, Sequence
+
+import numpy as np
+
+from .core.config_manager import (
+    ConfigManager,
+    get_process_config_manager,
+    reset_process_config_manager_for_testing,
+)
+from .utils import learner_supports_predict_proba
+from .viz import _matplotlib_compat as legacy  # noqa: F401 - re-exported as plotting.legacy
+
+
+def _get_plotting_config_manager() -> ConfigManager:
+    return get_process_config_manager()
+
+
+def reset_plotting_config_manager() -> None:
+    """Reset the shared process config snapshot for plotting tests."""
+    reset_process_config_manager_for_testing()
+
+
+def _bind_plot_plugin_config(
+    manager: Any,
+    identifier: str | None,
+    plugin: Any,
+) -> Mapping[str, Any]:
+    binder = getattr(manager, "bind_plugin_config", None)
+    if not callable(binder):
+        return {}
+    return binder(identifier, plugin, getattr(plugin, "plugin_meta", None))
+
+
+def __getattr__(name: str) -> Any:
+    raise AttributeError(f"module {__name__} has no attribute {name}")
+
+
+def derive_threshold_labels(threshold: Any | None) -> tuple[str, str]:
+    """Return positive/negative labels summarising a regression threshold."""
+    try:
+        if (
+            isinstance(threshold, Sequence)
+            and not isinstance(threshold, (str, bytes))
+            and len(threshold) >= 2
+        ):
+            lo = float(threshold[0])
+            hi = float(threshold[1])
+            return (f"{lo:.2f} <= Y < {hi:.2f}", "Outside interval")
+    except Exception:  # adr002_allow
+        logging.getLogger(__name__).debug(
+            "Failed to parse threshold as interval: %s", sys.exc_info()[1]
+        )
+    try:
+        value = float(threshold)
+    except:  # noqa: E722
+        if not isinstance(sys.exc_info()[1], Exception):
+            raise
+        return ("Target within threshold", "Outside threshold")
+    return (f"Y < {value:.2f}", f"Y >= {value:.2f}")
+
+
+_MATPLOTLIB_IMPORT_ERROR = None
+mcolors = None
+plt = None
+
+
+def _require_matplotlib() -> None:
+    """Ensure matplotlib is available before using plotting functions."""
+    global mcolors, plt, _MATPLOTLIB_IMPORT_ERROR
+    from .utils.exceptions import ConfigurationError
+
+    if plt is None or mcolors is None:
+        try:
+            import matplotlib.artist  # noqa: F401
+            import matplotlib.axes  # noqa: F401
+            import matplotlib.colors as mcolors_local
+
+            # Preload lazy-loaded submodules to avoid AttributeError when coverage runs
+            import matplotlib.image  # noqa: F401
+            import matplotlib.pyplot as plt_local
+
+            mcolors = mcolors_local
+            plt = plt_local
+            _MATPLOTLIB_IMPORT_ERROR = None
+        except Exception:  # adr002_allow
+            _MATPLOTLIB_IMPORT_ERROR = sys.exc_info()[1]
+
+        if plt is None or mcolors is None:
+            msg = (
+                "Plotting requires matplotlib. Install the 'viz' extra: "
+                "pip install calibrated_explanations[viz]"
+            )
+            if _MATPLOTLIB_IMPORT_ERROR is not None:
+                msg += f"\nOriginal import error: {_MATPLOTLIB_IMPORT_ERROR}"
+            raise ConfigurationError(
+                msg,
+                details={
+                    "requirement": "matplotlib",
+                    "extra": "viz",
+                    "reason": "import_failed" if _MATPLOTLIB_IMPORT_ERROR else "not_installed",
+                    "error": str(_MATPLOTLIB_IMPORT_ERROR) if _MATPLOTLIB_IMPORT_ERROR else None,
+                },
+            )
+
+
+def _read_plot_pyproject() -> Dict[str, Any]:
+    """Return ``pyproject.toml`` plot configuration when available."""
+    return _get_plotting_config_manager().pyproject_section("plots")
+
+
+def read_plot_pyproject() -> Dict[str, Any]:
+    """Public accessor for reading the plots pyproject section."""
+    return _read_plot_pyproject()
+
+
+def split_csv(value: Any) -> Sequence[str]:
+    """Normalize comma-separated labels into a tuple."""
+    if not value:
+        return ()
+    if isinstance(value, str):
+        return tuple(item.strip() for item in value.split(",") if item.strip())
+    if isinstance(value, Sequence):
+        return tuple(str(item).strip() for item in value if isinstance(item, str) and item.strip())
+    return ()
+
+
+def _format_save_path(base_path: Any, filename: str) -> str:
+    """Return a string path while preserving caller formatting when possible."""
+    if isinstance(base_path, (Path, PurePath, os.PathLike)):
+        return str(Path(base_path) / filename)
+    if isinstance(base_path, str):
+        if base_path.strip() == "":
+            return filename
+        if base_path.endswith("/") and "\\" not in base_path[:-1]:
+            return f"{base_path}{filename}"
+        if base_path.endswith("\\") and "/" not in base_path[:-1]:
+            return f"{base_path}{filename}"
+        return str(Path(base_path) / filename)
+    return str(Path(str(base_path)) / filename)
+
+
+def format_save_path(base_path: Any, filename: str) -> str:
+    """Public accessor for path formatting heuristics."""
+    return _format_save_path(base_path, filename)
+
+
+def _resolve_explainer_from_explanation(explanation: Any) -> Any:
+    """Best-effort resolver for explanation -> explainer references."""
+    resolved = explanation if hasattr(explanation, "plugin_manager") else None
+    getter = getattr(explanation, "get_explainer", None)
+    if callable(getter):
+        resolved = getter()
+    else:
+        getter = getattr(explanation, "_get_explainer", None)
+        if callable(getter):
+            resolved = getter()
+        else:
+            container = getattr(explanation, "calibrated_explanations", None)
+            if container is not None:
+                getter = getattr(container, "get_explainer", None)
+                if callable(getter):
+                    resolved = getter()
+                else:
+                    getter = getattr(container, "_get_explainer", None)
+                    if callable(getter):
+                        resolved = getter()
+                    else:
+                        resolved = getattr(container, "calibrated_explainer", None)
+
+    while resolved is not None and not hasattr(resolved, "plugin_manager"):
+        nested_explainer = getattr(resolved, "_explainer", None)
+        if nested_explainer is None:
+            nested_explainer = getattr(resolved, "explainer", None)
+        if nested_explainer is None or nested_explainer is resolved:
+            break
+        resolved = nested_explainer
+    return resolved
+
+
+def _resolve_plot_style_chain(explainer, explicit_style: str | None) -> Sequence[str]:
+    """Determine the ordered style fallback chain for plot builders/renderers."""
+    manager = getattr(explainer, "plugin_manager", None)
+    resolver = getattr(manager, "resolve_plot_style_chain", None)
+    if callable(resolver):
+        return resolver(explicit_style=explicit_style)
+
+    chain: List[str] = []
+    if isinstance(explicit_style, str) and explicit_style:
+        chain.append(explicit_style)
+
+    config_manager = _get_plotting_config_manager()
+    env_style = config_manager.env("CE_PLOT_STYLE")
+    if env_style:
+        chain.append(env_style.strip())
+    chain.extend(split_csv(config_manager.env("CE_PLOT_STYLE_FALLBACKS")))
+
+    py_settings = _read_plot_pyproject()
+    py_style = py_settings.get("style")
+    if isinstance(py_style, str) and py_style:
+        chain.append(py_style)
+    chain.extend(split_csv(py_settings.get("fallbacks")))
+
+    # If no explicit style provided, prepend the default style from registry
+    if not chain:
+        from .plugins.registry import list_plot_style_descriptors
+
+        for descriptor in list_plot_style_descriptors():
+            if descriptor.metadata.get("is_default", False):
+                chain.append(descriptor.identifier)
+                break
+
+    mode = getattr(explainer, "last_explanation_mode", None)
+    plot_fallbacks = getattr(explainer, "plot_plugin_fallbacks", {})
+    if mode and isinstance(plot_fallbacks, dict):
+        chain.extend(plot_fallbacks.get(mode, ()))
+
+    chain.append("legacy")
+
+    ordered: List[str] = []
+    seen: set[str] = set()
+    for identifier in chain:
+        if identifier and identifier not in seen:
+            ordered.append(identifier)
+            seen.add(identifier)
+    if "plot_spec.default" not in seen:
+        ordered.append("plot_spec.default")
+    if "legacy" not in ordered:
+        ordered.append("legacy")
+    return tuple(ordered)
+
+
+_BUILTIN_INSTANCE_PLOT_STYLES = {"regular", "triangular", "ensured", "narrative"}
+
+
+def _resolve_named_plot_style(
+    *,
+    style_override: Any,
+    style: Any,
+) -> str | None:
+    """Return an explicit plugin style identifier for instance plots when present."""
+    if isinstance(style_override, str) and style_override:
+        return style_override
+    if isinstance(style, str) and style and style not in _BUILTIN_INSTANCE_PLOT_STYLES:
+        return style
+    return None
+
+
+def _select_default_plot_style(
+    explanation: Any,
+    explicit_style: str | None,
+) -> tuple[str, bool]:
+    """Return the PlotSpec-first style selection and legacy opt-out flag."""
+    if explicit_style == "legacy":
+        return "legacy", True
+    if explicit_style:
+        return explicit_style, False
+
+    explainer = _resolve_explainer_from_explanation(explanation)
+    configured_style = _effective_configured_plot_style(explainer)
+    if configured_style:
+        return configured_style, configured_style == "legacy"
+    return "plot_spec.default", False
+
+
+def _warn_and_log_plotspec_fallback(message: str) -> None:
+    """Emit the visible fallback signals required for PlotSpec -> legacy."""
+    logging.getLogger(__name__).info(message)
+    warnings.warn(message, UserWarning, stacklevel=2)
+
+
+def _render_plotspec_once_and_save(
+    spec: Any,
+    *,
+    show: bool,
+    path: str,
+    title: str,
+    save_ext: Sequence[str],
+) -> None:
+    """Render a PlotSpec once and save all requested extensions from that figure."""
+    from .viz.matplotlib_adapter import (
+        _resolve_panel_layout_policy,  # pylint: disable=import-outside-toplevel
+    )
+    from .viz.matplotlib_adapter import (
+        render as render_plotspec,  # pylint: disable=import-outside-toplevel
+    )
+
+    if not save_ext:
+        render_plotspec(spec, show=show, save_path=None)
+        return
+
+    fig = render_plotspec(spec, show=show, return_fig=True)
+    try:
+        panels: list[tuple[str, Any]] = []
+        header = getattr(spec, "header", None)
+        body_spec = getattr(spec, "body", None)
+        if header is not None:
+            if getattr(header, "dual", False):
+                panels.append(("header_positive", header))
+                panels.append(("header_negative", header))
+            else:
+                panels.append(("header", header))
+        if body_spec is not None:
+            panels.append(("body", body_spec))
+        _, savefig_kwargs, _ = _resolve_panel_layout_policy(
+            spec,
+            panels=panels,
+            body_spec=body_spec,
+        )
+        for ext in save_ext:
+            fig.savefig(_format_save_path(path, title + ext), **savefig_kwargs)
+    finally:
+        if plt is not None:
+            plt.close(fig)
+
+
+# pre-v4 S4-H6: closed set of built-in ``plot_global`` keyword arguments.
+# Anything outside this set used to be forwarded silently (or with only an
+# INFO log, mirroring the S4-H3 explain-kwarg black hole) through both the
+# legacy and PlotSpec renderers; a misspelled kwarg such as ``filter_topp``
+# would be accepted without any signal.
+_PLOT_GLOBAL_KWARGS = frozenset(
+    {
+        "show",
+        "bins",
+        "use_legacy",
+        "style_override",
+        "style",
+        "path",
+        "save_ext",
+        "renderer",
+        "low_high_percentiles",
+    }
+)
+
+
+def _reject_unconsumed_plot_kwargs(
+    surface: str, kwargs: Mapping[str, Any], *, allowed: frozenset[str]
+) -> None:
+    """Emit the governed fallback signal for plot kwargs outside ``allowed``.
+
+    CONTRIBUTOR_INSTRUCTIONS.md §5: leftover keys are not built-in and are
+    only forwarded to downstream renderers/plugins, so a misspelling must be
+    visible (``UserWarning`` + INFO), not silently dropped or INFO-only.
+    """
+    unconsumed = sorted(set(kwargs) - allowed)
+    if not unconsumed:
+        return
+    message = (
+        f"{surface} received keyword argument(s) not recognised as built-in "
+        f"plot arguments: {unconsumed}. They will be forwarded to downstream "
+        "renderers/plugins; if this is a typo of a built-in argument "
+        f"({sorted(allowed)}), it will be silently ignored by the renderer."
+    )
+    logging.getLogger(__name__).info(message)
+    warnings.warn(message, UserWarning, stacklevel=3)
+
+
+def validate_plot_artifact(artifact: Any, *, identifier: str) -> None:
+    """ADR-036 §5: validate canonical PlotSpec artifacts before renderer invocation.
+
+    Accepts canonical PlotSpec dataclasses and dicts that pass validate_plotspec.
+    Raises ValidationError for raw dicts that fail validation so the error is
+    surfaced at the build/render boundary rather than inside the renderer.
+    """
+    if not isinstance(artifact, Mapping):
+        return
+    if not ("kind" in artifact or "plotspec_version" in artifact or "plot_spec" in artifact):
+        return
+    from .utils.exceptions import ValidationError  # pylint: disable=import-outside-toplevel
+    from .viz.serializers import validate_plotspec  # pylint: disable=import-outside-toplevel
+
+    try:
+        validate_plotspec(dict(artifact))
+    except ValidationError:
+        raise
+    except Exception as exc:  # adr002_allow - catch-all for unknown third-party validator errors
+        raise ValidationError(
+            f"Plot plugin '{identifier}' returned an invalid PlotSpec artifact; "
+            "check the build() return value.",
+            details={"identifier": identifier},
+        ) from exc
+
+
+def _render_instance_plot_plugin(
+    explanation: Any,
+    *,
+    explicit_style: str | None,
+    show: bool,
+    path: str | None,
+    save_ext: Sequence[str] | None,
+    renderer_override: str | None,
+    intent_type: str,
+    options: Mapping[str, Any],
+) -> Any | None:
+    """Render a registered custom plot plugin for a single explanation instance."""
+    if not explicit_style or explicit_style in {"legacy", "plot_spec.default"}:
+        return None
+
+    explainer = _resolve_explainer_from_explanation(explanation)
+    manager = getattr(explainer, "plugin_manager", None)
+    resolve_plot_plugin = getattr(manager, "resolve_plot_plugin", None)
+    if not callable(resolve_plot_plugin):
+        return None
+
+    from .plugins import PlotRenderContext, ensure_builtin_plugins
+
+    ensure_builtin_plugins()
+    plugin, identifier, _ = resolve_plot_plugin(
+        explicit_style=explicit_style,
+        renderer_override=renderer_override,
+    )
+    if identifier in {"legacy", "plot_spec.default"}:
+        return None
+
+    context = PlotRenderContext(
+        explanation=explanation,
+        instance_metadata=MappingProxyType(
+            {
+                "type": "instance",
+                "index": getattr(explanation, "index", None),
+            }
+        ),
+        style=identifier,
+        intent=MappingProxyType(
+            {
+                "type": intent_type,
+                "explainer_mode": getattr(explainer, "_last_explanation_mode", None),
+            }
+        ),
+        show=show,
+        path=path,
+        save_ext=tuple(save_ext) if save_ext else None,
+        options=MappingProxyType(dict(options)),
+        plugin_config=_bind_plot_plugin_config(manager, identifier, plugin),
+    )
+    artifact = plugin.build(context)
+    validate_plot_artifact(artifact, identifier=identifier)
+    return plugin.render(artifact, context=context)
+
+
+def _render_collection_plot_plugin(
+    collection: Any,
+    *,
+    explicit_style: str | None,
+    show: bool,
+    path: str | None,
+    save_ext: Sequence[str] | None,
+    renderer_override: str | None,
+    intent_type: str,
+    options: Mapping[str, Any],
+) -> Any | None:
+    """Render a registered custom plot plugin for a full explanation collection."""
+    if not explicit_style or explicit_style in {"legacy", "plot_spec.default"}:
+        return None
+
+    explainer = _resolve_explainer_from_explanation(collection)
+    manager = getattr(explainer, "plugin_manager", None)
+    resolve_plot_plugin = getattr(manager, "resolve_plot_plugin", None)
+    if not callable(resolve_plot_plugin):
+        return None
+
+    from .plugins import PlotRenderContext, ensure_builtin_plugins
+
+    ensure_builtin_plugins()
+    plugin, identifier, _ = resolve_plot_plugin(
+        explicit_style=explicit_style,
+        renderer_override=renderer_override,
+    )
+    if identifier in {"legacy", "plot_spec.default"}:
+        return None
+
+    context = PlotRenderContext(
+        explanation=collection,
+        instance_metadata=MappingProxyType({"type": "collection"}),
+        style=identifier,
+        intent=MappingProxyType(
+            {
+                "type": intent_type,
+                "explainer_mode": getattr(explainer, "_last_explanation_mode", None),
+            }
+        ),
+        show=show,
+        path=path,
+        save_ext=tuple(save_ext) if save_ext else None,
+        options=MappingProxyType(dict(options)),
+        plugin_config=_bind_plot_plugin_config(manager, identifier, plugin),
+    )
+    artifact = plugin.build(context)
+    validate_plot_artifact(artifact, identifier=identifier)
+    return plugin.render(artifact, context=context)
+
+
+# CE-owned style vocabulary: explanation-level semantic names plus the two
+# registered built-in style identifiers. Any other explicit style string is a
+# third-party plugin request and takes the strict dispatch path below.
+_CE_OWNED_PLOT_STYLES = _BUILTIN_INSTANCE_PLOT_STYLES | {"legacy", "plot_spec.default"}
+
+# Keys consumed by CE for route selection or output transport; everything else
+# in the caller's kwargs is plugin-owned and forwarded untouched.
+_THIRD_PARTY_SELECTION_KEYS = frozenset({"style", "renderer", "use_legacy"})
+_THIRD_PARTY_TRANSPORT_KEYS = frozenset({"show", "path", "filename", "save_ext"})
+
+# Reserved key under which plot_global exposes CE's validated prediction
+# payload to global/dashboard plugins.
+_GLOBAL_PAYLOAD_KEY = "payload"
+
+
+@dataclass(frozen=True)
+class _PlotDispatchOutcome:
+    """Result of a third-party plot dispatch.
+
+    ``handled`` is deliberately distinct from ``result is not None``: a
+    renderer that successfully handles a request may legitimately return
+    ``None``, and that must not re-trigger built-in rendering.
+    """
+
+    handled: bool
+    result: Any = None
+
+
+def _is_third_party_plot_style(style: Any) -> bool:
+    """Return True when *style* explicitly requests a non-CE-owned plot style."""
+    return isinstance(style, str) and bool(style) and style not in _CE_OWNED_PLOT_STYLES
+
+
+def _reject_conflicting_plot_selection(style: str, kwargs: Mapping[str, Any]) -> None:
+    """Raise ValidationError for contradictory explicit plot requests."""
+    from .utils.exceptions import ValidationError  # pylint: disable=import-outside-toplevel
+
+    if kwargs.get("use_legacy"):
+        raise ValidationError(
+            f"Contradictory plot request: style='{style}' selects a third-party "
+            "plot plugin but use_legacy=True selects the built-in legacy "
+            "renderer. Remove one of the two."
+        )
+    style_override = kwargs.get("style_override")
+    if isinstance(style_override, str) and style_override and style_override != style:
+        raise ValidationError(
+            f"Contradictory plot request: style='{style}' and "
+            f"style_override='{style_override}' name different styles. "
+            "Remove one of the two."
+        )
+
+
+def _normalize_third_party_transport(kwargs: Mapping[str, Any]) -> tuple[bool, Any, Any]:
+    """Return ``(show, path, save_ext)`` for a third-party plot request.
+
+    The renderer owns output formats: the path is taken verbatim from ``path``
+    (or ``filename`` as its alias) with no directory prefix, suffix rewrite,
+    or Matplotlib-oriented splitting.
+    """
+    from .utils.exceptions import ValidationError  # pylint: disable=import-outside-toplevel
+
+    path = None if kwargs.get("path") == "" else kwargs.get("path")
+    filename = None if kwargs.get("filename") == "" else kwargs.get("filename")
+    if path is not None and filename is not None and path != filename:
+        raise ValidationError(
+            "Conflicting output arguments: path="
+            f"{path!r} and filename={filename!r} differ. Provide only one "
+            "output location for a third-party plot style."
+        )
+    effective_path = path if path is not None else filename
+    show = kwargs.get("show", effective_path is None)
+    save_ext = kwargs.get("save_ext")
+    if isinstance(save_ext, list):
+        save_ext = tuple(save_ext)
+    return show, effective_path, save_ext
+
+
+def _third_party_plot_options(kwargs: Mapping[str, Any]) -> dict[str, Any]:
+    """Extract plugin-owned options from *kwargs* without mutating the caller's mapping."""
+    excluded = _THIRD_PARTY_SELECTION_KEYS | _THIRD_PARTY_TRANSPORT_KEYS
+    options: dict[str, Any] = {}
+    for key, value in kwargs.items():
+        if key in excluded:
+            continue
+        if key == "style_override" and (value is None or isinstance(value, str)):
+            # A string style_override is a selection surface (already validated
+            # against the explicit style) and None is its absent default;
+            # mapping-valued overrides remain plugin-visible configuration.
+            continue
+        options[key] = value
+    return options
+
+
+def _dispatch_third_party_plot(
+    *,
+    explainer: Any,
+    explanation: Any,
+    intent_type: str,
+    instance_metadata: Mapping[str, Any],
+    style: str,
+    renderer_override: str | None,
+    show: Any,
+    path: Any,
+    save_ext: Any,
+    options: Mapping[str, Any],
+    runtime: Mapping[str, Any],
+    resolved: tuple[Any, str, bool] | None = None,
+) -> _PlotDispatchOutcome:
+    """Resolve *style* strictly and run build -> validate -> render.
+
+    Errors from resolution, the builder, artifact validation, or the renderer
+    surface to the caller: an explicitly requested third-party style never
+    falls back to built-in rendering. Pass *resolved* (from a prior
+    ``resolve_plot_plugin_strict`` call) to reuse an already-resolved
+    plugin/identifier/trust tuple instead of resolving again.
+    """
+    from .plugins import PlotRenderContext, ensure_builtin_plugins
+    from .utils.exceptions import ConfigurationError
+
+    ensure_builtin_plugins()
+    manager = getattr(explainer, "plugin_manager", None)
+    if resolved is not None:
+        plugin, identifier, trusted = resolved
+    else:
+        resolver = getattr(manager, "resolve_plot_plugin_strict", None)
+        if not callable(resolver):
+            raise ConfigurationError(
+                f"Cannot resolve plot style '{style}': no plugin manager with "
+                "strict plot-style resolution is reachable from this explanation. "
+                "Third-party styles require an explainer created through the "
+                "public CalibratedExplainer/WrapCalibratedExplainer API."
+            )
+        plugin, identifier, trusted = resolver(style, renderer_override=renderer_override)
+
+    context = PlotRenderContext(
+        explanation=explanation,
+        instance_metadata=MappingProxyType(dict(instance_metadata)),
+        style=identifier,
+        intent=MappingProxyType(
+            {
+                "type": intent_type,
+                "explainer_mode": getattr(explainer, "_last_explanation_mode", None),
+            }
+        ),
+        show=show,
+        path=path,
+        save_ext=save_ext,
+        options=MappingProxyType(dict(options)),
+        plugin_config=_bind_plot_plugin_config(manager, identifier, plugin),
+        # ADR-006: live runtime references (explainer, request data) are
+        # granted to trusted plugins only.
+        runtime=runtime if trusted else {},
+    )
+    artifact = plugin.build(context)
+    validate_plot_artifact(artifact, identifier=identifier)
+    result = plugin.render(artifact, context=context)
+    return _PlotDispatchOutcome(handled=True, result=result)
+
+
+def _dispatch_explicit_instance_plot_style(
+    explanation: Any,
+    *,
+    intent_type: str,
+    filter_top: Any,
+    style: str,
+    kwargs: Mapping[str, Any],
+    resolved: tuple[Any, str, bool] | None = None,
+) -> _PlotDispatchOutcome:
+    """Dispatch an explanation-level third-party plot request before consumption.
+
+    This runs before any built-in ranking, filtering, or transport rewriting
+    can consume the request. *style* is the already-determined effective
+    style identifier (from ``style=``, ``style_override=``, or a resolved
+    configured preference);
+    callers must not re-derive it from ``kwargs["style"]`` alone, since an
+    explicit ``style_override=`` can name the plugin instead.
+    """
+    _reject_conflicting_plot_selection(style, kwargs)
+    show, path, save_ext = _normalize_third_party_transport(kwargs)
+    options = _third_party_plot_options(kwargs)
+    # filter_top is positional in explanation.plot; always forward it,
+    # including its default None, so plugins see the complete request.
+    options["filter_top"] = filter_top
+
+    explainer = _resolve_explainer_from_explanation(explanation)
+    instance_index = getattr(explanation, "index", None)
+    runtime = {
+        "scope": "instance",
+        "explainer": explainer,
+        "instance_index": instance_index,
+    }
+    return _dispatch_third_party_plot(
+        explainer=explainer,
+        explanation=explanation,
+        intent_type=intent_type,
+        instance_metadata={"type": "instance", "index": instance_index},
+        style=style,
+        renderer_override=kwargs.get("renderer"),
+        show=show,
+        path=path,
+        save_ext=save_ext,
+        options=options,
+        runtime=runtime,
+        resolved=resolved,
+    )
+
+
+def _configured_dispatch_blocked(kwargs: Mapping[str, Any]) -> bool:
+    """Return True when *kwargs* already make an explicit selection.
+
+    Mirrors the exact reachability condition of ``_select_default_plot_style``
+    in the built-in dispatch path: configured (manager/env/pyproject/chain)
+    style preference is consulted only when the caller supplied none of
+    ``style``, a string ``style_override``, ``use_legacy=True``, or a truthy
+    ``return_plot_spec``. Any of those present must retain their
+    existing precedence over ambient configuration -- this guard exists
+    purely to avoid changing *when* configured resolution is reached, not to
+    change what it resolves to.
+    """
+    if kwargs.get("style"):
+        return True
+    if kwargs.get("return_plot_spec"):
+        return True
+    if kwargs.get("use_legacy") is True:
+        return True
+    style_override = kwargs.get("style_override")
+    return isinstance(style_override, str) and bool(style_override)
+
+
+def _effective_configured_plot_style(explainer: Any) -> str | None:
+    """Return the style CE would select via configured preference alone.
+
+    Mirrors the non-explicit branch of ``_select_default_plot_style``
+    (manager override -> ``CE_PLOT_STYLE`` -> pyproject -> first non-legacy
+    chain entry), used both by that function and by the configured-dispatch
+    helpers below so the two stay in lockstep.
+    """
+    manager = getattr(explainer, "plugin_manager", None)
+    manager_style = getattr(manager, "plot_style_override", None)
+    if isinstance(manager_style, str) and manager_style:
+        return manager_style
+
+    config_manager = _get_plotting_config_manager()
+    env_style = config_manager.env("CE_PLOT_STYLE")
+    if isinstance(env_style, str) and env_style.strip():
+        return env_style.strip()
+
+    py_settings = _read_plot_pyproject()
+    py_style = py_settings.get("style")
+    if isinstance(py_style, str) and py_style:
+        return py_style
+
+    chain = (
+        _resolve_plot_style_chain(explainer, None)
+        if explainer is not None
+        else ("plot_spec.default", "legacy")
+    )
+    for identifier in chain:
+        if identifier and identifier != "legacy":
+            return identifier
+    return None
+
+
+def _dispatch_configured_instance_plot_style(
+    explanation: Any,
+    *,
+    intent_type: str,
+    filter_top: Any,
+    kwargs: Mapping[str, Any],
+) -> _PlotDispatchOutcome | None:
+    """Attempt full-fidelity dispatch for a *configured* (non-explicit) style.
+
+    Returns ``None`` when the configured preference is CE-owned or does not
+    resolve to a registered plugin, so the caller falls through to the
+    existing built-in/chain-based path unchanged -- preserving the
+    ADR-approved configured-preference fallback behavior exactly. Unlike the
+    explicit path, this never raises for resolution failure: only an
+    explicit ``style=``/``style_override=`` request is strict.
+    """
+    if _configured_dispatch_blocked(kwargs):
+        return None
+    explainer = _resolve_explainer_from_explanation(explanation)
+    if explainer is None:
+        return None
+    configured_style = _effective_configured_plot_style(explainer)
+    if not _is_third_party_plot_style(configured_style):
+        return None
+    manager = getattr(explainer, "plugin_manager", None)
+    resolver = getattr(manager, "resolve_plot_plugin_strict", None)
+    if not callable(resolver):
+        return None
+    try:
+        resolved = resolver(configured_style, renderer_override=kwargs.get("renderer"))
+    except Exception:  # noqa: BLE001 - adr002_allow: unresolved configured style defers to built-in fallback
+        return None
+    return _dispatch_explicit_instance_plot_style(
+        explanation,
+        intent_type=intent_type,
+        filter_top=filter_top,
+        style=configured_style,
+        kwargs=kwargs,
+        resolved=resolved,
+    )
+
+
+def _plugin_instance_index(explanation: Any, options: Mapping[str, Any]) -> Any:
+    """Resolve the instance index passed to custom plot plugins."""
+    if "instance_index" in options:
+        return options["instance_index"]
+    kind = options.get("shap_kind")
+    if kind in {"waterfall", "force"}:
+        return getattr(explanation, "index", None)
+    return None
+
+
+def resolve_plot_style_chain(explainer, explicit_style: str | None = None) -> Sequence[str]:
+    """Determine the ordered style fallback chain for plot builders/renderers.
+
+    Parameters
+    ----------
+    explainer : CalibratedExplainer
+        The explainer instance.
+    explicit_style : str, optional
+        An explicit style identifier to use as the primary style.
+
+    Returns
+    -------
+    Sequence[str]
+        The ordered list of style identifiers to attempt.
+    """
+    return _resolve_plot_style_chain(explainer, explicit_style)
+
+
+# pylint: disable=unknown-option-value
+# pylint: disable=too-many-arguments, too-many-statements, too-many-branches, too-many-locals, too-many-positional-arguments, fixme
+
+
+def _plot_config_path() -> Path:
+    """Return the resolved path to the plot configuration file."""
+    return Path(__file__).resolve().parent / "utils" / "configurations" / "plot_config.ini"
+
+
+def load_plot_config():
+    """Load plot configuration from INI file."""
+    config = configparser.ConfigParser()
+    config_path = _plot_config_path()
+
+    # Set default values
+    config["style"] = {"base": "seaborn-v0_8-whitegrid"}
+    config["fonts"] = {
+        "family": "sans-serif",
+        "sans_serif": "Arial",
+        "axes_label_size": "12",
+        "tick_label_size": "10",
+        "legend_size": "10",
+        "title_size": "14",
+    }
+    config["lines"] = {"width": "2"}
+    config["grid"] = {"style": "--", "alpha": "0.5"}
+    config["figure"] = {
+        "dpi": "300",
+        "save_dpi": "300",
+        "facecolor": "white",
+        "axes_facecolor": "white",
+        "width": "10",  # Add default width value
+    }
+    config["colors"] = {
+        "background": "#f8f9fa",
+        "text": "#666666",
+        "grid": "#cccccc",
+        "regression": "red",
+        "positive": "red",
+        "negative": "blue",
+        "uncertainty": "lightgrey",
+        "alpha": "0.2",
+    }
+
+    # Read config file if it exists
+    config.read(str(config_path), encoding="utf-8")
+    return config
+
+
+def update_plot_config(new_config):
+    """Update plot configuration file with new values."""
+    config = load_plot_config()
+
+    # Update configuration with new values
+    for section, values in new_config.items():
+        if section not in config:
+            config[section] = {}
+        for key, value in values.items():
+            config[section][key] = str(value)
+
+    # Write updated config to file, normalising trailing newlines so
+    # repeated writes don't accumulate blank lines.
+    from io import StringIO
+
+    config_path = _plot_config_path()
+    config_path.parent.mkdir(parents=True, exist_ok=True)
+
+    buf = StringIO()
+    config.write(buf)
+    text = buf.getvalue()
+    # Normalise line endings and ensure exactly one trailing newline
+    text = text.replace("\r\n", "\n").rstrip("\n") + "\n"
+    with config_path.open("w", encoding="utf-8", newline="\n") as f:
+        f.write(text)
+
+
+def _setup_plot_style(style_override=None):
+    """Set up plot style using configuration with optional runtime overrides."""
+    _require_matplotlib()
+    config = load_plot_config()
+
+    # Apply style overrides if provided
+    if style_override:
+        for section, values in style_override.items():
+            if section not in config:
+                config[section] = {}
+                warnings.warn(
+                    f'Unknown style section "{section}" in style override.', Warning, stacklevel=2
+                )
+            for key, value in values.items():
+                config[section][key] = str(value)
+
+    plt.style.use(config["style"]["base"])
+
+    # Font settings
+    plt.rcParams["font.family"] = config["fonts"]["family"]
+    plt.rcParams["font.sans-serif"] = [config["fonts"]["sans_serif"]]
+    plt.rcParams["axes.labelsize"] = float(config["fonts"]["axes_label_size"])
+    plt.rcParams["xtick.labelsize"] = float(config["fonts"]["tick_label_size"])
+    plt.rcParams["ytick.labelsize"] = float(config["fonts"]["tick_label_size"])
+    plt.rcParams["legend.fontsize"] = float(config["fonts"]["legend_size"])
+    plt.rcParams["axes.titlesize"] = float(config["fonts"]["title_size"])
+
+    # Line settings
+    plt.rcParams["lines.linewidth"] = float(config["lines"]["width"])
+
+    # Grid settings
+    plt.rcParams["grid.linestyle"] = config["grid"]["style"]
+    plt.rcParams["grid.alpha"] = float(config["grid"]["alpha"])
+
+    # Figure settings
+    plt.rcParams["figure.dpi"] = float(config["figure"]["dpi"])
+    plt.rcParams["savefig.dpi"] = float(config["figure"]["save_dpi"])
+    plt.rcParams["figure.facecolor"] = config["figure"]["facecolor"]
+    plt.rcParams["axes.facecolor"] = config["figure"]["axes_facecolor"]
+
+    return config
+
+
+def plot_probabilistic(
+    explanation,
+    instance,
+    predict,
+    feature_weights,
+    features_to_plot,
+    num_to_show,
+    column_names,
+    title,
+    path,
+    show,
+    interval=False,
+    idx=None,
+    save_ext=None,
+    style_override=None,
+    use_legacy=None,
+    **kwargs,
+):
+    """
+    Plot regular and uncertainty explanations.
+
+    Parameters
+    ----------
+    explanation : object
+        The explanation object containing the details of the explanation.
+    instance : array-like
+        The instance for which the explanation is generated.
+    predict : dict
+        The prediction details including 'predict', 'low', and 'high'.
+    feature_weights : dict or array-like
+        The weights of the features.
+    features_to_plot : list
+        The list of features to plot.
+    num_to_show : int
+        The number of features to show in the plot.
+    column_names : list
+        The names of the columns.
+    title : str
+        The title of the plot.
+    path : str
+        The path to save the plot.
+    show : bool
+        Whether to show the plot.
+    interval : bool, optional
+        Whether to plot intervals.
+    idx : int, optional
+        The index for interval plotting.
+    save_ext : list, optional
+        The list of file extensions to save the plot.
+    style_override : str, optional
+        The style to use for plotting.
+    use_legacy : bool, optional
+        Whether to use the legacy plotting system.
+    """
+    return_plot_spec = kwargs.get("return_plot_spec", False)
+    if return_plot_spec:
+        use_legacy = False
+
+    explicit_style = _resolve_named_plot_style(
+        style_override=style_override,
+        style=kwargs.get("style"),
+    )
+    if use_legacy is None:
+        selected_style, use_legacy = _select_default_plot_style(explanation, explicit_style)
+    else:
+        selected_style = explicit_style or ("plot_spec.default" if use_legacy is False else None)
+    explainer = _resolve_explainer_from_explanation(explanation)
+
+    predict_payload = dict(predict or {})
+
+    if use_legacy:
+        from .viz import _matplotlib_compat as legacy
+
+        legacy._plot_probabilistic(
+            explanation,
+            instance,
+            predict_payload,
+            feature_weights,
+            features_to_plot,
+            num_to_show,
+            column_names,
+            title,
+            path,
+            show,
+            interval,
+            idx,
+            save_ext,
+        )
+        return
+
+    plugin_result = _render_instance_plot_plugin(
+        explanation,
+        explicit_style=selected_style,
+        show=show,
+        path=path or None,
+        save_ext=save_ext,
+        renderer_override=kwargs.get("renderer"),
+        intent_type="factual",
+        options={
+            **kwargs,
+            "instance_index": _plugin_instance_index(explanation, kwargs),
+        },
+    )
+    if plugin_result is not None:
+        return plugin_result
+
+    # If matplotlib is unavailable and we're not showing, perform a no-op to avoid failing
+    _require_matplotlib()
+    if save_ext is None:
+        save_ext = ["svg", "pdf", "png"]
+    if (
+        not return_plot_spec and not show and plt is None
+    ):  # lightweight path for tests/CI without viz extra
+        return
+    # If we're not showing and not saving, perform a no-op to avoid requiring matplotlib
+    if not return_plot_spec and not show and (save_ext is None or len(save_ext) == 0):
+        return
+    if interval is True:
+        assert idx is not None
+
+    def _finite_or(value: Any, fallback: float) -> float:
+        try:
+            val = float(value)
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            return fallback
+        if not np.isfinite(val):
+            return fallback
+        return val
+
+    y_minmax = getattr(explanation, "y_minmax", None)
+    base_pred = _finite_or(predict_payload.get("predict"), 0.0)
+    predict_payload["predict"] = base_pred
+
+    low_fallback = base_pred
+    high_fallback = base_pred
+    if isinstance(y_minmax, Sequence) and len(y_minmax) >= 2:
+        try:
+            low_fallback = float(y_minmax[0])
+            high_fallback = float(y_minmax[1])
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            low_fallback = base_pred
+            high_fallback = base_pred
+
+    predict_payload["low"] = _finite_or(predict_payload.get("low"), low_fallback)
+    predict_payload["high"] = _finite_or(predict_payload.get("high"), high_fallback)
+    # Build a PlotSpec and render via matplotlib adapter to centralize logic
+    # Build a PlotSpec and render via matplotlib adapter to centralize logic
+    from .viz.builders import build_probabilistic_bars_spec
+    from .viz.matplotlib_adapter import render as render_plotspec
+
+    # Attempt to extract class labels for header annotation and captioning
+    class_labels = None
+    with contextlib.suppress(Exception):
+        class_labels = explanation.get_class_labels()
+
+    neg_caption: str | None = None
+    pos_caption: str | None = None
+    neg_label = None
+    pos_label = None
+
+    prediction_classes = None
+    if getattr(explanation, "prediction", None) is not None:
+        prediction_classes = explanation.prediction.get("classes")
+
+    def _format_class(value: Any) -> str:
+        try:
+            return str(value)
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            return ""
+
+    is_thresholded = False
+    with contextlib.suppress(Exception):
+        is_thresholded = explanation.is_thresholded()
+
+    if is_thresholded:
+        threshold = getattr(explanation, "y_threshold", None)
+        try:
+            if np.isscalar(threshold):  # type: ignore[arg-type]
+                thr_val = float(threshold)  # type: ignore[arg-type]
+                neg_caption = f"P(y>{thr_val:.2f})"
+                pos_caption = f"P(y<={thr_val:.2f})"
+            elif isinstance(threshold, Sequence) and len(threshold) >= 2:
+                lo = float(threshold[0])
+                hi = float(threshold[1])
+                neg_caption = f"y_hat <= {lo:.3f} || y_hat > {hi:.3f}"
+                pos_caption = f"{lo:.3f} < y_hat <= {hi:.3f}"
+            else:
+                neg_caption = "P(y>threshold)"
+                pos_caption = "P(y<=threshold)"
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            neg_caption = "P(y>threshold)"
+            pos_caption = "P(y<=threshold)"
+    else:
+        is_multiclass = False
+        if explainer is not None:
+            with contextlib.suppress(Exception):
+                is_multiclass = bool(explainer.is_multiclass())
+        if not is_multiclass:
+            is_multiclass = bool(getattr(explanation, "is_multiclass", False))
+
+        if class_labels is None:
+            if is_multiclass:
+                label_val = _format_class(prediction_classes)
+                neg_caption = f"P(y!={label_val})"
+                pos_caption = f"P(y={label_val})"
+            else:
+                neg_caption = "P(y=0)"
+                pos_caption = "P(y=1)"
+        elif bool(getattr(explanation, "is_multiclass", False)) or is_multiclass:
+            pred_idx = 0
+            if prediction_classes is not None:
+                try:
+                    pred_idx = int(prediction_classes)
+                except:  # noqa: E722
+                    if not isinstance(sys.exc_info()[1], Exception):
+                        raise
+                    pred_idx = 0
+            try:
+                label_val = class_labels[pred_idx]
+            except:  # noqa: E722
+                if not isinstance(sys.exc_info()[1], Exception):
+                    raise
+                label_val = prediction_classes
+            label_str = _format_class(label_val)
+            neg_caption = f"P(y!={label_str})"
+            pos_caption = f"P(y={label_str})"
+        else:
+            try:
+                neg_label = class_labels[0]
+                pos_label = class_labels[1]
+            except:  # noqa: E722
+                if not isinstance(sys.exc_info()[1], Exception):
+                    raise
+                neg_label = class_labels[0] if class_labels else None
+                pos_label = class_labels[1] if class_labels and len(class_labels) > 1 else None
+            if neg_label is not None:
+                neg_caption = f"P(y={_format_class(neg_label)})"
+            if pos_label is not None:
+                pos_caption = f"P(y={_format_class(pos_label)})"
+
+    spec = build_probabilistic_bars_spec(
+        title=title,
+        predict=predict_payload,
+        feature_weights=feature_weights,
+        features_to_plot=features_to_plot,
+        column_names=column_names,
+        rule_labels=column_names,
+        instance=instance,
+        y_minmax=getattr(explanation, "y_minmax", None),
+        interval=interval,
+        sort_by=None,
+        ascending=False,
+        neg_label=neg_label,
+        pos_label=pos_label,
+        neg_caption=neg_caption,
+        pos_caption=pos_caption,
+    )
+
+    # Use the adapter's render function. For save behavior, construct a temporary
+    # save_path if saving multiple extensions was requested by caller.
+    save_path = None
+    if save_ext is not None and len(save_ext) > 0 and path is not None and title is not None:
+        # The matplotlib adapter accepts a single save_path; callers previously saved
+        # multiple files by iterating. We'll mimic that behavior here below.
+        save_path = None
+
+    try:
+        # Render to show (no-op if neither show nor save requested)
+        render_plotspec(spec, show=show, save_path=save_path)
+
+        # If requested, also save multiple extensions like the legacy function did
+        if save_ext is not None and len(save_ext) > 0 and path is not None and title is not None:
+            from .viz.matplotlib_adapter import render as _render
+
+            for ext in save_ext:
+                _render(spec, show=False, save_path=_format_save_path(path, title + ext))
+    except:  # noqa: E722
+        if not isinstance(sys.exc_info()[1], Exception):
+            raise
+        _warn_and_log_plotspec_fallback(
+            f"PlotSpec rendering failed with '{sys.exc_info()[1]}'. Falling back to legacy plot."
+        )
+        from .viz import _matplotlib_compat as legacy_module
+
+        legacy_module._plot_probabilistic(
+            explanation,
+            instance,
+            predict,
+            feature_weights,
+            features_to_plot,
+            num_to_show,
+            column_names,
+            title,
+            path,
+            show,
+            interval,
+            idx,
+            save_ext,
+        )
+    return spec if return_plot_spec else None
+
+
+# pylint: disable=too-many-branches, too-many-statements, too-many-locals
+def plot_regression(
+    explanation,
+    instance,
+    predict,
+    feature_weights,
+    features_to_plot,
+    num_to_show,
+    column_names,
+    title,
+    path,
+    show,
+    interval=False,
+    idx=None,
+    save_ext=None,
+    style_override=None,
+    use_legacy=None,
+    **kwargs,
+):
+    """Plot regression explanations.
+
+    Parameters
+    ----------
+    explanation : object
+        The explanation object containing the details of the explanation.
+    instance : array-like
+        The instance for which the explanation is generated.
+    predict : dict
+        The prediction details including 'predict', 'low', and 'high'.
+    feature_weights : dict or array-like
+        The weights of the features.
+    features_to_plot : list
+        The list of features to plot.
+    num_to_show : int
+        The number of features to show in the plot.
+    column_names : list
+        The names of the columns.
+    title : str
+        The title of the plot.
+    path : str
+        The path to save the plot.
+    show : bool
+        Whether to show the plot.
+    interval : bool, optional
+        Whether to plot intervals.
+    idx : int, optional
+        The index for interval plotting.
+    save_ext : list, optional
+        The list of file extensions to save the plot.
+    """
+    return_plot_spec = kwargs.get("return_plot_spec", False)
+    if return_plot_spec:
+        use_legacy = False
+
+    if interval and hasattr(explanation, "is_one_sided"):
+        try:
+            if explanation.is_one_sided():
+                raise Warning("Interval plot is not supported for one-sided explanations.")
+        except Warning:
+            raise
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            # If the guard fails unexpectedly, defer to legacy parity by proceeding.
+            logging.getLogger(__name__).debug("Guard check failed: %s", sys.exc_info()[1])
+
+    explicit_style = _resolve_named_plot_style(
+        style_override=style_override,
+        style=kwargs.get("style"),
+    )
+    if use_legacy is None:
+        selected_style, use_legacy = _select_default_plot_style(explanation, explicit_style)
+    else:
+        selected_style = explicit_style or ("plot_spec.default" if use_legacy is False else None)
+
+    if use_legacy:
+        from .viz import _matplotlib_compat as legacy
+
+        legacy.plot_regression(
+            explanation,
+            instance,
+            predict,
+            feature_weights,
+            features_to_plot,
+            num_to_show,
+            column_names,
+            title,
+            path,
+            show,
+            interval,
+            idx,
+            save_ext,
+        )
+        return
+
+    plugin_result = _render_instance_plot_plugin(
+        explanation,
+        explicit_style=selected_style,
+        show=show,
+        path=path or None,
+        save_ext=save_ext,
+        renderer_override=kwargs.get("renderer"),
+        intent_type="factual",
+        options={
+            **kwargs,
+            "instance_index": _plugin_instance_index(explanation, kwargs),
+        },
+    )
+    if plugin_result is not None:
+        return plugin_result
+
+    # If matplotlib is unavailable and we're not showing, perform a no-op to avoid failing
+    if (
+        not return_plot_spec and not show and plt is None
+    ):  # lightweight path for tests/CI without viz extra
+        return
+    # If we're not showing and not saving, perform a no-op to avoid requiring matplotlib
+    if not return_plot_spec and not show and (save_ext is None or len(save_ext) == 0):
+        return
+
+    # Build PlotSpec via builder and render via adapter
+    if save_ext is None:
+        save_ext = ["svg", "pdf", "png"]
+    from .viz.builders import build_regression_bars_spec
+    from .viz.matplotlib_adapter import render as render_plotspec
+
+    confidence = None
+    try:
+        calibrated = getattr(explanation, "calibrated_explanations", None)
+        if calibrated is not None:
+            confidence = calibrated.get_confidence()
+    except:  # noqa: E722
+        if not isinstance(sys.exc_info()[1], Exception):
+            raise
+        confidence = None
+
+    spec = build_regression_bars_spec(
+        title=title,
+        predict=predict,
+        feature_weights=feature_weights,
+        features_to_plot=features_to_plot,
+        column_names=column_names,
+        rule_labels=column_names,
+        instance=instance,
+        y_minmax=getattr(explanation, "y_minmax", None),
+        interval=interval,
+        confidence=confidence,
+        sort_by=None,
+        ascending=False,
+    )
+
+    # Attach a minimal reject badge for plotting when explanation carries reject_context
+    try:
+        rc = getattr(explanation, "reject_context", None)
+        if rc is not None and getattr(rc, "rejected", False):
+            if getattr(rc, "reject_type", None) == "ambiguity":
+                badge = "REJECTED (ambiguous)"
+            elif getattr(rc, "reject_type", None) == "novelty":
+                badge = "REJECTED (novel)"
+            else:
+                badge = "REJECTED"
+            try:
+                spec.reject_badge = badge
+                spec.reject_reason = getattr(rc, "reject_type", None)
+            except Exception as exc:  # adr002_allow - best-effort
+                logging.getLogger(__name__).debug(
+                    "failed to attach reject badge to PlotSpec: %s", exc, exc_info=True
+                )
+    except Exception as exc:  # adr002_allow - non-fatal
+        logging.getLogger(__name__).debug(
+            "failed reading explanation.reject_context: %s", exc, exc_info=True
+        )
+
+    try:
+        if save_ext is not None and len(save_ext) > 0 and path is not None and title is not None:
+            _render_plotspec_once_and_save(
+                spec,
+                show=show,
+                path=path,
+                title=title,
+                save_ext=save_ext,
+            )
+        else:
+            from .viz.matplotlib_adapter import (
+                render as render_plotspec,  # pylint: disable=import-outside-toplevel
+            )
+
+            render_plotspec(spec, show=show, save_path=None)
+    except:  # noqa: E722
+        if not isinstance(sys.exc_info()[1], Exception):
+            raise
+        _warn_and_log_plotspec_fallback(
+            f"PlotSpec rendering failed with '{sys.exc_info()[1]}'. Falling back to legacy plot."
+        )
+        from .viz import _matplotlib_compat as legacy_module
+
+        legacy_module.plot_regression(
+            explanation,
+            instance,
+            predict,
+            feature_weights,
+            features_to_plot,
+            num_to_show,
+            column_names,
+            title,
+            path,
+            show,
+            interval,
+            idx,
+            save_ext,
+        )
+    return spec if return_plot_spec else None
+
+
+# pylint: disable=duplicate-code
+def plot_triangular(
+    explanation,
+    proba,
+    uncertainty,
+    rule_proba,
+    rule_uncertainty,
+    num_to_show,
+    title,
+    path,
+    show,
+    save_ext=None,
+    style_override=None,
+    use_legacy=None,
+):
+    """
+    Plot triangular explanations.
+
+    Parameters
+    ----------
+    explanation : object
+        The explanation object containing the details of the explanation.
+    proba : array-like
+        The probabilities of the predictions.
+    uncertainty : array-like
+        The uncertainties of the predictions.
+    rule_proba : array-like
+        The probabilities of the rules.
+    rule_uncertainty : array-like
+        The uncertainties of the rules.
+    num_to_show : int
+        The number of rules to show in the plot.
+    title : str
+        The title of the plot.
+    path : str
+        The path to save the plot.
+    show : bool
+        Whether to show the plot.
+    save_ext : list, optional
+        The list of file extensions to save the plot.
+    """
+    explicit_style = _resolve_named_plot_style(style_override=style_override, style=None)
+    if use_legacy is None:
+        _, use_legacy = _select_default_plot_style(explanation, explicit_style)
+    if use_legacy:
+        from .viz import _matplotlib_compat as legacy
+
+        legacy.plot_triangular(
+            explanation,
+            proba,
+            uncertainty,
+            rule_proba,
+            rule_uncertainty,
+            num_to_show,
+            title,
+            path,
+            show,
+            save_ext,
+        )
+        return
+
+    # Build canonical triangular PlotSpec via the builder and delegate rendering
+    # to the adapter.
+    from .viz.builders import build_triangular_plotspec
+    from .viz.matplotlib_adapter import render as render_plotspec
+
+    if save_ext is None:
+        save_ext = ["svg", "pdf", "png"]
+
+    is_probabilistic = True
+    with contextlib.suppress(Exception):
+        mode = explanation.get_mode()
+        is_probabilistic = mode == "classification" or (
+            mode == "regression" and bool(explanation.is_thresholded())
+        )
+
+    spec = build_triangular_plotspec(
+        title=title,
+        proba=proba,
+        uncertainty=uncertainty,
+        rule_proba=rule_proba,
+        rule_uncertainty=rule_uncertainty,
+        num_to_show=num_to_show,
+        is_probabilistic=is_probabilistic,
+    )
+
+    # Let adapter perform the rendering and handle saving behavior.
+    if not show and plt is None and (save_ext is None or len(save_ext) == 0):
+        return spec
+
+    try:
+        if save_ext is not None and len(save_ext) > 0 and path is not None and title is not None:
+            _render_plotspec_once_and_save(
+                spec,
+                show=show,
+                path=path,
+                title=title,
+                save_ext=save_ext,
+            )
+        else:
+            render_plotspec(spec, show=show, save_path=None)
+    except:  # noqa: E722
+        if not isinstance(sys.exc_info()[1], Exception):
+            raise
+        _warn_and_log_plotspec_fallback(
+            f"PlotSpec rendering failed with '{sys.exc_info()[1]}'. Falling back to legacy plot."
+        )
+        from .viz import _matplotlib_compat as legacy
+
+        legacy.plot_triangular(
+            explanation,
+            proba,
+            uncertainty,
+            rule_proba,
+            rule_uncertainty,
+            num_to_show,
+            title,
+            path,
+            show,
+            save_ext,
+        )
+    return
+
+
+# `__plot_triangular`
+def _draw_proba_triangle_overlay():
+    """Render the static probability triangle overlay."""
+    x = np.arange(0, 1, 0.01)
+    plt.plot((x / (1 + x)), x, color="black")
+    plt.plot(x, ((1 - x) / x), color="black")
+    x = np.arange(0.5, 1, 0.005)
+    plt.plot((0.5 + x - 0.5) / (1 + x - 0.5), x - 0.5, color="black")
+    x = np.arange(0, 0.5, 0.005)
+    plt.plot((x + 0.5 - x) / (1 + x), x, color="black")
+
+
+# pylint: disable=too-many-arguments, too-many-locals, invalid-name, too-many-branches, too-many-statements
+def plot_alternative(
+    explanation,
+    instance,
+    predict,
+    feature_predict,
+    features_to_plot,
+    num_to_show,
+    column_names,
+    title,
+    path,
+    show,
+    save_ext=None,
+    style_override=None,
+    use_legacy=None,
+    **kwargs,
+):
+    """
+    Plot alternative explanations.
+
+    Parameters
+    ----------
+    explanation : object
+        The explanation object containing the details of the explanation.
+    instance : array-like
+        The instance for which the explanation is generated.
+    predict : dict
+        The prediction details including 'predict', 'low', and 'high'.
+    feature_predict : dict
+        The predictions for the features.
+    features_to_plot : list
+        The list of features to plot.
+    num_to_show : int
+        The number of features to show in the plot.
+    column_names : list
+        The names of the columns.
+    title : str
+        The title of the plot.
+    path : str
+        The path to save the plot.
+    show : bool
+        Whether to show the plot.
+    save_ext : list, optional
+        The list of file extensions to save the plot.
+    """
+    return_plot_spec = kwargs.get("return_plot_spec", False)
+    if return_plot_spec:
+        use_legacy = False
+
+    explicit_style = _resolve_named_plot_style(
+        style_override=style_override,
+        style=kwargs.get("style"),
+    )
+    if use_legacy is None:
+        selected_style, use_legacy = _select_default_plot_style(explanation, explicit_style)
+    else:
+        selected_style = explicit_style or ("plot_spec.default" if use_legacy is False else None)
+    explainer = _resolve_explainer_from_explanation(explanation)
+
+    if use_legacy:
+        from .viz import _matplotlib_compat as legacy
+
+        legacy.plot_alternative(
+            explanation,
+            instance,
+            predict,
+            feature_predict,
+            features_to_plot,
+            num_to_show,
+            column_names,
+            title,
+            path,
+            show,
+            save_ext,
+        )
+        return
+
+    plugin_result = _render_instance_plot_plugin(
+        explanation,
+        explicit_style=selected_style,
+        show=show,
+        path=path or None,
+        save_ext=save_ext,
+        renderer_override=kwargs.get("renderer"),
+        intent_type="alternative",
+        options={
+            **kwargs,
+            "instance_index": _plugin_instance_index(explanation, kwargs),
+        },
+    )
+    if plugin_result is not None:
+        return plugin_result
+
+    # If we're not showing and not saving, perform a no-op to avoid requiring matplotlib.
+    # Saving still requires the renderer/backend to be available.
+    if not return_plot_spec and not show and (save_ext is None or len(save_ext) == 0):
+        return
+
+    if not return_plot_spec:
+        _require_matplotlib()
+
+    if save_ext is None:
+        save_ext = ["svg", "pdf", "png"]
+
+    features_to_plot = list(features_to_plot or [])
+
+    # Ensure y_minmax is finite when available
+    y_minmax = getattr(explanation, "y_minmax", None)
+    normalised_y_minmax: tuple[float, float] | None = None
+    if isinstance(y_minmax, Sequence) and len(y_minmax) >= 2:
+        try:
+            y0, y1 = float(y_minmax[0]), float(y_minmax[1])
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            normalised_y_minmax = None
+        else:
+            if np.isfinite(y0) and np.isfinite(y1):
+                normalised_y_minmax = (y0, y1)
+
+    def _safe_float(value: Any) -> float | None:
+        try:
+            val = float(value)
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            return None
+        if not np.isfinite(val):
+            return None
+        return val
+
+    predict_payload: Dict[str, Any] = {}
+    if isinstance(predict, Mapping):
+        predict_payload.update(predict)
+
+    base_pred = _safe_float(predict_payload.get("predict"))
+    if base_pred is None:
+        base_pred = 0.0
+
+    low_default = base_pred
+    high_default = base_pred
+    if normalised_y_minmax is not None:
+        low_default = normalised_y_minmax[0]
+        high_default = normalised_y_minmax[1]
+
+    pred_low = _safe_float(predict_payload.get("low"))
+    pred_high = _safe_float(predict_payload.get("high"))
+
+    predict_payload["predict"] = base_pred
+    predict_payload["low"] = pred_low if pred_low is not None else low_default
+    predict_payload["high"] = pred_high if pred_high is not None else high_default
+
+    feature_payload: Any = feature_predict
+    if isinstance(feature_predict, Mapping):
+        fallback_map = {
+            "predict": base_pred,
+            "low": predict_payload["low"],
+            "high": predict_payload["high"],
+        }
+        sanitised: Dict[str, List[float]] = {}
+        for key, values in feature_predict.items():
+            if isinstance(values, np.ndarray):
+                seq = values.tolist()
+            elif isinstance(values, Sequence):
+                seq = list(values)
+            else:
+                seq = [values]
+            fallback = fallback_map.get(key, base_pred)
+            sanitised[key] = [
+                val if (val := _safe_float(item)) is not None else float(fallback) for item in seq
+            ]
+        feature_payload = sanitised
+    else:
+        values_seq: Sequence[Any]
+        if isinstance(feature_predict, np.ndarray):
+            values_seq = feature_predict.tolist()
+        elif isinstance(feature_predict, Sequence):
+            values_seq = list(feature_predict)
+        else:
+            values_seq = [feature_predict]
+        feature_payload = [
+            val if (val := _safe_float(item)) is not None else float(base_pred)
+            for item in values_seq
+        ]
+
+    feature_count = 0
+    if isinstance(feature_payload, Mapping):
+        for values in feature_payload.values():
+            if isinstance(values, Sequence):
+                try:
+                    feature_count = max(feature_count, len(values))
+                except:  # noqa: E722
+                    if not isinstance(sys.exc_info()[1], TypeError):
+                        raise
+                    continue
+                if feature_count:
+                    break
+    elif isinstance(feature_payload, Sequence):
+        try:
+            feature_count = len(feature_payload)
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], TypeError):
+                raise
+            feature_count = 0
+
+    normalised_indices: list[int] = []
+    for idx in features_to_plot:
+        try:
+            value = int(idx)
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            logging.getLogger(__name__).debug(
+                "Failed to convert feature index to int: %s", sys.exc_info()[1]
+            )
+            continue
+        if value < 0:
+            continue
+        normalised_indices.append(value)
+    features_to_plot = normalised_indices
+
+    if not features_to_plot and feature_count:
+        features_to_plot = list(range(feature_count))
+
+    if len(features_to_plot) == 0 or num_to_show <= 0:
+        return
+
+    if column_names is None and feature_count:
+        column_names = [str(idx) for idx in range(feature_count)]
+
+    interval = (
+        isinstance(feature_payload, Mapping)
+        and "low" in feature_payload
+        and "high" in feature_payload
+    )
+
+    try:
+        mode = ""
+        try:
+            mode = str(explanation.get_mode() or "")
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            mode = ""
+        is_regression = "regression" in mode
+
+        neg_label = None
+        pos_label = None
+        x_axis_label = None
+        xlim_override: tuple[float, float] | None = None
+        xticks_override: Sequence[float] | None = None
+        is_thresholded = False
+        if not is_regression:
+            class_labels = None
+            with contextlib.suppress(Exception):
+                class_labels = explanation.get_class_labels()
+            if class_labels is not None and len(class_labels) >= 2:
+                try:
+                    prediction = getattr(explanation, "prediction", {})
+                    cls_idx = 1
+                    if isinstance(prediction, Mapping):
+                        cls_idx = int(prediction.get("classes", 1))
+                    pos_label = class_labels[cls_idx]
+                    neg_idx = 0 if cls_idx != 0 else 1
+                    neg_label = class_labels[neg_idx]
+                except:  # noqa: E722
+                    if not isinstance(sys.exc_info()[1], Exception):
+                        raise
+                    neg_label = None
+                    pos_label = None
+            # Legacy plots fixed the probability axis to [0,1] with evenly spaced ticks
+            xlim_override = (0.0, 1.0)
+            xticks_override = [float(x) for x in np.linspace(0.0, 1.0, 11)]
+            with contextlib.suppress(Exception):
+                is_thresholded = bool(explanation.is_thresholded())
+            if is_thresholded:
+                threshold_value = getattr(explanation, "y_threshold", None)
+                if np.isscalar(threshold_value):
+                    try:
+                        x_axis_label = (
+                            f"Probability of target being below {float(threshold_value):.2f}"
+                        )
+                    except:  # noqa: E722
+                        if not isinstance(sys.exc_info()[1], Exception):
+                            raise
+                        x_axis_label = "Probability"
+                elif isinstance(threshold_value, tuple) and len(threshold_value) >= 2:
+                    try:
+                        x_axis_label = (
+                            "Probability of target being between "
+                            f"{float(threshold_value[0]):.3f} and {float(threshold_value[1]):.3f}"
+                        )
+                    except:  # noqa: E722
+                        if not isinstance(sys.exc_info()[1], Exception):
+                            raise
+                        x_axis_label = "Probability"
+                else:
+                    try:
+                        x_axis_label = (
+                            f"Probability of target being below {float(threshold_value):.2f}"
+                        )
+                    except:  # noqa: E722
+                        if not isinstance(sys.exc_info()[1], Exception):
+                            raise
+                        x_axis_label = "Probability"
+            else:
+                predicted_idx = None
+                try:
+                    prediction = getattr(explanation, "prediction", None)
+                    if isinstance(prediction, Mapping):
+                        predicted_idx = prediction.get("classes")
+                except:  # noqa: E722
+                    if not isinstance(sys.exc_info()[1], Exception):
+                        raise
+                    predicted_idx = None
+                idx_value = None
+                if predicted_idx is not None:
+                    with contextlib.suppress(Exception):
+                        idx_value = int(predicted_idx)
+                is_multi = False
+                if explainer is not None:
+                    with contextlib.suppress(Exception):
+                        is_multi = bool(explainer.is_multiclass())
+                if class_labels is None:
+                    if is_multi:
+                        x_axis_label = f"Probability for class '{predicted_idx}'"
+                    else:
+                        x_axis_label = "Probability for the positive class"
+                else:
+                    if is_multi and idx_value is not None and 0 <= idx_value < len(class_labels):
+                        x_axis_label = f"Probability for class '{class_labels[idx_value]}'"
+                    elif not is_multi and len(class_labels) > 1:
+                        x_axis_label = f"Probability for class '{class_labels[1]}'"
+                    else:
+                        x_axis_label = "Probability"
+                if x_axis_label is None:
+                    x_axis_label = "Probability"
+        else:
+            with contextlib.suppress(Exception):
+                is_thresholded = bool(explanation.is_thresholded())
+            if normalised_y_minmax is not None:
+                try:
+                    xlim_override = (
+                        float(normalised_y_minmax[0]),
+                        float(normalised_y_minmax[1]),
+                    )
+                except:  # noqa: E722
+                    if not isinstance(sys.exc_info()[1], Exception):
+                        raise
+                    xlim_override = None
+            if xlim_override is None:
+                try:
+                    xlim_override = (
+                        float(predict_payload.get("low", 0.0)),
+                        float(predict_payload.get("high", 0.0)),
+                    )
+                except:  # noqa: E722
+                    if not isinstance(sys.exc_info()[1], Exception):
+                        raise
+                    xlim_override = None
+            confidence = None
+            try:
+                calibrated = getattr(explanation, "calibrated_explanations", None)
+                if calibrated is not None:
+                    confidence = calibrated.get_confidence()
+            except:  # noqa: E722
+                if not isinstance(sys.exc_info()[1], Exception):
+                    raise
+                confidence = None
+            if is_thresholded:
+                xlim_override = (0.0, 1.0)
+                xticks_override = [float(x) for x in np.linspace(0.0, 1.0, 11)]
+                threshold_value = getattr(explanation, "y_threshold", None)
+                if np.isscalar(threshold_value):
+                    try:
+                        x_axis_label = (
+                            f"Probability of target being below {float(threshold_value):.2f}"
+                        )
+                    except:  # noqa: E722
+                        if not isinstance(sys.exc_info()[1], Exception):
+                            raise
+                        x_axis_label = "Probability"
+                elif isinstance(threshold_value, tuple) and len(threshold_value) >= 2:
+                    try:
+                        x_axis_label = (
+                            "Probability of target being between "
+                            f"{float(threshold_value[0]):.3f} and {float(threshold_value[1]):.3f}"
+                        )
+                    except:  # noqa: E722
+                        if not isinstance(sys.exc_info()[1], Exception):
+                            raise
+                        x_axis_label = "Probability"
+                else:
+                    try:
+                        x_axis_label = (
+                            f"Probability of target being below {float(threshold_value):.2f}"
+                        )
+                    except:  # noqa: E722
+                        if not isinstance(sys.exc_info()[1], Exception):
+                            raise
+                        x_axis_label = "Probability"
+            else:
+                if confidence is not None:
+                    x_axis_label = f"Prediction interval with {confidence}% confidence"
+                else:
+                    x_axis_label = "Prediction interval"
+
+        from .viz.builders import (
+            build_alternative_probabilistic_spec,
+            build_alternative_regression_spec,
+        )
+        from .viz.matplotlib_adapter import render as render_plotspec
+
+        builder_kwargs = {
+            "title": title,
+            "predict": predict_payload,
+            "feature_weights": feature_payload,
+            "features_to_plot": features_to_plot,
+            "column_names": column_names,
+            "rule_labels": column_names,
+            "instance": instance,
+            "y_minmax": normalised_y_minmax,
+            "interval": interval,
+            "sort_by": None,
+            "ascending": False,
+            "legacy_solid_behavior": True,
+        }
+        if is_regression:
+            if is_thresholded:
+                threshold_value = getattr(explanation, "y_threshold", None)
+                pos_label, neg_label = derive_threshold_labels(threshold_value)
+                classification_kwargs = builder_kwargs.copy()
+                classification_kwargs["neg_label"] = neg_label
+                classification_kwargs["pos_label"] = pos_label
+                classification_kwargs["xlabel"] = x_axis_label or "Probability"
+                classification_kwargs["xlim"] = (0.0, 1.0)
+                classification_kwargs["xticks"] = [float(x) for x in np.linspace(0.0, 1.0, 11)]
+                classification_kwargs["y_minmax"] = None
+                spec = build_alternative_probabilistic_spec(**classification_kwargs)
+            else:
+                builder_kwargs.update(
+                    {
+                        "xlabel": x_axis_label,
+                        "xlim": xlim_override,
+                        "xticks": xticks_override,
+                    }
+                )
+                spec = build_alternative_regression_spec(**builder_kwargs)
+        else:
+            builder_kwargs.update(
+                {
+                    "neg_label": neg_label,
+                    "pos_label": pos_label,
+                    "xlabel": x_axis_label,
+                    "xlim": xlim_override,
+                    "xticks": xticks_override,
+                }
+            )
+            spec = build_alternative_probabilistic_spec(**builder_kwargs)
+
+        try:
+            if save_ext and path is not None and title is not None:
+                _render_plotspec_once_and_save(
+                    spec,
+                    show=show,
+                    path=path,
+                    title=title,
+                    save_ext=save_ext,
+                )
+            else:
+                from .viz.matplotlib_adapter import (
+                    render as render_plotspec,  # pylint: disable=import-outside-toplevel
+                )
+
+                render_plotspec(spec, show=show, save_path=None)
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            _warn_and_log_plotspec_fallback(
+                f"PlotSpec rendering failed with '{sys.exc_info()[1]}'. Falling back to legacy plot."
+            )
+            from .viz import _matplotlib_compat as legacy
+
+            legacy.plot_alternative(
+                explanation,
+                instance,
+                predict,
+                feature_predict,
+                features_to_plot,
+                num_to_show,
+                column_names,
+                title,
+                path,
+                show,
+                save_ext,
+            )
+        return spec if return_plot_spec else None
+    except:  # noqa: E722
+        if not isinstance(sys.exc_info()[1], Exception):
+            raise
+        _warn_and_log_plotspec_fallback(
+            f"PlotSpec rendering failed with '{sys.exc_info()[1]}'. Falling back to legacy plot."
+        )
+        from .viz import _matplotlib_compat as legacy
+
+        legacy.plot_alternative(
+            explanation,
+            instance,
+            predict,
+            feature_predict,
+            features_to_plot,
+            num_to_show,
+            column_names,
+            title,
+            path,
+            show,
+            save_ext,
+        )
+        return
+
+
+def _build_global_prediction_payload(
+    explainer: Any,
+    x: Any,
+    y: Any,
+    threshold: Any,
+    kwargs: Mapping[str, Any],
+) -> dict[str, Any]:
+    """Build the validated prediction payload shared by all global plot routes."""
+    bins = kwargs.get("bins")
+    is_regularized = True
+    if not learner_supports_predict_proba(explainer.learner) and threshold is None:
+        prediction_kwargs = {"bins": bins}
+        if "low_high_percentiles" in kwargs:
+            prediction_kwargs["low_high_percentiles"] = kwargs["low_high_percentiles"]
+        predict, (low, high) = explainer.predict(x, uq_interval=True, **prediction_kwargs)
+        proba = None
+        is_regularized = False
+    else:
+        proba, (low, high) = explainer.predict_proba(
+            x, uq_interval=True, threshold=threshold, bins=bins
+        )
+        predict = None
+
+    uncertainty = (
+        (np.array(high) - np.array(low)) if (low is not None and high is not None) else None
+    )
+    return {
+        "proba": proba,
+        "predict": predict,
+        "low": low,
+        "high": high,
+        "uncertainty": uncertainty,
+        "y": (list(y) if y is not None else None),
+        "is_regularized": is_regularized,
+        "threshold": threshold,
+        "class_labels": getattr(explainer, "class_labels", None),
+        "x": x,
+    }
+
+
+# pylint: disable=duplicate-code, too-many-branches, too-many-statements, too-many-locals
+def _dispatch_explicit_global_plot_style(
+    explainer: Any,
+    x: Any,
+    y: Any,
+    threshold: Any,
+    style: str,
+    kwargs: Mapping[str, Any],
+    resolved: tuple[Any, str, bool] | None = None,
+) -> _PlotDispatchOutcome:
+    """Dispatch an explicit third-party global/dashboard style from plot_global."""
+    from .utils.exceptions import ValidationError  # pylint: disable=import-outside-toplevel
+
+    _reject_conflicting_plot_selection(style, kwargs)
+    if _GLOBAL_PAYLOAD_KEY in kwargs:
+        raise ValidationError(
+            f"'{_GLOBAL_PAYLOAD_KEY}' is a reserved plot_global option: CE "
+            "publishes its validated global prediction payload under this key "
+            "and will not overwrite or forward a caller-supplied value. Rename "
+            "the argument."
+        )
+    show, path, save_ext = _normalize_third_party_transport(kwargs)
+    bins = kwargs.get("bins")
+
+    # CE-owned validation of model outputs happens before dispatch so every
+    # global renderer observes the same validated prediction payload.
+    payload = _build_global_prediction_payload(explainer, x, y, threshold, kwargs)
+
+    options = _third_party_plot_options(kwargs)
+    options[_GLOBAL_PAYLOAD_KEY] = payload
+
+    runtime = {
+        "scope": "global",
+        "explainer": explainer,
+        "x": x,
+        "y": y,
+        "threshold": threshold,
+        "bins": bins,
+    }
+    return _dispatch_third_party_plot(
+        explainer=explainer,
+        explanation=getattr(explainer, "latest_explanation", None),
+        intent_type="global",
+        instance_metadata={"type": "global"},
+        style=style,
+        renderer_override=kwargs.get("renderer"),
+        show=show,
+        path=path,
+        save_ext=save_ext,
+        options=options,
+        runtime=runtime,
+        resolved=resolved,
+    )
+
+
+def _dispatch_configured_global_plot_style(
+    explainer: Any,
+    x: Any,
+    y: Any,
+    threshold: Any,
+    kwargs: Mapping[str, Any],
+) -> _PlotDispatchOutcome | None:
+    """Attempt full-fidelity dispatch for a *configured* (non-explicit) global style.
+
+    Returns ``None`` when the configured preference is CE-owned, does not
+    resolve to a registered plugin, or fails during build/render -- in all
+    three cases the caller falls through to the existing legacy-fallback
+    path, preserving ``plot_global``'s pre-existing visible-fallback
+    governance for configured (not explicit) selections. A malformed request
+    (conflicting transport, reserved ``payload`` key) still raises, since
+    that is a caller bug rather than a plugin-availability issue.
+    """
+    from .utils.exceptions import ValidationError  # pylint: disable=import-outside-toplevel
+
+    if _configured_dispatch_blocked(kwargs):
+        return None
+    configured_style = _effective_configured_plot_style(explainer)
+    if not _is_third_party_plot_style(configured_style):
+        return None
+    manager = getattr(explainer, "plugin_manager", None)
+    resolver = getattr(manager, "resolve_plot_plugin_strict", None)
+    if not callable(resolver):
+        return None
+    try:
+        resolved = resolver(configured_style, renderer_override=kwargs.get("renderer"))
+    except Exception:  # noqa: BLE001 - adr002_allow: unresolved configured style defers to legacy fallback
+        return None
+    try:
+        return _dispatch_explicit_global_plot_style(
+            explainer, x, y, threshold, configured_style, kwargs, resolved=resolved
+        )
+    except ValidationError:
+        raise
+    except Exception as exc:  # noqa: BLE001 - adr002_allow: matches plot_global's existing catch-and-fallback
+        _warn_and_log_plotspec_fallback(
+            f"PlotSpec rendering failed with '{exc}'. Falling back to legacy plot."
+        )
+        return None
+
+
+def plot_global(explainer, x, y=None, threshold=None, **kwargs):
+    """
+    Generate a global explanation plot for the given test data.
+
+    This plot is based on the
+    probability distribution and the uncertainty quantification intervals.
+    The plot is only available for calibrated probabilistic learners (both classification and
+    thresholded regression).
+
+    Parameters
+    ----------
+    explainer : object
+        The explainer object used to generate the explanations.
+    x : array-like
+        The input data for which predictions are to be made.
+    y : array-like, optional
+        The true labels of the test data.
+    threshold : float, int, optional
+        The threshold value used with regression to get probability of being below the threshold.
+    **kwargs : dict
+        Additional keyword arguments.
+    """
+    style_kwarg = kwargs.get("style")
+    style_override_kwarg = kwargs.get("style_override")
+    requested_style = style_kwarg
+    if not _is_third_party_plot_style(requested_style) and _is_third_party_plot_style(
+        style_override_kwarg
+    ):
+        requested_style = style_override_kwarg
+    if _is_third_party_plot_style(requested_style):
+        return _dispatch_explicit_global_plot_style(
+            explainer, x, y, threshold, requested_style, kwargs
+        ).result
+    if not _configured_dispatch_blocked(kwargs):
+        configured_outcome = _dispatch_configured_global_plot_style(
+            explainer, x, y, threshold, kwargs
+        )
+        if configured_outcome is not None:
+            return configured_outcome.result
+
+    _reject_unconsumed_plot_kwargs("plot_global", kwargs, allowed=_PLOT_GLOBAL_KWARGS)
+
+    show = kwargs.get("show", True)
+    use_legacy = kwargs.get("use_legacy")
+    explicit_style = _resolve_named_plot_style(
+        style_override=kwargs.get("style_override"),
+        style=kwargs.get("style"),
+    )
+    if use_legacy is None:
+        selected_style, use_legacy = _select_default_plot_style(explainer, explicit_style)
+    else:
+        selected_style = explicit_style or ("plot_spec.default" if use_legacy is False else None)
+
+    # pre-v4 S4-H6: gather and validate model outputs once, ahead of the
+    # use_legacy dispatch, so both the legacy and PlotSpec renderers observe
+    # the same validated prediction payload. Previously the legacy branch
+    # returned immediately and only validated *inside* legacy.plot_global,
+    # which itself validated only after a "not show and no matplotlib"
+    # no-op check -- so plot(..., threshold=<invalid>, use_legacy=True,
+    # show=False) silently skipped validation entirely.
+    payload = _build_global_prediction_payload(explainer, x, y, threshold, kwargs)
+    proba = payload["proba"]
+    predict = payload["predict"]
+    low = payload["low"]
+    high = payload["high"]
+    is_regularized = payload["is_regularized"]
+
+    validated_payload = {
+        "proba": proba,
+        "predict": predict,
+        "low": low,
+        "high": high,
+        "is_regularized": is_regularized,
+    }
+
+    if use_legacy:
+        from .viz import _matplotlib_compat as legacy
+
+        legacy.plot_global(
+            explainer, x, y, threshold, _validated_payload=validated_payload, **kwargs
+        )
+        return
+
+    path = kwargs.get("path")
+    save_ext_value = kwargs.get("save_ext")
+    if isinstance(save_ext_value, (list, tuple)):
+        save_ext_value = tuple(save_ext_value)
+
+    from .plugins import (
+        PlotRenderContext,
+        ensure_builtin_plugins,
+    )
+    from .utils.exceptions import ConfigurationError as _PlotConfigurationError
+
+    ensure_builtin_plugins()
+
+    manager = getattr(explainer, "plugin_manager", None)
+    resolve_plot_plugin = getattr(manager, "resolve_plot_plugin", None)
+    if not callable(resolve_plot_plugin):
+        raise _PlotConfigurationError(
+            "PluginManager.resolve_plot_plugin is unavailable; cannot resolve plot plugin."
+        )
+
+    plugin, identifier, chain = resolve_plot_plugin(
+        explicit_style=selected_style,
+        renderer_override=kwargs.get("renderer"),
+    )
+
+    errors: List[str] = []
+    if identifier == "legacy" or getattr(plugin, "plugin_meta", {}).get("style") == "legacy":
+        _warn_and_log_plotspec_fallback(
+            "PlotSpec rendering resolved to legacy. Falling back to legacy plot."
+        )
+        from .viz import _matplotlib_compat as legacy
+
+        legacy.plot_global(
+            explainer, x, y, threshold, _validated_payload=validated_payload, **kwargs
+        )
+        return
+    else:
+        context = PlotRenderContext(
+            explanation=getattr(explainer, "latest_explanation", None),
+            instance_metadata=MappingProxyType({"type": "global"}),
+            style=identifier,
+            intent=MappingProxyType(
+                {
+                    "type": "global",
+                    "explainer_mode": getattr(explainer, "_last_explanation_mode", None),
+                }
+            ),
+            show=show,
+            path=path,
+            save_ext=save_ext_value,
+            options=MappingProxyType({"payload": payload}),
+            plugin_config=_bind_plot_plugin_config(manager, identifier, plugin),
+        )
+        try:
+            artifact = plugin.build(context)
+            result = plugin.render(artifact, context=context)
+        except:  # noqa: E722
+            if not isinstance(sys.exc_info()[1], Exception):
+                raise
+            errors.append(f"{identifier}: {sys.exc_info()[1]}")
+            if "legacy" in chain:
+                _warn_and_log_plotspec_fallback(
+                    f"PlotSpec rendering failed with '{sys.exc_info()[1]}'. "
+                    "Falling back to legacy plot."
+                )
+                from .viz import _matplotlib_compat as legacy
+
+                legacy.plot_global(
+                    explainer, x, y, threshold, _validated_payload=validated_payload, **kwargs
+                )
+                return
+        else:
+            return result
+
+    raise _PlotConfigurationError(
+        "Unable to resolve plot plugin for global explanations; "
+        + "tried: "
+        + ", ".join(chain)
+        + ("; errors: " + "; ".join(errors) if errors else "")
+    )
+
+
+def _plot_proba_triangle():
+    """Build a Matplotlib figure showcasing the probability triangle layout."""
+    _require_matplotlib()
+    fig = plt.figure()
+    x = np.arange(0, 1, 0.01)
+    plt.plot((x / (1 + x)), x, color="black")
+    plt.plot(x, ((1 - x) / x), color="black")
+    x = np.arange(0.5, 1, 0.005)
+    plt.plot((0.5 + x - 0.5) / (1 + x - 0.5), x - 0.5, color="black")
+    x = np.arange(0, 0.5, 0.005)
+    plt.plot((x + 0.5 - x) / (1 + x), x, color="black")
+    return fig
+
+
+def plot_proba_triangle():
+    """Public accessor so tests can exercise the probability triangle helper."""
+    return _plot_proba_triangle()
+
+
+# pylint: disable=invalid-name
+
+
+def _plot_alternative_dict(  # pragma: no cover  # ADR-023: multiclass visualization
+    explanations,
+    alternatives_values,
+    predicts,
+    feature_predicts,
+    features_list_to_plot,
+    num_to_show_list,
+    colors,
+    column_names_list,
+    title,
+    path,
+    show,
+    interval=False,
+    idx=None,
+    save_ext=None,
+    style_override=None,
+):
+    """
+    Plot regular and uncertainty explanations.
+
+    Parameters
+    ----------
+    explanation : object
+        The explanation object containing the details of the explanation.
+    instance : array-like
+        The instance for which the explanation is generated.
+    predict : dict
+        The prediction details including 'predict', 'low', and 'high'.
+    feature_weights : dict or array-like
+        The weights of the features.
+    features_to_plot : list
+        The list of features to plot.
+    num_to_show : int
+        The number of features to show in the plot.
+    column_names : list
+        The names of the columns.
+    title : str
+        The title of the plot.
+    path : str
+        The path to save the plot.
+    show : bool
+        Whether to show the plot.
+    interval : bool, optional
+        Whether to plot intervals.
+    idx : int, optional
+        The index for interval plotting.
+    save_ext : list, optional
+        The list of file extensions to save the plot.
+    """
+    # Set default values
+    config = _setup_plot_style(style_override)
+
+    if save_ext is None:
+        save_ext = ["svg", "pdf", "png"]
+    # Get figure width from config, with fallback to default value
+    fig_width = float(config["figure"].get("width", 10))
+
+    sum_of_num_to_show_list = sum(num_to_show_list)
+    dig_length = sum_of_num_to_show_list * 0.5
+    fig = plt.figure(figsize=(fig_width, dig_length))
+
+    ax_main = fig.add_subplot(111)
+    num_of_labels = len(explanations)
+    labels_yax_locs = np.linspace(0, num_of_labels - 1, num_of_labels)
+
+    subfigures = fig.subfigures(
+        len(column_names_list) + 1, 1
+    )  # len(explanations)//2+1, height_ratios=[2, len(explanations)//2+1, num_to_show*2+2]
+
+    main_column_names = []
+    main_twin_column_names = []
+    for i, (
+        explanation,
+        instance,
+        predict,
+        feature_predict,
+        features_to_plot,
+        column_names,
+        num_to_show,
+    ) in enumerate(
+        zip(
+            explanations,
+            alternatives_values,
+            predicts,
+            feature_predicts,
+            features_list_to_plot,
+            column_names_list,
+            num_to_show_list,
+            strict=False,
+        )
+    ):
+        # plot the probabilities at the top
+        xj = np.linspace(labels_yax_locs[i] - 0.2, labels_yax_locs[i] + 0.2, 2)
+        pred = predict["predict"]
+        pred_low = predict["low"] if predict["low"] != -np.inf else explanation.y_minmax[0]
+        pred_high = predict["high"] if predict["high"] != np.inf else explanation.y_minmax[1]
+        venn_abers = {"low_high": [pred_low, pred_high], "predict": pred}
+
+        alpha_val = float(config["colors"]["alpha"])
+        pos_color = colors[i]
+        ax_main = subfigures[i].add_subplot(111)
+        # Plot the base prediction in black/grey
+        if num_to_show > 0:
+            # Fill original Venn Abers interval
+            x = np.linspace(0, num_to_show - 1, num_to_show)
+            xl = np.linspace(-0.5, x[0], 2) if len(x) > 0 else np.linspace(-0.5, 0, 2)
+            xh = np.linspace(x[-1], x[-1] + 0.5, 2) if len(x) > 0 else np.linspace(0, 0.5, 2)
+
+            if (pred_low < 0.5 and pred_high < 0.5) or (pred_low > 0.5 and pred_high > 0.5):
+                color = pos_color  # __get_fill_color(venn_abers,0.15)
+                ax_main.fill_betweenx(
+                    x,
+                    [pred_low] * (num_to_show),
+                    [pred_high] * (num_to_show),
+                    color=color,
+                    alpha=alpha_val,
+                )
+                # Fill up to the edges
+                ax_main.fill_betweenx(
+                    xl, [pred_low] * (2), [pred_high] * (2), color=color, alpha=alpha_val
+                )
+                ax_main.fill_betweenx(
+                    xh, [pred_low] * (2), [pred_high] * (2), color=color, alpha=alpha_val
+                )
+
+            else:
+                venn_abers["predict"] = pred_low
+                color = pos_color
+                ax_main.fill_betweenx(
+                    x,
+                    [pred_low] * (num_to_show),
+                    [0.5] * (num_to_show),
+                    color=color,
+                    alpha=alpha_val,
+                )
+                # Fill up to the edges
+                ax_main.fill_betweenx(
+                    xl, [pred_low] * (2), [0.5] * (2), color=color, alpha=alpha_val
+                )
+                ax_main.fill_betweenx(
+                    xh, [pred_low] * (2), [0.5] * (2), color=color, alpha=alpha_val
+                )
+                venn_abers["predict"] = pred_high
+                color = pos_color
+                ax_main.fill_betweenx(
+                    x,
+                    [0.5] * (num_to_show),
+                    [pred_high] * (num_to_show),
+                    color=color,
+                    alpha=alpha_val,
+                )
+                # Fill up to the edges
+                ax_main.fill_betweenx(
+                    xl, [0.5] * (2), [pred_high] * (2), color=color, alpha=alpha_val
+                )
+                ax_main.fill_betweenx(
+                    xh, [0.5] * (2), [pred_high] * (2), color=color, alpha=alpha_val
+                )
+
+            for jx, j in enumerate(features_to_plot):
+                pred_low = (
+                    feature_predict["low"][j]
+                    if feature_predict["low"][j] != -np.inf
+                    else explanation.y_minmax[0]
+                )
+                pred_high = (
+                    feature_predict["high"][j]
+                    if feature_predict["high"][j] != np.inf
+                    else explanation.y_minmax[1]
+                )
+                pred = feature_predict["predict"][j]
+                xj = np.linspace(x[jx] - 0.2, x[jx] + 0.2, 2)
+                venn_abers = {"low_high": [pred_low, pred_high], "predict": pred}
+                # Fill each feature impact
+
+                if (pred_low < 0.5 and pred_high < 0.5) or (pred_low > 0.5 and pred_high > 0.5):
+                    ax_main.fill_betweenx(xj, pred_low, pred_high, color=pos_color)
+                else:
+                    venn_abers["predict"] = pred_low
+                    ax_main.fill_betweenx(xj, pred_low, 0.5, color=pos_color)
+                    venn_abers["predict"] = pred_high
+                    ax_main.fill_betweenx(xj, 0.5, pred_high, color=pos_color)
+
+            for i in features_to_plot:
+                main_column_names.append(column_names[i])
+                main_twin_column_names.append(instance[i])
+
+        ax_main.set_yticks(range(1))
+        ax_main.set_yticklabels(labels=[main_column_names[i]])  # \
+        ax_main.set_ylim(-0.5, x[-1] + 0.5 if len(x) > 0 else 0.5)
+        ax_main.set_xlim([0, 1])
+
+        ax_main_twin = ax_main.twinx()
+        ax_main_twin.set_yticks(range(1))
+        ax_main_twin.set_yticklabels(labels=[main_twin_column_names[i]])
+        ax_main_twin.set_ylim(-0.5, x[-1] + 0.5 if len(x) > 0 else 0.5)
+
+    ax_main_twin.set_ylabel("Alternative rules")
+    ax_main.set_ylabel("Instance values")
+
+    ax_main.set_yticks(range(sum_of_num_to_show_list))
+    ax_main.set_yticklabels(
+        labels=[main_column_names[i] for i in range(len(main_column_names))]
+    ) if (len(main_column_names) == sum_of_num_to_show_list) else ax_main.set_yticks(
+        range(sum_of_num_to_show_list)
+    )  # pylint: disable=expression-not-assigned
+    ax_main.set_ylim(-0.5, x[-1] + 0.5 if len(x) > 0 else 0.5)
+    ax_main.set_ylabel("Alternative rules")
+
+    ax_main_twin = ax_main.twinx()
+    ax_main_twin.set_yticks(range(sum_of_num_to_show_list))
+    ax_main_twin.set_yticklabels([main_twin_column_names[i] for i in range(len(main_column_names))])
+    ax_main_twin.set_ylim(-0.5, x[-1] + 0.5 if len(x) > 0 else 0.7)
+    ax_main_twin.set_ylabel("Instance values")
+
+    if explanation.get_class_labels() is None:
+        if explanation.get_explainer().is_multiclass():
+            ax_main.set_xlabel(f"Probability for class '{explanation.prediction['classes']}'")
+        else:
+            ax_main.set_xlabel("Probability for the positive class")
+    elif explanation.get_explainer().is_multiclass():
+        # pylint: disable=line-too-long
+        ax_main.set_xlabel(
+            f"Probability for class '{explanation.get_class_labels()[explanation.prediction['classes']]}'"
+        )
+    else:
+        ax_main.set_xlabel(f"Probability for class '{explanation.get_class_labels()[1]}'")
+    # ax_main.set_xlim(0,1)
+    # ax_main.set_xticks(np.linspace(0, 1, 11))
+
+    with contextlib.suppress(Exception):
+        fig.tight_layout()
+    for ext in save_ext:
+        fig.savefig(path + title + ext, bbox_inches="tight")
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)
+
+
+def get_multiclass_config():  # pragma: no cover  # ADR-023: multiclass visualization
+    """Return default plotting style configuration for multiclass figures."""
+    config = {}
+
+    config["fonts"] = {
+        "family": "sans-serif",
+        "sans_serif": "Arial",
+        "axes_label_size": "6",
+        "tick_label_size": "5",
+        "legend_size": "5",
+        "title_size": "7",
+    }
+    config["lines"] = {"width": "1"}
+    config["figure"] = {
+        "dpi": "200",
+        "save_dpi": "200",
+        "facecolor": "white",
+        "axes_facecolor": "white",
+        "width": "5",  # Add default width value
+    }
+    return config
+
+
+def _plot_probabilistic_dict(  # pragma: no cover  # ADR-023: multiclass visualization
+    explanations,
+    instances,
+    predicts,
+    feature_weights_list,
+    features_list_to_plot,
+    num_to_show_list,
+    colors,
+    column_names_list,
+    title,
+    path,
+    show,
+    interval=False,
+    idx=None,
+    save_ext=None,
+    style_override=None,
+):
+    """
+    Plot regular and uncertainty explanations.
+
+    Parameters
+    ----------
+    explanation : object
+        The explanation object containing the details of the explanation.
+    instance : array-like
+        The instance for which the explanation is generated.
+    predict : dict
+        The prediction details including 'predict', 'low', and 'high'.
+    feature_weights : dict or array-like
+        The weights of the features.
+    features_to_plot : list
+        The list of features to plot.
+    num_to_show : int
+        The number of features to show in the plot.
+    column_names : list
+        The names of the columns.
+    title : str
+        The title of the plot.
+    path : str
+        The path to save the plot.
+    show : bool
+        Whether to show the plot.
+    interval : bool, optional
+        Whether to plot intervals.
+    idx : int, optional
+        The index for interval plotting.
+    save_ext : list, optional
+        The list of file extensions to save the plot.
+    """
+    # Set default values
+    config = _setup_plot_style(style_override)
+
+    if save_ext is None:
+        save_ext = ["svg", "pdf", "png"]
+    if interval is True:
+        pass  # assert idx is not None
+    # Get figure width from config, with fallback to default value
+    fig_width = float(config["figure"].get("width", 10))
+
+    sum_of_num_to_show_list = sum(num_to_show_list)
+    dig_length = sum_of_num_to_show_list * 0.5 + 2
+    fig = plt.figure(figsize=(fig_width, dig_length))
+    subfigures = fig.subfigures(
+        len(column_names_list) + 1, 1
+    )  # len(explanations)//2+1, height_ratios=[2, len(explanations)//2+1, num_to_show*2+2]
+    ax_positive = subfigures[0].add_subplot(111)
+
+    num_of_labels = len(explanations)
+    labels_yax_locs = np.linspace(0, num_of_labels - 1, num_of_labels)
+    x = np.linspace(0, sum_of_num_to_show_list - 1, sum_of_num_to_show_list)
+    counter = 0
+    for i, (explanation, predict) in enumerate(zip(explanations, predicts, strict=False)):
+        if interval and (explanation.is_one_sided()):
+            raise Warning("Interval plot is not supported for one-sided explanations.")
+
+        # plot the probabilities at the top
+        xj = np.linspace(labels_yax_locs[i] - 0.2, labels_yax_locs[i] + 0.2, 2)
+        pred = predict["predict"]
+        pred_low = predict["low"] if predict["low"] != -np.inf else explanation.y_minmax[0]
+        pred_high = predict["high"] if predict["high"] != np.inf else explanation.y_minmax[1]
+
+        alpha_val = float(config["colors"]["alpha"])
+        color = colors[int(predict["classes"])]
+        if interval:
+            ax_positive.fill_betweenx(xj, pred, pred, color=color)
+            ax_positive.fill_betweenx(xj, 0, pred_low, color=color)
+            ax_positive.fill_betweenx(xj, pred_low, pred_high, color=color, alpha=alpha_val)
+        else:
+            ax_positive.fill_betweenx(xj, pred, pred, color=color)
+            ax_positive.fill_betweenx(xj, 0, pred, color=color)
+
+    for i, (instance, feature_weights, features_to_plot, _column_names, num_to_show) in enumerate(
+        zip(
+            instances,
+            feature_weights_list,
+            features_list_to_plot,
+            column_names_list,
+            num_to_show_list,
+            strict=False,
+        )
+    ):
+        ax_main = subfigures[i + 1].add_subplot(111)
+
+        # Plot the base prediction in black/grey
+        if num_to_show > 0:
+            x = np.linspace(0, num_to_show - 1, num_to_show)
+
+            # For each feature, plot the weight
+            for jx, j in enumerate(features_to_plot):
+                xj = np.linspace(x[jx] - 0.2, x[jx] + 0.2, 2)
+                counter += 1
+                min_val, max_val = 0, 0
+                if interval:
+                    width = feature_weights["predict"][j]
+                    # if width > 0:
+                    wl = feature_weights["low"][j]
+                    wh = feature_weights["high"][j]
+                    wh, wl = np.max([wh, wl]), np.min([wh, wl])
+                    max_val = wh if width < 0 else 0
+                    min_val = wl if width > 0 else 0
+                    # If uncertainty cover zero, then set to 0 to avoid solid plotting
+                    if wl < 0 < wh:
+                        min_val = 0
+                        max_val = 0
+                else:
+                    width = feature_weights["predict"][j]
+                    min_val = min(width, 0)
+                    max_val = max(width, 0)
+                color = colors[int(feature_weights["classes"][j])]
+                (ax_main.fill_betweenx(xj, min_val, max_val, color=color),)
+                if interval:
+                    if wl < 0 < wh:
+                        ax_main.fill_betweenx(xj, 0, wl, color=color, alpha=alpha_val)
+                        ax_main.fill_betweenx(xj, wh, 0, color=color, alpha=alpha_val)
+                    else:
+                        ax_main.fill_betweenx(xj, wl, wh, color=color, alpha=alpha_val)
+
+        ax_main.set_yticks(range(1))
+        ax_main.set_yticklabels(labels=[column_names_list[i]])  # \
+        ax_main.set_ylim(-0.5, x[-1] + 0.5 if len(x) > 0 else 0.5)
+        ax_main.set_xlim([-1, 1])
+
+        ax_main_twin = ax_main.twinx()
+        ax_main_twin.set_yticks(range(1))
+        ax_main_twin.set_yticklabels(labels=[instance[0]])
+        ax_main_twin.set_ylim(-0.5, x[-1] + 0.5 if len(x) > 0 else 0.5)
+
+    ax_main_twin.set_ylabel("Instance values")
+    ax_main.set_ylabel("Features")
+    ax_main.set_xlabel("Feature weights")
+
+    ax_positive.set_ylim(0.3)
+    ax_positive.set_xlim([0, 1])
+    ax_positive.set_yticks(range(num_of_labels))
+    ax_positive.set_yticklabels(labels=explanations[0].get_class_labels())  # pylint: disable=line-too-long
+    for tick, color in zip(ax_positive.yaxis.get_major_ticks(), colors, strict=False):
+        tick.label1.set_color(color)
+    ax_positive.set_xticks(np.linspace(0, 1, 6))
+    # Enhance subplot appearance
+    for ax in [ax_positive, ax_main]:
+        ax.spines["top"].set_visible(False)
+        ax.spines["right"].set_visible(False)
+
+    # Add background colors for better readability
+    ax_main.patch.set_facecolor(config["colors"]["background"])
+
+    # Enhance legend appearance
+    ax_main_twin.tick_params(axis="y", colors=config["colors"]["text"])
+    for ext in save_ext:
+        fig.savefig(path + title + ext)
+    if show:
+        plt.show()
+    else:
+        plt.close(fig)

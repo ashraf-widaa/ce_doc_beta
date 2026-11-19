@@ -1,0 +1,53 @@
+claim_id: CE-CAP-EXPL-002
+claim_type: capability
+owner: calibrated_explanations
+status: current
+
+adr_links:
+  - ADR-008
+  - ADR-015
+  - ADR-026
+  - ADR-042
+
+claim_text: >
+  calibrated_explanations produces calibrated alternative explanations for individual
+  instances through WrapCalibratedExplainer, identifying feature changes that would
+  shift the prediction toward an alternative outcome.
+
+public_api:
+  - calibrated_explanations.core.wrap_explainer.WrapCalibratedExplainer.explore_alternatives
+
+task_types:
+  - binary_classification
+  - multiclass_classification
+  - regression
+  - probabilistic_regression
+
+requirements:
+  - CE-REQ-EXPL-API-002
+  - CE-REQ-EXPL-ALT-RETURN-001
+  - CE-REQ-EXPL-ALT-DOC-001
+
+verification:
+  proves:
+    - api_contract
+    - output_structure
+  verification_type: automated
+
+assumptions:
+  - The explainer must be fitted (explainer.fitted is True) before calling explore_alternatives.
+  - The explainer must be calibrated (explainer.calibrated is True) before calling explore_alternatives.
+  - The calibration set must be representative of the test distribution (exchangeability
+    assumption). The statistical validity of alternative exploration depends on this
+    assumption; the test verifies the API contract only, not finite-sample guarantees.
+  - Alternative explanations describe changes in feature values relative to the current
+    instance; they do not guarantee that a changed instance would actually receive the
+    alternative prediction in a new model deployment.
+
+evidence_required:
+  - commit_sha
+  - package_version
+  - test_id
+  - dataset_id
+  - random_seed
+  - result

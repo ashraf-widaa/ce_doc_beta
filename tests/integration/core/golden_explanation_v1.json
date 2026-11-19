@@ -1,0 +1,53 @@
+{
+  "schema_version": "1.0.0",
+  "task": "classification",
+  "index": 0,
+  "explanation_type": "factual",
+  "prediction": {
+    "predict": 1,
+    "low": 0.9,
+    "high": 1.1
+  },
+  "rules": [
+    {
+      "feature": 0,
+      "rule": "r1",
+      "rule_weight": {
+        "predict": 0.1,
+        "low": 0.05,
+        "high": 0.15
+      },
+      "rule_prediction": {
+        "predict": 0.0,
+        "low": -0.1,
+        "high": 0.1
+      },
+      "instance_prediction": null,
+      "feature_value": null,
+      "is_conjunctive": false,
+      "value_str": null,
+      "bin_index": null
+    },
+    {
+      "feature": 1,
+      "rule": "r2",
+      "rule_weight": {
+        "predict": 0.2,
+        "low": 0.15,
+        "high": 0.25
+      },
+      "rule_prediction": {
+        "predict": 1.0,
+        "low": 0.9,
+        "high": 1.1
+      },
+      "instance_prediction": null,
+      "feature_value": null,
+      "is_conjunctive": false,
+      "value_str": null,
+      "bin_index": null
+    }
+  ],
+  "provenance": null,
+  "metadata": null
+}

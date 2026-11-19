@@ -1,0 +1,183 @@
+import pytest
+import numpy as np
+import warnings
+from unittest.mock import MagicMock
+from calibrated_explanations.explanations.explanation import (
+    FactualExplanation,
+    AlternativeExplanation,
+)
+
+
+def test_fallback_to_legacy(monkeypatch):
+    f = FactualExplanation.__new__(FactualExplanation)
+    f.has_rules = True
+    f.rules = {
+        "rule": ["feat1", "feat2"],
+        "feature": [0, 1],
+        "weight": [0.1, 0.2],
+        "weight_low": [0.0, 0.1],
+        "weight_high": [0.2, 0.3],
+        "sampled_values": [1, 2],
+        "value": ["1", "2"],
+        "classes": 1,
+    }
+    f.has_conjunctive_rules = False
+    f.conjunctive_rules = []
+    f.y_threshold = None
+    f.x_test = np.array([1, 2])
+    f.prediction = {"predict": 0.5}
+    f.bin = None
+
+    # Keep setup lightweight to avoid over-mocking while preserving behavior.
+    f.rank_features = lambda *args, **kwargs: [0, 1]
+
+    def _failing_predict_conjunctive(*args, **kwargs):
+        raise Exception("Predict failed")
+
+    f.predict_conjunctive = _failing_predict_conjunctive
+
+    # Mock legacy function
+    mock_legacy = MagicMock()
+    monkeypatch.setattr(
+        "calibrated_explanations.explanations.legacy_conjunctions.add_conjunctions_factual_legacy",
+        mock_legacy,
+    )
+
+    # Call with fallback
+    with warnings.catch_warnings():
+        warnings.simplefilter("ignore")
+        FactualExplanation.add_conjunctions(
+            f, n_top_features=2, max_rule_size=2, _fallback_to_legacy_on_zero=True
+        )
+
+    mock_legacy.assert_called_once()
+    assert isinstance(f.conjunctive_rules, dict)
+
+
+# --- Phase 4A: Conjunction output validation tests ---
+
+
+def test__raise_on_predict_error_surfaces_exceptions():
+    """Calling with _raise_on_predict_error=True should propagate prediction errors."""
+    f = FactualExplanation.__new__(FactualExplanation)
+    f.has_rules = True
+    f.rules = {
+        "rule": ["feat1", "feat2"],
+        "feature": [0, 1],
+        "weight": [0.1, 0.2],
+        "weight_low": [0.0, 0.1],
+        "weight_high": [0.2, 0.3],
+        "sampled_values": [np.array([1.0]), np.array([2.0])],
+        "value": ["1", "2"],
+        "classes": 1,
+    }
+    f.has_conjunctive_rules = False
+    f.conjunctive_rules = []
+    f.y_threshold = None
+    f.x_test = np.array([1, 2])
+    f.prediction = {"predict": 0.5}
+    f.bin = None
+
+    f.rank_features = MagicMock(return_value=[0, 1])
+    f.predict_conjunctive = MagicMock(side_effect=ValueError("broken predictor"))
+
+    with pytest.raises(ValueError, match="broken predictor"):
+        FactualExplanation.add_conjunctions(
+            f, n_top_features=2, max_rule_size=2, _raise_on_predict_error=True
+        )
+
+
+def test_conjunction_diagnostic_includes_predict_errors():
+    """When all predictions fail, the warning should include predict_errors."""
+    f = FactualExplanation.__new__(FactualExplanation)
+    f.has_rules = True
+    f.rules = {
+        "rule": ["feat1", "feat2"],
+        "feature": [0, 1],
+        "weight": [0.1, 0.2],
+        "weight_low": [0.0, 0.1],
+        "weight_high": [0.2, 0.3],
+        "sampled_values": [np.array([1.0]), np.array([2.0])],
+        "value": ["1", "2"],
+        "classes": 1,
+    }
+    f.has_conjunctive_rules = False
+    f.conjunctive_rules = []
+    f.y_threshold = None
+    f.x_test = np.array([1, 2])
+    f.prediction = {"predict": 0.5}
+    f.bin = None
+
+    f.rank_features = MagicMock(return_value=[0, 1])
+    f.predict_conjunctive = MagicMock(side_effect=RuntimeError("shape mismatch"))
+
+    with pytest.warns(UserWarning, match="predict_errors"):
+        FactualExplanation.add_conjunctions(f, n_top_features=2, max_rule_size=2, verbose=True)
+
+
+# --- Phase 4C: Edge case tests ---
+
+
+def test_max_rule_size_1_returns_self():
+    """max_rule_size=1 should return self without creating conjunctions."""
+    f = FactualExplanation.__new__(FactualExplanation)
+    f.has_rules = True
+    f.rules = {
+        "rule": ["feat1", "feat2"],
+        "feature": [0, 1],
+        "weight": [0.1, 0.2],
+        "weight_low": [0.0, 0.1],
+        "weight_high": [0.2, 0.3],
+        "sampled_values": [np.array([1.0]), np.array([2.0])],
+        "value": ["1", "2"],
+        "classes": 1,
+    }
+    f.has_conjunctive_rules = False
+    f.conjunctive_rules = []
+    f.y_threshold = None
+    f.x_test = np.array([1, 2])
+    f.prediction = {"predict": 0.5}
+    f.bin = None
+    f.rank_features = MagicMock(return_value=[0, 1])
+    f.predict_conjunctive = MagicMock()
+
+    result = FactualExplanation.add_conjunctions(f, n_top_features=2, max_rule_size=1)
+
+    # predict_conjunctive should never be called with max_rule_size=1
+    f.predict_conjunctive.assert_not_called()
+    assert result is f
+
+
+def test_alternative__raise_on_predict_error():
+    """AlternativeExplanation should also support _raise_on_predict_error."""
+    f = AlternativeExplanation.__new__(AlternativeExplanation)
+    f.has_rules = True
+    f.rules = {
+        "rule": ["feat1", "feat2"],
+        "feature": [0, 1],
+        "weight": [0.1, 0.2],
+        "weight_low": [0.0, 0.1],
+        "weight_high": [0.2, 0.3],
+        "sampled_values": [np.array([1.0]), np.array([2.0])],
+        "value": ["1", "2"],
+        "feature_value": ["fv1", "fv2"],
+        "predict": [0.6, 0.7],
+        "predict_low": [0.5, 0.6],
+        "predict_high": [0.7, 0.8],
+        "is_conjunctive": [False, False],
+        "classes": 1,
+    }
+    f.has_conjunctive_rules = False
+    f.conjunctive_rules = []
+    f.y_threshold = None
+    f.x_test = np.array([1, 2])
+    f.prediction = {"predict": 0.5}
+    f.bin = None
+
+    f.rank_features = MagicMock(return_value=[0, 1])
+    f.predict_conjunctive = MagicMock(side_effect=ValueError("alt broken"))
+
+    with pytest.raises(ValueError, match="alt broken"):
+        AlternativeExplanation.add_conjunctions(
+            f, n_top_features=2, max_rule_size=2, _raise_on_predict_error=True
+        )

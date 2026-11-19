@@ -1,0 +1,1860 @@
+<!-- markdownlint-disable-file -->
+# Changelog
+
+## [Unreleased]
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.2...main)
+
+## [v1.0.2](https://github.com/Moffran/calibrated_explanations/releases/tag/v1.0.2) - 2026-10-20
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.1...v1.0.2)
+
+### Fixed
+
+- **Thresholded-regression Venn–Abers score precision (#251):** split-CPS scores
+  are now rounded to 10 decimal places at both calibration and inference. This
+  removes spurious interval changes when identical scalar scores straddle the
+  former four-decimal calibration grid, and merges floating-point variants of
+  equal tuple-event scores. Probability estimates and interval endpoints can
+  change substantially (up to 0.50 for an endpoint in a small synthetic
+  comparison). Classification and percentile-based regression are unchanged.
+
+- **No false invariant warnings for one-sided or off-centre percentile
+  intervals (#247):** in regression without a threshold,
+  `predict(..., uq_interval=True)`, `explain_factual` and `explore_alternatives`
+  warned `Prediction invariant violated: predict not in [low, high]` for valid
+  queries. This happened in two cases. With `low_high_percentiles=(-inf, q)` or
+  `(q, inf)`, the open end is reported as the minimum or maximum calibration
+  target, so a median outside that range was flagged. Intervals such as
+  `(-inf, 40)` or `(60, inf)` do not contain the median at all. The check now
+  only applies to the sides the requested percentiles imply. It no longer uses
+  the placeholder end, and it is still enforced for `(5, 95)`, `(40, 60)`,
+  `(-inf, 90)` and `(10, inf)`. Plugin batch validation follows the same rule.
+  Classification and probabilistic regression are unchanged. All returned
+  numbers are unchanged, including the `min(y_cal)`/`max(y_cal)` placeholder
+  ends, and a `low > high` warning is still raised when the placeholder
+  crosses the finite bound. Representing the open end as unbounded is planned
+  for v1.1.0 (#237). ADR-021 §4/§4b is amended accordingly.
+- **One authoritative interval-calibration update path; inconsistent
+  `reinitialize` inputs fail fast (#208):** the unreachable duplicate
+  `IntervalRegistry.update` is removed (it had no callers, and its
+  classification branch ignored `xs`/`ys`), leaving
+  `calibration.interval_learner.update_interval_learner` as the only update
+  path. `reinitialize` used to drop `xs` silently when `ys` was missing (and
+  vice versa), ignore `bins` given without data, and fail with an internal
+  indexing error when appending to a Mondrian explainer without `bins`. These
+  now raise `ValidationError` up front. Appending in fast mode raises a
+  `ConfigurationError` that names the alternatives. The calibration state is
+  unchanged in every case.
+- **`reinitialize` now refreshes calibration (silent wrong output, #239):**
+  `CalibratedExplainer.reinitialize(learner, xs, ys)` appended the rows to
+  `x_cal`/`y_cal`, but classification kept using the Venn-Abers calibrator
+  fitted on the original calibration set. Probabilities and intervals were
+  unchanged, bit for bit, and no warning was raised. `reinitialize(learner)`
+  with a new or refitted learner had the same problem in both modes; this
+  includes `WrapCalibratedExplainer.fit()` after `calibrate()`. The cached
+  calibrator, the cached predict function and (when `CE_CACHE` is enabled)
+  cached predictions are now discarded. After an append, classification
+  matches a fresh calibration on the combined data. After a learner change,
+  both modes match a fresh calibration. Regression appends still extend the
+  existing conformal split in place. `reinitialize` is now atomic: if it fails
+  (including on mismatched `bins`), the calibration set, bins, learner and
+  calibrator are restored. ADR-013 now states that an interval plugin must not
+  return a cached calibrator for an `operation="update"` context.
+- **`set_mode` now rebuilds the calibrator for the new mode (#241):**
+  `CalibratedExplainer.set_mode()` re-ran calibrator initialization but reused
+  the cached calibrator, task and predict function of the previous mode, so
+  switching between classification and regression kept a `VennAbers` or
+  `IntervalRegressor` of the wrong kind. The calibrator is now rebuilt for the
+  new mode and the default predict function is rebound (`predict_proba` or
+  `predict`; a user-supplied one is kept). If the rebuild fails, the previous
+  mode and calibration state are restored.
+- **Calibrator primitive checksums are reproducible and verified (#240):** the
+  `checksums.sha256` of `VennAbers`/`IntervalRegressor` primitives was a digest
+  of a pickle of the in-memory calibrator. It changed between processes for
+  identical content, and nothing checked it on load. It is now a SHA-256 over
+  the canonical JSON of the persisted content, tagged
+  `"algorithm": "sha256-canonical-json-v1"`. `from_primitive()` verifies it
+  and raises `IncompatibleStateError` when the content was modified or the
+  algorithm is unknown. Primitives saved by 1.0.1 and earlier have no tag. They
+  still load, but with a `UserWarning` plus an INFO log, because they cannot be
+  verified. A future schema version will reject them, so re-save them with
+  `save_state()`.
+- **Regression `Pipeline`s are no longer treated as classifiers (#245):** the
+  task was inferred from `"predict_proba" in dir(learner)`. Before
+  scikit-learn 1.8, `dir()` of a `Pipeline` lists `predict_proba` even when the
+  final step is a regressor, so `calibrate()` without `mode=` treated a
+  regression pipeline as a classifier and failed. scikit-learn estimators are
+  now classified by `is_classifier`/`is_regressor`, other learners by whether
+  `predict_proba` is accessible. The plotting paths use the same check.
+- **Thresholded regression is now instance-wise (batch-invariant):**
+  `predict_proba(x, threshold=...)`, `predict(..., threshold=...)` and
+  thresholded explanations could give the same object a different calibrated
+  probability and Venn-Abers interval depending on which other rows shared the
+  batch, their order and the batch size (differences up to 0.18 observed).
+  crepes' smoothed conformal p-values draw their random term per *row index*
+  after reseeding, so an object's Venn-Abers input score depended on its batch
+  position. Scalar thresholds were affected; tuple thresholds were affected only
+  under exact ties, because the random term cancels in the difference. Test
+  scores also came from a CPS fitted on all calibration data, while the
+  Venn-Abers calibration scores came from the split CPS. The score is now the
+  deterministic (unsmoothed) CPD value of the split CPS, on both the calibration
+  and the test side: the standard inductive Venn-Abers construction, with one
+  score function. **Numerical outputs of thresholded regression change**:
+  across the evaluated datasets, Brier score and ECE show no significant
+  degradation (unconditional and normalized calibration improve slightly).
+  Venn-Abers intervals are slightly wider, most visibly under Mondrian
+  calibration. Individual probabilities can shift noticeably when the
+  calibration set is small. New requirement `CE-REQ-PRED-PROB-INSTANCE-001` (TIF
+  `CE-TIF-PRED-PROB-002`) pins the contract. The split CPS needs one
+  difficulty value per instance. Without a difficulty estimator, every input
+  type, including a pandas `DataFrame`, now gets one value per row, so
+  `DataFrame` and array inputs give identical results (#249).
+
+- **Unknown `CE_*` environment-variable warning no longer repeats:** the
+  `UserWarning` from `ConfigManager.from_sources()` fired on every explainer
+  construction, so a single stray `CE_*` variable could flood experiment
+  logs. It now fires once per process for each distinct set of unknown keys.
+  The release-tooling variable `CE_CONDA_FEEDSTOCK_DIR` was renamed to
+  `CALIBRATED_EXPLANATIONS_FEEDSTOCK_DIR` so that it stays out of the
+  library's reserved `CE_` namespace.
+- **Enabled parallel with the `auto` strategy now fails fast (#218):**
+  `perf_parallel(True)` without `backend=`, or `CE_PARALLEL=1`/`on`/`enable`
+  without a strategy token, left the removed `auto` strategy selected, and the
+  executor silently picked a backend when entered (`joblib` locally,
+  `sequential` in CI), contradicting ADR-004. `build_config()`,
+  `WrapCalibratedExplainer.from_config()` and `calibrate()` now raise
+  `ConfigurationError`, and entering an enabled `ParallelExecutor` with
+  `strategy="auto"` raises instead of auto-selecting. The executor the explain
+  runtime creates for itself, and the pool from
+  `CalibratedExplainer.initialize_pool()` / `with explainer:`, now use
+  `sequential` when `CE_PARALLEL` names no strategy, so default `explain_*`
+  calls are unaffected and no longer start a worker pool.
+- **Unrecognised `CE_PARALLEL` / `CE_CACHE` tokens are surfaced (#219):** a
+  token neither parser understands (for example the typo in
+  `CE_PARALLEL=enable,thread`, an unknown `granularity=` value or a
+  non-boolean `force_serial=` value) used to be dropped silently. It is still
+  ignored, but now emits a `UserWarning` plus an INFO log naming the variable
+  and the token; from v1.1.0 it raises `ConfigurationError` (#225). Both
+  parsers now accept the same case-insensitive enable labels
+  (`1`/`true`/`on`/`yes`/`enable`) and disable labels
+  (`0`/`false`/`off`/`no`/`disable`) in any position, so
+  `CE_PARALLEL=1,threads` now enables parallel execution instead of ignoring
+  the `1`.
+- **`CE_CACHE` is honoured by a plain `WrapCalibratedExplainer` (#220):**
+  `CE_CACHE` used to be read only by `ExplainerBuilder`/`ExplainerConfig`, so
+  `CE_CACHE=on` had no effect on `WrapCalibratedExplainer(model)` or
+  `CalibratedExplainer(...)` and nothing reported it. Both now provision a
+  calibrator cache from `CE_CACHE`, like `CE_PARALLEL` already did; a
+  `perf_cache=` argument (including a builder-provided cache) still takes
+  precedence, and nothing changes when `CE_CACHE` is unset.
+- **An enabled calibrator cache no longer breaks `predict` (#220):** cache keys
+  kept arrays nested inside tuples unhashed, and cache hits compared stored
+  prediction tuples with `==`, so any enabled cache raised `TypeError` or
+  `ValueError` on the first prediction. Nested arrays are now hashed and cached
+  results are returned unchanged.
+- **Narrative HTML output escapes user-supplied content (#222):**
+  `to_narrative(output_format="html")` inserted feature names, class labels
+  and categorical values into the table without escaping, so any markup they
+  contained was rendered as live HTML (for example in a notebook). Header and
+  cell content is now passed through `html.escape` before the newline-to-`<br>`
+  conversion. The `text`, `markdown`, `dict` and `dataframe` formats are
+  unchanged.
+- **Narrative capability claim names the real template dependency (#223):**
+  `CE-CAP-NARR-001` said template narration depended on Jinja2 and fell back
+  or raised `ImportError` without it. Narration uses PyYAML (the `narrative`
+  extra); the claim now records that without PyYAML a YAML template, including
+  the packaged default, raises `SerializationError` with no fallback, and only
+  a caller-supplied `.json` `template_path` works. No code change.
+
+### Added
+
+- **Optional conda-forge feedstock auto-update:** `make release-postcommit` now
+  ends with a best-effort `scripts/update_conda_feedstock.py` step that, when
+  `CALIBRATED_EXPLANATIONS_FEEDSTOCK_DIR` points at a local clone of the
+  `calibrated-explanations-feedstock` fork, bumps `recipe/meta.yaml` to the
+  just-published PyPI version and opens a PR against
+  `conda-forge/calibrated-explanations-feedstock`. No-op when the env var is
+  unset; failures warn rather than fail the release. Standalone retry via
+  `make conda-feedstock-update`.
+
+### Documentation / Governance
+
+- **ADR-042 canonical ranking semantics (#224), accepted:** defines one ranking
+  contract per explanation type for rule retrieval, plots, narratives and
+  conjunction selection. Factual rules rank strongest first by `|weight|`,
+  with the narrower uncertainty interval winning ties. Alternative rules use
+  the `ensured` score that alternative plots already use by default, now also
+  for `__repr__`, narratives and conjunction candidates. Narratives follow
+  plot logic, and `add_conjunctions()` and `to_narrative()` gain the plot's
+  `rnk_metric`/`rnk_weight` arguments. Ties then fall back
+  to native rule index, `NaN` ranks last, `top_k` edge cases are defined,
+  PlotSpec `sort_by` stays presentation-only, and no statistical
+  ranking-stability guarantee is claimed. Current (v1.0.x) behaviour,
+  including the inconsistencies it replaces, is pinned by characterisation
+  tests. No ranking behaviour changes in this release; the ordering changes
+  land in v1.1.0 (#204).
+
+## [v1.0.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v1.0.1) - 2026-09-22
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.0...v1.0.1)
+
+### Fixed
+
+- **Coverage gate restored:** added behavioral coverage for the public interval
+  calibrator output validator, including interval invariants, probability shape
+  and normalization contracts, and calibration contexts without an inferable
+  row count.
+- **Wrapper auto-encoding now preserves mixed-type columns:** the built-in
+  `auto_encode='auto'` path now leaves numeric columns unchanged while
+  encoding categorical columns deterministically, supports explicit
+  categorical feature overrides, and exposes a configurable missing-value
+  policy for categorical inputs.
+- **Default `WrapCalibratedExplainer` now auto-encodes mixed-type input (#202):**
+  `fit()` and `calibrate()` only reached the preprocessing path when a user
+  preprocessor was supplied, so with default settings the built-in encoder
+  never ran and `fit()` on a DataFrame with string columns failed with
+  `ValueError: could not convert string to float`. The built-in path now
+  engages whenever the input has non-numeric columns or `categorical_features`
+  is configured; with `auto_encode=False` such input raises an actionable
+  `ValidationError`. All-numeric input still reaches the learner unchanged.
+- **Built-in encoder missing-value sentinel no longer collides with real
+  values:** when a categorical column contained the literal string
+  `"__missing__"` together with missing values, `transform()` encoded the
+  missing values with the literal's code instead of the separate sentinel
+  category learned at fit time.
+- **Explicitly requested cache and parallel execution no longer degrade
+  silently (#209):** `ExplainerBuilder.build_config()` and
+  `WrapCalibratedExplainer.from_config()` now raise `ConfigurationError` when an
+  enabled cache or parallel executor cannot be initialized. Previously both were
+  dropped with only a DEBUG log. Error `details` name the `capability`, the
+  failing `source` (configuration values, `CE_CACHE`/`CE_PARALLEL`, or primitive
+  construction) and the underlying `cause`. Non-numeric `CE_CACHE`/`CE_PARALLEL`
+  values such as `workers=two` now raise `ConfigurationError` that names the
+  variable and token, on both the builder and the plain constructor paths. The
+  retained sequential fallbacks (parallel pool start-up failure,
+  `force_serial` recovery, and joblib requested but not installed) now emit a
+  `UserWarning` plus an INFO log. The minimal cache-backend notice is logged
+  once, only when an enabled cache is built, rather than whenever the cache
+  module is imported without `cachetools`. Sequential, no-cache defaults are
+  unchanged.
+
+### Documentation / Governance
+
+- **Strict docs build restored:** pinned `numpydoc==1.10.0` in
+  `docs/requirements-doc.txt`. The previously unpinned numpydoc resolved to
+  1.11.0, which links auto-generated class-member tables as `.name`; Sphinx then
+  resolved inherited members such as `predict` ambiguously across classes, and
+  `sphinx -W` failed with ten "more than one target found" warnings.
+- **Companion ecosystem documentation:** documented the core library, official
+  plugin repository, and studies repository as the three current ecosystem
+  components. Research reproduction now routes to the version-specific study
+  READMEs, and the obsolete core `eval` extra and its CI installation paths
+  were removed.
+- **Interactive demo discoverability:** linked the no-installation web demo from
+  the README, RTD landing and Get Started pages, and PyPI project metadata,
+  while identifying the versioned documentation as the authority for supported
+  behavior and guarantees.
+- **Root-level docs and config corrected for accuracy:** `README.md`,
+  `SECURITY.md`, `CITATION.cff`, `PROMPTS.md`, `QUICK_API.md`,
+  `CONTRIBUTING.md`, `METADATA.json`, `.pre-commit-config.yaml`, and
+  `.mcp.example.json` no longer overstate model compatibility as
+  scikit-learn-only, no longer imply unconditional calibration/interval
+  guarantees, and no longer reference the retired `v0.10.x` support line,
+  stale `pip install -e .` setup, or a placeholder `PYSEC-0000` pip-audit
+  exception. Removed the tracked `.DS_Store` and ignored it going forward.
+
+### Security
+
+- **`WrapCalibratedExplainer` state persistence no longer executes pickle
+  (ADR-031 schema v3):** `save_state()`/`load_state()` previously persisted
+  the entire wrapper as `wrapper.pkl` (and any calibrator lacking a
+  `to_primitive()` contract as a `python_pickle` payload), verified only by a
+  SHA-256 checksum recorded in the same manifest. That checksum proved
+  internal consistency, not trustworthy origin: anyone able to write to a
+  state directory could replace `wrapper.pkl` with a malicious pickle,
+  recompute the checksum, and have `load_state()` execute arbitrary code.
+  `save_state()` now writes only JSON-safe declarative data (schema
+  `v3`) — no wrapper or calibrator pickle bytes are ever written — and
+  `load_state()` never calls `pickle.loads`/`pickle.load`/`joblib.load`/
+  `cloudpickle.loads` on artifact-provided bytes, even when every checksum in
+  the artifact is internally consistent. See ADR-031 for the full
+  integrity-vs-authenticity-vs-safe-parsing rationale.
+- **Legacy pickle-based artifacts (schema v1/v2) are rejected
+  unconditionally.** `load_state()` refuses them before reading any pickle
+  byte, with an error explaining that checksums do not authenticate an
+  artifact and pointing to the migration path below. There is no in-library
+  "unsafe legacy load" escape hatch.
+- **Unsupported calibrators fail closed instead of falling back to
+  pickle.** `save_state()` now raises `SerializationError` naming the
+  calibrator type when it does not implement the JSON-safe
+  `to_primitive()`/`from_primitive()` contract, instead of silently
+  persisting it as a `python_pickle` payload. (The `FastIntervalCalibrator`
+  sequence used by FAST regression is now recognized as a collection of
+  natively-serializable calibrators, so this does not affect FAST tuning
+  round-trips, which continue to work.)
+- **`load_state()` signature change (source-compatibility break):**
+  `WrapCalibratedExplainer.load_state(path, *, learner=None, preprocessor=None,
+  difficulty_estimator=None, mc=None)`. A generic fitted learner (and an
+  arbitrary custom preprocessor) cannot be safely reconstructed from
+  persisted bytes, so the caller must supply those live, already-fitted
+  objects again; they are validated against persisted task/feature-count/
+  classes/preprocessor-identity metadata before use. Built-in preprocessing
+  (`BuiltinEncoder`) is reconstructed automatically from its JSON-safe
+  mapping and does not need to be supplied.
+- **Artifact parsing hardened:** absolute paths, `..` traversal, duplicate
+  file entries, files outside the safe-schema allow-list (including a
+  `wrapper.pkl` with a correctly recomputed checksum), on-disk files not
+  declared in the manifest, and symlinks resolving outside the artifact
+  directory are all rejected before any file's contents are parsed as
+  anything beyond raw bytes for hashing.
+- **Migration:** to load a pre-hardening (schema v1/v2) artifact, open it
+  with a trusted, older calibrated-explanations environment you already
+  control (the version that produced it), then call `save_state()` again
+  there to produce a schema v3 artifact. Only do this for artifacts you
+  created yourself and still trust — never for a downloaded or otherwise
+  untrusted artifact.
+
+## [v1.0.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v1.0.0) - 2026-07-21
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.0rc2...v1.0.0)
+
+### Changed
+
+- **GA compatibility statement:** the public API, the plugin trust model
+  (ADR-006), and the visualization extension contract (ADR-037) are now
+  declared **stable as of `1.0.0`**, superseding the `1.0.0rc1`/`1.0.0rc2`
+  "frozen, patch-fixes-only" framing. Only patch-level defect fixes will be
+  accepted against these contracts going forward. The Explanation Schema v1
+  freeze (`docs/schema_v1.md`, frozen as of `1.0.0rc1`) and the zero-active-
+  deprecations status re-confirmed on the GA candidate commit both carry
+  forward unchanged; see the
+  [v1.0.0 upgrade checklist](docs/upgrade/v1.0.0-upgrade-checklist.md) for
+  cumulative migration guidance for documented workflows since v0.6.1.
+
+## [v1.0.0rc2](https://github.com/Moffran/calibrated_explanations/releases/tag/v1.0.0rc2) - 2026-07-20
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.0rc1...v1.0.0rc2)
+
+### Fixed
+
+- **Third-party plot-plugin dispatch:** fixed third-party visualization
+  dispatch through the public factual, alternative, global, and dashboard
+  plotting APIs. Explicitly selected registered styles now receive their
+  complete plugin option set (`filter_top`, `uncertainty`, `rnk_metric`,
+  `rnk_weight`, `bins`, `low_high_percentiles`, and arbitrary plugin-specific
+  kwargs) and documented runtime context without requiring replacement of CE
+  plotting functions. Explicit plugin failures no longer silently fall through
+  to built-in rendering, an explicitly requested style resolves exactly or
+  raises an actionable `ConfigurationError`, and a renderer legitimately
+  returning `None` is treated as handled instead of triggering built-in
+  plotting. Output transport for third-party styles is renderer-neutral:
+  non-empty `filename`/`path` values are forwarded verbatim (conflicts raise
+  `ValidationError`), exact empty strings retain their historical no-save
+  meaning, no `plots/` prefix or suffix rewriting is applied, and `show`
+  defaults follow the established save-implies-no-show convention. Configured
+  non-legacy plugin styles also remain active when callers explicitly pass
+  `use_legacy=False`, and global regression payload bounds now use the
+  requested `low_high_percentiles`.
+
+### Added
+
+- **`PlotRenderContext.runtime` (additive, trusted plugins only):** a
+  read-only mapping carrying the originating public explainer and original
+  plot request (`x`, `y`, `threshold`, `bins`, `instance_index`) so trusted
+  global/dashboard plugins can drive public explainer APIs without
+  monkey-patching. Populated only after ADR-006 trust resolution; excluded
+  from pickling (restored as an empty mapping). Existing positional and
+  keyword construction of `PlotRenderContext` remains valid.
+- **`PluginManager.resolve_plot_plugin_strict`:** exact-identifier plot style
+  resolution without fallback-chain expansion, used by the public plotting
+  surfaces for explicit third-party style requests.
+
+## [v1.0.0rc1](https://github.com/Moffran/calibrated_explanations/releases/tag/v1.0.0rc1) - 2026-07-15
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.11.6...v1.0.0rc1)
+
+### Changed
+
+- **Install and Python support:** install this release candidate reproducibly
+  with `pip install calibrated-explanations==1.0.0rc1`. Python 3.10 is the
+  v1.0.0 support floor (`requires-python >=3.10`); the supported CI matrix is
+  Python 3.10–3.13.
+- **RC documentation readiness:** added the exact `1.0.0rc1` install pin and
+  visible Beta/API-freeze notice to the README and public docs landing paths;
+  corrected API examples that still used removed `.explain(...)` and private
+  `_from_config(...)` forms; aligned guarded-option defaults, feature-filter
+  metadata, and upgrade guidance with the frozen runtime contracts.
+- **RC cache/parallel staging sign-off:** the opt-in cache and explicit thread
+  strategy paths passed the `1.0.0rc1` staging-equivalent smoke. The safe-defaults
+  guide now names the optional `cache_hit` / `cache_miss` events and
+  `parallel_execution.worker_utilisation_pct` evidence field, and clarifies that
+  v1 parallel activation requires an explicit strategy.
+- **Explanation Schema v1 freeze:** the
+  [payload contract](docs/schema_v1.md) is frozen as of
+  `1.0.0rc1`. The stable `explanation_type` enum includes `factual`,
+  `alternative`, and `fast` (the FAST runtime pathway remains experimental and
+  opt-in). Patch releases may add documented `metadata` or `provenance` sub-keys,
+  but top-level semantics and stable fields will not be renamed or removed before
+  a v2 schema cycle.
+- **Public API:** The public API is frozen as of `1.0.0rc1`. Only patch-level
+  defect fixes will be accepted before GA. The ADR-020 protected legacy workflow
+  is verified against its v0.7.0-era baseline, and the
+  [v1.0.0 upgrade checklist](docs/upgrade/v1.0.0-upgrade-checklist.md) provides
+  cumulative migration guidance for documented workflows since v0.6.1.
+- **ADR-038 API graduation and deprecation closure:** closed/stable per-method
+  keyword surfaces now reject unknown, removed, and cross-method arguments with
+  `ConfigurationError`. The documented experimental explanation-plugin seam
+  retains `multi_labels_enabled` (the sole canonical spelling) and
+  `interval_summary` in `**kwargs` until those parameters graduate. Zero active
+  deprecations were verified by `make deprecation-closure`.
+- **Deliberate deferral:** TIF architecture documentation gaps remain
+  non-blocking under release decision D10; this RC makes no new TIF-specific
+  public capability claim.
+
+### Release-blocking defect patches
+
+- Added `make release-prepare-files` as a focused, deterministic preparation
+  lane for version-dependent release tasks. It reuses the release-preflight
+  updater without requiring checklist closure or producing a publication
+  handoff report, breaking the circular dependency where Task 6 required the
+  final version before the readiness guard allowed that version to be written.
+  The strict `make release-preflight` gate remains mandatory and reruns the
+  preparation idempotently after prerequisite task checklists close.
+- Corrected the version-alignment gate to strip only development/local version
+  data from release-facing metadata. Release-candidate markers such as `rc1`
+  are now preserved, so the checker agrees with the exact prerelease written to
+  `CITATION.cff` and `METADATA.json` by the release updater.
+- **Task 6 CI evidence (2026-07-15):** dispatching `scheduled.yml` on the RC
+  candidate commit (run `29410010188`) surfaced two failures unrelated to the
+  full 3.10-3.13 Python matrix, which passed. `tests/parity_reference/*.json`
+  fixtures for the `classification` and `multiclass` datasets were stale
+  against the intentional, already-documented and already-tested v0.11.6
+  `predict(...)` label-dtype change above (commit `3f6e0d9a`): the fixtures
+  still expected coerced string labels (`"C0"`/`"C1"`) instead of the
+  preserved original label dtype. Regenerated via
+  `python tests/parity_reference/run_parity_reference.py --dataset
+  {classification,multiclass} [--condition-source prediction] --update`;
+  parity now holds for all four datasets across both condition sources. No
+  production code changed. Separately, the `examples-smoke` job added by the
+  v0.11.6 Task 60 CI consolidation ran `pytest examples -q`, which always
+  collected zero tests (`examples/` holds runnable demo scripts, not
+  `test_*.py` files) and failed with exit code 5 on every dispatch since it
+  was introduced. `.github/workflows/scheduled.yml` now runs each
+  `examples/use_cases/*.py` script directly and fails the job if any script
+  exits non-zero; all six scripts pass locally.
+- **Task 7 (2026-07-15): `release-finalize` worktree check compared exact
+  `git status --short` text instead of content.** `release.md`'s sequence is
+  preflight, then finalize, then commit/tag/push (step 11) — finalize is
+  meant to confirm nothing changed since preflight finished, while the tree
+  is still dirty. Committing exactly what preflight produced (its own
+  regenerated evidence files) before running finalize always failed, because
+  a "N files modified" status string can never equal a clean `""` status,
+  even with byte-identical file content. `scripts/local_checks.py` now
+  records `worktree_changed_files` (a `{path: sha256}` map, excluding the
+  report's own path) alongside the existing status string; `release-finalize`
+  falls back to that map when the status strings differ, so a dirty-to-
+  committed transition passes as long as content is unchanged, while genuine
+  drift or an unrelated extra change still fails. Covered by 3 new tests in
+  `tests/scripts/test_local_checks_release_workflow.py` (25/25 passing).
+
+## [v0.11.6](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.11.6) - 2026-07-15
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.11.5...v0.11.6)
+
+### Changed
+
+- Release automation now treats `release.md` as one executable 17-step contract: `make release-preflight` performs steps 1-10 including all deterministic release-file updates, only steps 11-13 remain maintainer-gated, and `make release-postcommit` verifies the published release and performs steps 14-17 without hard-coding the current or next version.
+
+- **v1 CI consolidation (v0.11.6 Task 60, 2026-07-13):** the GitHub Actions inventory shrank from 14 workflow files to 3 (`ci.yml`, `scheduled.yml`, `maintenance.yml`). The canonical PR gate is now the repository-owned profile `make local-checks-pr` executed by `ci.yml` (single stable required check: `CI / required`), with path-sensitive specialist jobs (viz, docs, packaging, governance schema) and main-push-only assurance (coverage + Codecov, package build + clean-wheel smoke, strict docs). Heavy analysis (full Python matrix, parity harnesses, perf regression, notebooks, examples, linkcheck, over-testing, dependency audit) moved from nightly/main-push to weekly `scheduled.yml`. `maintenance.yml` is the only write-capable workflow (manual baseline refresh via reviewable PR). Deleted: `sync-skills.yml` (no private skill-repository sync in OSS CI), `update_baseline.yml`, `deprecation-check.yml` (folded into the PR profile as the zero-active-deprecation ledger gate), `ci-pr.yml`, `ci-main.yml`, `ci-full.yml`, `ci-nightly.yml`, `ci-policy.yml`, `ci-release-docs.yml`, `dependency-submission.yml`, and all three `reusable-*.yml` files. `scripts/quality/validate_ci_policy.py` is rewritten as a blocking full-inventory validator (`--full-inventory`) enforced identically by the always-run `ci.yml` policy job, the `local-checks-pr` profile, and a `.github/`-scoped pre-commit hook; the expired v0.11.3 reusable-first allowlist is gone. The release-readiness guard in `scripts/local_checks.py` now enforces checklist closure for every task parsed from the active plan (previously hardcoded `range(1, 45)`), and the stale `make ci-local-new` target was removed.
+- Added a strict `make release-preflight` gate for the pre-tag half of the release process, plus a `make release-finalize` handoff guard for the manual publish phase. Task 45 no longer duplicates the private manual release checklist; instead the manual publish phase starts only after preflight is green, the release plan summary is closure-ready, and `release-finalize` confirms the worktree still matches the successful preflight snapshot.
+- Split local verification into `make quick`, `make local-checks-task TASK=<n>`, `make local-checks-pr`, `make local-checks-full`, and `make local-checks-release`, and clarified `local-checks-ci` / `ci-local-runblocks` as workflow run-block smoke rather than full CI parity. Release-plan task closure should now use the task-focused profile instead of defaulting to PR-scope checks.
+- Completed the `local-checks-task` mapping coverage promised by the verification-profile split, and made it release-plan-driven: every non-optional v0.11.6 release-plan task (1–21 and 23–29) now has a focused step/lint mapping defined in the plan document itself (a fenced `toml ce-task-verification` block in `development/current-work/v0.11.6_plan.md`), while `scripts/local_checks.py` is a generic engine that discovers the active plan from the project version lineage (`--plan` override) — future release plans carry their own mappings without touching the engine. Unsupported task ids fail with a clean error listing the supported set. Added five reusable quality gates backing the pending-task mappings: `check_forbidden_doc_patterns.py` (named doc/skill/notebook pattern guards), `check_version_alignment.py` (runtime vs package-metadata version drift), `check_runtime_deprecations.py` (AST scan for deprecation emitters the ledger gate cannot see), `check_skill_mirror_sync.py` (skill mirror structural drift), and `check_fallback_filter_live.py` (probes that the fallback-warning pytest filter actually fires). Note: gates for still-open tasks intentionally fail until their task closes — they are the acceptance instruments, not post-hoc checks.
+- Shared CE skills now have a single canonical source in `.claude/skills/`. The `.agents/skills/`, `.github/skills/`, and `.codex/skills/` copies for shared CE skills were rewritten as shim `SKILL.md` files that point back to the canonical path, and the skill-sync checker now rejects shadow-tree copies that carry their own duplicated `assets/`, `references/`, or `scripts/`.
+
+### Fixed
+
+- Release-preflight checkpoint reports no longer publish a misleading top-level `exit_status: 0` before all automated steps finish. Incomplete snapshots now use `null`, and `make release-finalize` identifies the last recorded checkpoint and explains that the full preflight must be rerun to completion.
+
+- **Task 54 (pre-v4 S4-H6): unified plot and prediction validation contracts.** `WrapCalibratedExplainer.plot(..., threshold=<invalid>, use_legacy=True, show=False)` used to return normally instead of raising `ValidationError`, because `plotting.py::plot_global` selected the legacy renderer and returned *before* the prediction payload was gathered/validated, and the legacy renderer itself only validated after a `not show and matplotlib-not-yet-imported` no-op check — so any call combining `show=False` with `use_legacy=True` silently skipped threshold validation entirely. `plot_global` now gathers and validates the prediction payload once, ahead of the `use_legacy` dispatch, and passes that identical validated payload into the legacy renderer instead of letting it re-derive (and potentially bypass) validation independently. Separately, a misspelled plot-only keyword argument (e.g. `filter_topp=1`) used to be forwarded to downstream renderers/plugins with only an `INFO` log on wrapper, collection, and item plot surfaces — the same unconsumed-forwarding gap as the Task 51 explain-kwarg fix, but for plot kwargs. Unrecognized plot kwargs now also emit a `UserWarning` alongside the INFO log, per the mandatory fallback-visibility policy. If you were relying on an invalid `threshold=` silently no-op'ing under `use_legacy=True, show=False`, or on a misspelled plot kwarg being silently swallowed, update the call site — validation now raises, and unrecognized kwargs are now visible.
+- `CalibratedExplainer(..., oob=True)` classification calibration now recovers out-of-bag labels through the fitted learner's `classes_` instead of casting the raw OOB argmax/threshold index straight to `y_cal`'s original dtype. The previous cast silently produced digit-string labels (e.g. `"0"`/`"1"`) for non-numeric or non-contiguous-numeric class label spaces — for example string labels `"False"`/`"True"` — which the new (previous entry) `y_cal`-subset-of-`classes_` validation now correctly rejects instead of calibrating against wrong labels. Numeric label spaces and the existing pandas-`Categorical` mapping are unaffected.
+- `WrapCalibratedExplainer` preprocessing failures now fail fast instead of silently substituting raw, untransformed features. A configured preprocessor's `fit`/`fit_transform`/`transform` call raising during `fit()`, `calibrate()`, `predict()`, `predict_proba()`, `explain_factual()`, or `explore_alternatives()` now raises `ValidationError` with `details=` naming the stage, preprocessor type, and original error class, instead of logging a warning and feeding raw input into a learner/explainer trained or calibrated on transformed features. `fit()` and `calibrate()` also defer invalidating `fitted`/`calibrated` state until after preprocessing succeeds, so a rejected call leaves a previously working wrapper untouched. This closes bug-list/pre-v4 finding S4-B1, a silent-correctness defect where a mid-lifecycle transform failure could silently change the predicted class. If you relied on preprocessing failures being silently bypassed, fix the underlying preprocessor error or catch `ValidationError` explicitly.
+- Classification `predict(...)` and `predict_proba(...)` now fail fast when `threshold=` is supplied on classification explainers instead of silently ignoring the parameter. This matches the existing explain-path validation and closes a call-time configuration seam where even malformed tuples such as `threshold=(3, 1)` previously returned ordinary classification outputs. Classification calibration also now rejects `y_cal` labels outside the fitted learner's `classes_`, with a `ValidationError` details payload listing both the calibration labels and learner label set, so calibration cannot silently relabel the task from the calibration slice alone.
+- Plugin CLI and default narrative text now avoid non-ASCII banner/template glyphs that could crash redirected Windows output. `ce plugins ...` no longer prints the `🔒` banner prefix, and the built-in narrative wording now uses ASCII-safe markers (`[!]`, `- weight ~`) so `cp1252`-encoded stdout paths do not raise `UnicodeEncodeError` before users can inspect plugin metadata or print explanation narratives.
+- README and QUICK_API example coverage now has an executable integration smoke test, the README fairness snippet calibrates Mondrian bins before binned explanations, and the optional modality shims now point users to installable companion packages (`pip install ce-audio` / `pip install ce-vision`) instead of nonexistent extras.
+- `make local-checks-task TASK=<n>` now respects an explicit empty `lint_targets = []`
+  mapping in the active release plan. Task-focused profiles no longer expand that
+  value into changed-file or repo-wide Ruff work, which keeps decision-ledger or
+  command-only tasks scoped to their mapped verification steps while preserving the
+  existing fallback behavior when `lint_targets` is omitted entirely.
+- Uncalibrated `WrapCalibratedExplainer.predict(...)` and `predict_proba(...)` now enforce the same fail-fast kwarg validation as the calibrated path and apply configured inference preprocessing before returning raw learner outputs. Unknown kwargs on the pre-calibration path now raise `ConfigurationError` instead of being silently ignored, while wrappers fitted with a preprocessor no longer send raw categorical inputs straight into the underlying learner before calibration.
+- Probabilistic regression interval thresholds now validate tuple shape and ordering consistently across `predict_proba(...)`, `explain_factual(...)`, and `explore_alternatives(...)`. Reversed tuples such as `threshold=(105.0, 95.0)`, equal bounds such as `threshold=(100.0, 100.0)`, non-length-2 tuples, and non-numeric tuple entries now raise `ValidationError` instead of silently producing misleading calibrated probabilities for an impossible event. If you were passing interval tuples dynamically, make sure they are numeric two-tuples with `low < high`.
+- Classification `predict(...)` and reject-envelope prediction payloads now preserve the original classification label dtype instead of coercing common numeric label spaces such as `{0, 1}` and `{0, 1, 2}` to NumPy strings. CE now stores the original class-value array for prediction decoding and keeps `class_labels` as a display-only surface for plots, narratives, and explanation text. If you added local workarounds for the earlier string output, you can remove them.
+- Classification `predict(...)` and reject-envelope prediction payloads now decode classification outputs through the stored inverse label map only. Label spaces that overlap their encoded indices, such as `{1, 2}` and `{1, 2, 3}`, no longer return labels that never appeared in calibration data (for example predicting `0` for a `{1, 2}` task). Task 23's numeric-label support is re-verified against behavioral `predict` assertions, and downstream callers should re-run any label-sensitive classification smoke tests if they adopted v0.11.6-dev before this fix.
+- Reject-policy NCF migration guidance now matches the runtime boundary completely. In addition to the earlier `ncf="entropy"` fail-fast closure, explicit `ncf="hinge"` and `ncf="margin"` remain documented as rejected legacy inputs that raise `ValidationError`; callers must use `ncf="default"` or `ncf="ensured"` instead. The v0.11.6 upgrade guide collects these replacements together with the other warn-to-raise changes in this milestone; see [docs/upgrade/v0.11.6-upgrade-checklist.md](docs/upgrade/v0.11.6-upgrade-checklist.md).
+- Narrative text now stays aligned with the actual calibrated prediction state. Binary narratives derive `Prediction:` from the calibrated class decision instead of the explained positive class, multiclass narratives populate runner-up class plus probability margin from the stored full-probability payload, and probability-style narrative intervals are clipped to `[0, 1]` at presentation time so end users no longer see placeholder runner-up text or impossible bounds such as `1.049` in narrative output.
+- `interval_summary=` now propagates consistently through explanation surfaces instead of only affecting `predict_proba(...)` and the hidden `__full_probabilities__` payload. Factual and alternative explanations now use the caller-selected summary for the canonical `prediction["predict"]` value, JSON export, narrative probability line, and feature/rule perturbation predictions, so `lower`/`upper`/`mean` selections no longer produce mutually contradictory probability values inside a single explanation payload.
+- Public value validation now fails fast consistently across `calibrate()`, direct `CalibratedExplainer(...)` construction, `predict()`, `predict_proba()`, and explanation entry points instead of coercing or failing late. Boolean controls such as `multi_labels_enabled`, `suppress_crepes_errors`, and `fast` now require real booleans; mixed-case `mode` is normalized once; invalid `sample_percentiles`, malformed `low_high_percentiles`, empty/mismatched `threshold` sequences, out-of-range `features_to_ignore` indices, non-integer `seed` values, and invalid FAST `noise_type` / `scale_factor` / `severity` now raise structured `ValidationError` payloads before plugin setup or state mutation. If you relied on truthy string coercion or late fallback/error behavior for these parameters, update those call sites to pass the documented types explicitly.
+- **Task 49 (pre-v4 S4-H1): test-only public API aliases removed from `CalibratedExplainer`/`WrapCalibratedExplainer`.** ADR-030 remediation in v0.10.2 had converted internal state into public, mostly-mutable aliases whose only purpose was letting tests bypass the private-member gate (their own docstrings/comments said "for testing"). These are removed: `CalibratedExplainer.feature_names_internal` (use `feature_names`, the existing public property backed by the same state), `.initialize_interval_learner_for_fast_explainer()`, `.bridge_monitors`, `.explanation_plugin_instances`, `.pyproject_explanations`/`.pyproject_intervals`/`.pyproject_plots`, `.lime_helper`/`.shap_helper`, the stale `.is_initialized` (`.. deprecated:: 0.10.1`, no active ledger row; use `.initialized`); and `WrapCalibratedExplainer.serialise_preprocessor_value`/`.extract_preprocessor_snapshot`/`.build_preprocessor_metadata`/`.pre_fit_preprocess`/`.pre_transform`/`.maybe_preprocess_for_inference`/`.finalize_fit`/`.format_proba_output`/`.normalize_auto_encode_flag`/`.normalize_public_kwargs`. `CalibratedExplainer.get_sigma_test` is kept (used cross-module by `calibration/interval_regressor.py`) and dispositioned as an internal, non-user-facing surface; `fast`/`noise_type`/`scale_factor`/`severity` are kept as the genuine documented public properties they already were. Tests that needed this internal state now go through a single centralized accessor module, `tests/helpers/explainer_internals.py`, which reaches private state via reflection (`__dict__`/class-dict lookup) rather than attribute syntax, so no `.github/private_member_allowlist.json` entry is required; the allowlist is empty again. A new `scripts/quality/check_class_surface_allowlist.py` gate freezes the public surface of both classes against `.github/class_surface_allowlist.json` so a future PR cannot silently reintroduce a test-only production alias. If you were relying on any of the removed names directly, migrate to the public equivalent named above or to your own encapsulated helper.
+
+- Release packaging metadata and smoke checks are now truthful to the supported surface. `pyproject.toml` raises `requires-python` to `>=3.10`, declares the tested Python classifiers (`3.10`–`3.13`), and limits package discovery to the public `calibrated_explanations` namespace so the repository-only `external_plugins` tree no longer leaks into release wheels. The packaging artifact checker now validates `Requires-Python`, required shipped package data (`py.typed`, schema JSON files, the explain template, and plot config), and unexpected top-level wheel packages, and it can clean stale `dist/` artifacts so release inspection runs against the fresh build instead of a mixed-version upload set. `make local-checks-release` now includes the build plus artifact smoke steps directly.
+- `ce_agent_utils.explain_and_narrate(..., narrative_format=...)` and `explain_and_summarize(..., narrative_format=...)` no longer emit a runtime `DeprecationWarning`. The removed legacy alias now raises `ConfigurationError` with `expertise_level=` migration guidance instead, so the v0.11.6 zero-active-deprecations gate is true at runtime as well as in the markdown ledger.
+- `to_narrative(format=...)` no longer fails silently. The unsupported `format=` keyword now raises `ConfigurationError` on single-explanation, collection, and multiclass narrative APIs with guidance to use `output_format=` and `expertise_level=` instead, and the CE-first docs now show the supported narrative call forms.
+- Narrative and plot typo seams no longer disappear silently. `to_narrative(...)` now rejects stray keyword arguments such as `expertise_lvl=` with `ConfigurationError`, collection-level `plot(...)` logs non-built-in forwarded kwargs at `INFO`, and direct-core `CalibratedExplainer.explain_factual(...)` / `explore_alternatives(...)` now log genuinely plugin-forwarded kwargs so the ADR-038 experimental seam remains visible instead of silent. The plugin contract docs now spell out the wrapper-vs-core difference for call-time plugin kwargs.
+- Built wheel and sdist artifacts now include the repository `LICENSE` text again, and Task 11 adds a packaging smoke check that builds release artifacts and fails when the wheel or sdist omits the license file or the wheel metadata drops the `License-File` entry.
+- Classification calibration now fails fast when `y_cal` contains only one unique class. `WrapCalibratedExplainer.calibrate(...)` and direct `CalibratedExplainer(...)` construction raise `ValidationError` with a stable details payload instead of accepting a single-class calibration slice that could leave `class_labels` incoherent with probability columns.
+- Classification calibration now encodes every supported classification label space to contiguous internal class indices before fitting interval calibrators. Numeric labels outside `0..K-1` (for example `{1, 2}` or `{2, 5, 9}`) no longer fail with misleading interval-calibrator errors or out-of-bounds index crashes during `calibrate()`. CE now preserves coherent probability-column metadata and factual explanations for contiguous numeric, non-contiguous numeric, and string class labels on both the wrapper and direct-core paths.
+- Reject-policy NCF validation now fails fast for the removed legacy alias `ncf="entropy"` instead of silently normalizing it to `ncf="default"`. Callers must pass `ncf="default"` or `ncf="ensured"` explicitly.
+- Fail-fast closure of the silent guarded-kwarg sink: `guarded=`, `significance=`, `n_neighbors=`, `normalize_guard=`, and `merge_adjacent=` (removed in v0.11.5) now raise `ConfigurationError` with `GuardedOptions` migration guidance from `CalibratedExplainer.explain_factual` / `explore_alternatives` and the `WrapCalibratedExplainer` delegators, instead of being silently swallowed by the `**kwargs` sink. `_KNOWN_PUBLIC_KWARGS` no longer allowlists `guarded`, `n_neighbors`, or `merge_adjacent`.
+- Fail-fast reject-policy kwarg validation now closes the silent `predict_reject` / `apply_policy` sink: removed `confidence=` now raises with `reject_confidence=` migration guidance, reject-kwarg typos no longer vanish silently, and the wrapper/core reject-policy prediction paths reject the removed alias consistently.
+- `coerce_normalization_strategy()` and `coerce_interval_summary()` now raise `ValidationError` on unrecognized input (typo strings, unrelated types) instead of silently substituting a default. `VennAbers.predict_proba(normalize=True/False)` — the legacy bool passthrough removed in v0.11.5 — now raises `ValidationError` instead of silently resolving to `NormalizationStrategy.SCALE` regardless of the boolean value; callers must pass `normalization=NormalizationStrategy.<MEMBER>`. `interval_summary=None` (the "use the default" sentinel) continues to resolve to `IntervalSummary.REGULARIZED_MEAN`. The `VennAbers.predict_proba` `normalize=` docstring is corrected to match the implemented (raising) behavior.
+- **ADR-038: fail-fast call-time kwarg validation across the public API (v0.11.6 Task 5).** Unknown keyword arguments to `calibrate()` / `explain_factual()` / `explore_alternatives()` / `explain_fast()` / `predict()` / `predict_proba()` now raise `ConfigurationError` instead of emitting a `UserWarning` and being silently forwarded. **This reverses the v0.11.4 Task 15 behavior** (`UserWarning: ... will be forwarded for compatibility but may be ignored`); code or notebooks that relied on unknown kwargs being silently ignored now get an immediate, actionable error. The resulting validation model:
+  - **Per-method allow-lists with a single source of truth.** Each method validates against its own allowed set — a name valid on another method raises `ConfigurationError` ("recognized on another method but not valid here") instead of being silently accepted but inert (previously e.g. `calibrate(x, y, guarded_options=...)` passed validation, then vanished into unconsumed constructor kwargs with no error and no effect). The sets are defined once on `CalibratedExplainer`, and `WrapCalibratedExplainer` derives its gates from them, so everything the core explainer accepts on a surface, the wrapper accepts too.
+  - **Applies to `CalibratedExplainer` used directly, not just the wrapper.** `__init__` / `predict()` / `predict_proba()` reject unrecognized keyword arguments outright; `explain_factual()` / `explore_alternatives()` reject only names known on another method, and still forward genuinely unrecognized keys to explanation plugins (the ADR-038 §3 experimental exception is preserved — plugin extensibility is unaffected).
+  - **Audited allow-lists and consistent removed-alias handling.** Genuinely valid, notebook/doc-used names missing from the original v0.11.4 enumeration were added (`categorical_labels`, `class_labels`, `features_to_ignore`, `oob`, `factual_plugin`, `alternative_plugin`, `fast_plugin`, `interval_plugin`, `fast_interval_plugin`, `plot_style`); six dead or internal-only names now raise instead of being silently accepted (`condition`, `condition_label`, `condition_labels`, `include_reject_details`, and the internally-set `output_interval` / `y_threshold`, which previously risked a confusing `TypeError: got multiple values for keyword argument` deep inside the call stack). All four removed-alias check families (removed public aliases, removed guarded kwargs, removed reject kwargs, removed `normalize=`) are applied consistently on every gated method of both classes; in particular `normalize=` — a legacy passthrough removed in v0.11.5, never a synonym of `normalization=` — now raises `ConfigurationError` at the public gate with migration guidance instead of a `ValidationError` deep inside `VennAbers.predict_proba`.
+  - **`calibrate()` hardening.** Gains a keyword-only `mondrian_categorizer=` parameter as an intentional, documented alias for `mc=` (specifying both raises); accepts call-time `perf_cache=` / `perf_parallel=`, which override the wrapper-level attributes; and no longer discards a working calibration when a call is rejected — `calibrated = False` is set only after all validation passes, so a typo'd recalibrate leaves the previous explainer usable.
+  - **Plot paths keep working under the gates.** `viz/_matplotlib_compat.plot_global` forwards only prediction-relevant kwargs into the gated `predict()`/`predict_proba()` (so `plot(x, use_legacy=True)` and the automatic PlotSpec→legacy fallback are unaffected), and `predict()` gains the same defensive `show=`/`style_override=` stripping `predict_proba()` already had, since `.plot()`'s kwargs flow into both.
+  - Unknown-kwarg errors name the rejecting method (`WrapCalibratedExplainer.calibrate received unknown keyword arguments: ...`), not just the class. New `tests/unit/core/test_parameter_surface_contracts.py` enforces the wrapper/explainer derivation invariant structurally and exercises every allow-listed parameter end-to-end, with a completeness gate so new names cannot land untested.
+
+## [v0.11.5](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.11.5) - 2026-07-07
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.11.4...v0.11.5)
+
+### Added
+
+- **ADR-038 RC graduation planning:** v1.0.0-rc remains validation/freeze by default, but now explicitly allows only one planned implementation item: closing the ADR-038 `**kwargs` graduation gate for `explain_factual` / `explore_alternatives` and aligned `WrapCalibratedExplainer` delegators. The RC deprecation gate is strict: `make deprecation-closure` must prove zero active deprecations, not merely zero blocking deprecations, before tagging RC.
+- **ADR-039 (Accepted): Conditional (Mondrian) calibration and explanation semantics.** Accepted ADR codifying the `bins`/`mc` contract through `calibrate`, `predict`, and explain paths: channel exclusivity and precedence, calibrate/inference consistency requirements, unseen-label and length validation, lifecycle reset on re-calibration (with an explicit `reuse_conditional` opt-in to stay conditional), and `mc` serialization visibility. The defect inventory motivating the contract and its remediation tasks live in `development/current-work/v0.11.5_plan.md`.
+- **ADR-040 (Accepted): Capability verification framework and requirements-as-code governance.** Ratifies the capability verification framework already implemented across the CE capability surface: capability claims, requirements-as-code, TIF (Test Interface Framework) public-API verification interfaces, capability-contract tests, and raw/curated evidence records with explicit assumption boundaries. The active TIF registry spans explanations, conjunctions, filtering, guarded explanations, Mondrian conditional calibration, narratives, prediction, classification, probabilistic regression, reject policies, and visualization. The v0.11.5 Mondrian capability-chain extension (ADR-039 D6) is one application of this framework, not its scope. Release gates: `make capability-chain-check` (structural) and `make capability-evidence-refresh` (release boundary).
+- **v0.11.5 replanning:** Inserted a v0.11.5 milestone between v0.11.4 and v1.0.0-rc (`development/current-work/v0.11.5_plan.md`). v0.11.5 ships the already-implemented RC Task 0 deprecation-closure work (ledger attribution moves to `Removed in: v0.11.5`) and the full ADR-039 conditional-calibration remediation as fail-fast bug fixes with zero new deprecation cycles, so the v1.0.0 API freeze is not built on known silent-correctness defects. v1.0.0-rc remains validation/freeze and resumes unchanged after v0.11.5 closes.
+
+### Fixed
+
+- **ADR-039:** Conditional inference now fails fast when inline `bins=` calibration is used without inference-time `bins=`, when `bins=` is supplied after global calibration, when explicit `bins=` conflicts with stored `mc=`, when labels are outside the calibration vocabulary, or when bin-label lengths do not match the input sample count.
+- **ADR-039:** Recalibrating without `bins=` or `mc=` now resets conditional state to global calibration. Use `reuse_conditional=True` to opt into reusing a stored categorizer.
+- **ADR-039:** Pickle and `save_state()` now emit `UserWarning` plus INFO logging when dropping a configured `mc`; loaded conditional wrappers require explicit `bins=` instead of failing later in calibrator internals.
+- Corrected conditional calibration examples across practitioner playbooks, the CE-first agent guide, task API comparison, classification task docs, and the `ce-mondrian-conditional` skill.
+- **ADR-037: Fixed collection-level plot plugin ranking option forwarding.** `CalibratedExplanations.plot()` now forwards explicit `rnk_metric`, `rnk_weight`, `uncertainty`, and `filter_top` values to collection plugin `options` for custom styles, so plugin-rendered collection plots apply caller-selected ranking instead of silently falling back to plugin defaults.
+
+### Removed
+
+- Carried RC deprecation-closure removals now ship in v0.11.5: guarded legacy kwargs (`guarded=True`, `significance=`, `n_neighbors=`, `normalize_guard=`, `merge_adjacent=`), `confidence=` reject aliases, boolean `NormalizationStrategy.coerce()` aliases, `calibrated_explanations.core.reject` module shim, `calibrated_explanations.core.explain.explain(...)`, `ExplainerHandle.learner`, `ParallelConfig(strategy="auto")` with `enabled=True`, `CalibratedExplanations.legacy_payload(exp)`, schema v1 pickle primitive loaders for `VennAbers` and `IntervalRegressor`, and legacy plugin `plot_kinds` category vocabulary.
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.11.5...main)
+
+## [v0.11.4](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.11.4) - 2026-06-19
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.11.3...v0.11.4)
+
+### Breaking changes (v0.11.4)
+
+- **ADR-033 §6.2: `data_modalities` is now required in `plugin_meta`.**
+  `validate_plugin_meta` previously applied a silent `("tabular",)` default when
+  `data_modalities` was absent. That default-fallback is removed in v0.11.4. Plugins
+  missing the key now raise `ValidationError` at registration time. Add
+  `"data_modalities": ["tabular"]` (or the appropriate modality) to your `plugin_meta`
+  dict. Entry-point discovery warns and skips invalid plugin metadata fail-closed. See
+  `docs/upgrade/v0.11.4-upgrade-checklist.md` for the full migration note.
+
+### Bug fixes (v0.11.4)
+
+- **ADR-031: Migrated native calibrator primitives to JSON-safe schema v2.**
+  `VennAbers` and `IntervalRegressor` now serialize field-level JSON-safe
+  primitives instead of `pickle_b64` payloads, while v1 pickle primitives remain
+  loadable with `DeprecationWarning` through the v1.0.0 cleanup window. Wrapper
+  state manifests now write schema version 2 and continue to load v1 artifacts.
+  Malformed v2 primitives now fail fast with `ConfigurationError` before reaching
+  NumPy/crepes internals.
+
+- **ADR-013: Added interval calibrator runtime output validation.** Trusted
+  VennAbers-style interval calibrators are now sampled at creation time and
+  checked for floating probability output, expected row shape, simplex bounds,
+  and interval monotonicity; ADR-013 now records that frozen
+  `IntervalCalibratorContext` supersedes a separate `LegacyIntervalContext`
+  adapter.
+
+- **ADR-015/ADR-026: Hardened plugin prediction invariants.** Prediction bridge
+  monitoring now raises `ValidationError` on interval invariant breaches,
+  classification bridge predictions enforce `predict in [low, high]` when paired
+  bounds are present, and explanation batch validation now checks rule-level
+  factual and alternative prediction intervals.
+
+- **ADR-038: Unknown wrapper keyword arguments are now visible.**
+  `WrapCalibratedExplainer` emits a `UserWarning` for unrecognized public
+  keyword arguments while continuing to forward them for compatibility.
+
+- **ADR-006: Fixed plugin checksum metadata trust elevation.** Supplying a
+  `checksum` field in third-party plugin metadata no longer promotes the plugin
+  to trusted. Checksum verification is now recorded separately as integrity
+  metadata, while trust remains controlled only by the registry trust policy,
+  environment/config allowlists, or explicit keyed trust APIs.
+
+- **ADR-008: Fixed multiclass `class_index` latent serialization bug.** `MultiClassCalibratedExplanations.to_json()` and `to_json_stream()` previously lost `class_index` (and `class_label`) because those keys were added to the legacy payload dict after `legacy_to_domain()` had already constructed the `Explanation` object, so `from_legacy_dict` never extracted them and the domain object carried no class annotation. After the `_exp_to_domain` migration, class annotations are now explicitly merged into `domain.metadata` before serialization — `to_json → from_json` round-trips for multiclass collections preserve `class_index` in each explanation's metadata.
+
+### CI / infrastructure (v0.11.4)
+
+- **ADR-012: Added strict release docs workflow support.** The reusable docs
+  workflow now runs `sphinx-build -W --keep-going`; nightly docs remain advisory,
+  and a release-branch `ci-release-docs.yml` workflow runs the blocking HTML docs
+  gate for `release/**`.
+
+- **ADR-028/STD-005: Added public logging configuration helper.**
+  `calibrated_explanations.configure_logging()` configures the package root
+  logger and installs the shared context filter; cache and legacy agent loggers
+  now live under ADR-028 `core.*` domains.
+
+- **ADR-037: Plot plugin metadata now uses semantic `plot_kinds`.** Built-in plot
+  plugins declare the six PlotSpec semantic kind names. Legacy category names
+  (`instance`, `collection`, `global`) remain accepted with `DeprecationWarning`
+  until v1.0.0; `triangular` remains an internal PlotSpec routing kind.
+
+- **ADR-005/ADR-030: Closed v0.11.4 test-quality gaps.** Added the missing
+  golden explanation fixture schema test, removed redundant private-member
+  legacy serialization tests, and hardened the visualization contract smoke test
+  with `viz` marker coverage plus concrete Agg/no-figure-leak assertions.
+
+- Fixed nightly `parity-reference` CI failures for `regression`/`probabilistic_regression`
+  datasets. Root cause: commit `9693c3d8` (2026-06-12) removed the `scikit-learn==1.6.1`/`1.5.2`
+  exact pins from `constraints.txt`, letting fresh installs resolve scikit-learn ≥1.8.0, which
+  changed `DecisionTreeRegressor` split-selection behavior and broke byte-for-byte parity with
+  the committed golden fixtures (`DecisionTreeClassifier`-based classification/multiclass
+  fixtures were unaffected). Added `tests/parity_reference/constraints.txt`, a
+  `scikit-learn<1.8` overlay scoped to the `parity-reference` nightly job only — the
+  project-wide `scikit-learn>=1.3` floor in `constraints.txt`/`requirements.txt` is unchanged.
+  See `tests/parity_reference/README.md` and `development/current-work/v0.11.4_plan.md` Task 7 for the
+  full investigation and rationale.
+
+## [v0.11.3](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.11.3) - 2026-06-16
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.11.2...v0.11.3)
+
+### Breaking changes (v0.11.3)
+
+- **RT-17: Call-time configuration taxonomy (`GuardedOptions` and `reject_confidence`).**
+  - New `GuardedOptions` frozen dataclass exported from root namespace (ADR-038). Replace
+    `explain_factual(x, guarded=True, significance=0.1)` with
+    `explain_factual(x, guarded_options=GuardedOptions(confidence=0.9))`.
+    Note the numeric inversion: `confidence = 1 − significance`.
+  - `predict_reject` and `apply_policy` rename their primary confidence parameter from
+    `confidence=` to `reject_confidence=` to disambiguate from `GuardedOptions.confidence`
+    and `confidence_level`. The old `confidence=` kwarg still works but emits a
+    `DeprecationWarning`; it will be removed at v1.0.0.
+  - The legacy `guarded=True`, `significance=`, `n_neighbors=`, `normalize_guard=`, and
+    `merge_adjacent=` keyword arguments in the guarded explain path now emit
+    `DeprecationWarning` and will be removed at v1.0.0.
+
+### Improvements
+
+- Centralized migrated runtime configuration consumers behind a process-level
+  `ConfigManager` singleton and added `ConfigSpec` for class-owned configuration
+  schema extension while preserving legacy module-level config aliases.
+- Introduced config management hardening for CE and official plugins:
+  deterministic plugin config snapshotting, source attribution, validation hooks,
+  runtime delivery, redaction, and provisional export diagnostics. The plugin
+  config pyproject namespace, environment override, metadata schema, context field,
+  and export shape are intended for cross-repository hardening and are not yet
+  declared stable public API.
+
+### Bug fixes
+
+- **RT-16: Treat thresholded regression reject as pure binary event classification.**
+  Runtime regression reject now derives calibration labels from the same central
+  event helper used by evaluation: scalar thresholds use `y <= threshold`, interval
+  thresholds use `low < y <= high`, invalid intervals raise `ValidationError`, and
+  per-instance threshold arrays are rejected. Scenario 3 was rebuilt around
+  event-label coverage, singleton precision/recall/error, and empty/singleton/
+  ambiguity accounting instead of interval-width selection.
+
+- **RT-14: Fix multiclass reject NCF — `_default_ncf_kind` now returns `"hinge"` for
+  multiclass (was `"margin"`).** With binarized proba `[1-p_max, p_max]`, margin NCF
+  produced a scalar broadcast identically to both columns, making singleton prediction
+  sets geometrically impossible and causing 100% rejection (mean_reject_rate = 1.0 in
+  Scenario 2). Hinge NCF produces column-specific scores (`alpha[:,0]=p_max`,
+  `alpha[:,1]=1-p_max`), restoring `{1}` positive correctness-proxy singletons and
+  `{0}` proxy-negative singletons. Added `default_ncf_kind()` public wrapper and
+  tests in `test_reject_ncf_redteam.py`. Scenario 2 re-run: mean accepted top-1
+  accuracy 0.901 (was NaN), mean non-accepted rate 0.471 (was 1.0).
+
+- **RT-15: Reframe Scenario 2 as an explicit multiclass top-1 correctness proxy.**
+  The `{1}`-only acceptance rule is no longer presented as a general multiclass
+  reject decision. It is now exposed through the opt-in
+  `experimental.multiclass_top1_correctness` strategy, which is valid only for
+  multiclass classification and treats `{0}` proxy singletons as non-accepted top-1
+  predictions. Scenario 2 now reports `positive_singleton_rate`,
+  `proxy_negative_singleton_rate`, `proxy_singleton_accuracy`, and
+  `non_accepted_rate`, with legacy aliases kept for artifact compatibility. Proxy
+  accuracy is computed against `1[top-1 prediction is correct]`, not only on the
+  `{1}` accepted subset.
+
+- **Reject scenario singleton precision/recall diagnostics.** All reject scenario
+  CSV/JSON/Markdown artifacts now include singleton precision and recall where
+  prediction-set labels align with empirical labels. For binary classification this
+  uses true class labels; for multiclass correctness-proxy rows it uses
+  `1[top-1 prediction is correct]`; for threshold-regression rows it uses the
+  threshold event label.
+
+- **RT-9: Fix regression mode support for `experimental.difficulty_normalized`.** The
+  explicit regression guard was removed from `_experimental_difficulty_normalized_strategy`.
+  `resolve_policy_spec` now stores NCF settings directly for regression mode instead of
+  calling `initialize_reject_learner` (which requires a call-time threshold). All four
+  `crepes.extras.DifficultyEstimator` setups are supported in both classification and
+  regression mode. 32 unit tests pass.
+
+- **RT-11: Guard `experimental.difficulty_normalized` against missing difficulty estimator.**
+  `apply_policy()` now raises `ConfigurationError` (not silent fallback) when any
+  `_DIFFICULTY_STRATEGIES` member is requested without `difficulty_estimator` set.
+
+- **RT-6: Add zero-value guard to `_difficulty_values()`.** Zero difficulty values now
+  raise `ValidationError` (division by zero is mathematically invalid).
+
+### Deprecated
+
+- **Guarded method pair deprecated (ADR-032, Task 13):** `CalibratedExplainer.explain_guarded_factual(...)` and `CalibratedExplainer.explore_guarded_alternatives(...)` (and their `WrapCalibratedExplainer` counterparts) are now deprecated in favour of the parameterized API: `explain_factual(..., guarded=True)` and `explore_alternatives(..., guarded=True)`. The old methods emit `DeprecationWarning` and delegate to the new API. Removal target: v1.0.0.
+
+### Packaging / CI
+
+- **RT-1 through RT-13 red-team remediation (difficulty_reject branch):** Completed
+  all 15 red-team items identified in the v0.11.3 Task 8 review:
+  - RT-1: Corrected Scenario 9 description in practitioner doc (sign error on AUC
+    delta — full-grid positive delta is a high-rejection-rate selection effect, not a
+    matched-operating-point improvement).
+  - RT-3: New `scenario_12_coverage_validity_difficulty_normalized.py` providing
+    coverage validity sweep for arm C, registered as supplementary in `run_all_reject.py`.
+  - RT-4: Added "Matching Quality" section to Scenario 11 artifact (mean abs error
+    0.045–0.088 per target).
+  - RT-5: Added "Metric Consistency Note" to Scenario 9 and 11 artifacts explaining
+    the AUC direction reversal (high-conf selection effect).
+  - RT-7: Added `--crepes-ablation` flag to Scenario 9 and 11 running all four
+    `crepes.extras.DifficultyEstimator` setups (knn_dist, knn_std, knn_res, rf_var).
+  - RT-8: Added `--diagnose-db` flag to Scenario 9 for D-B paradox score-distribution
+    diagnostics.
+  - RT-10: Added statistical significance note (t-test, none reach α=0.05) to
+    Scenario 11 artifact and JSON.
+  - RT-12: Added "Experimental API stability contract" section to researcher doc.
+  - RT-13: Added "Known limitations and fairness" section to researcher doc.
+
+- **Difficulty-normalized reject documentation update:** Expanded practitioner and
+  improvement documentation for reject-option conformal classification with
+  difficulty-aware routing, including singleton/empty/multi-label set semantics,
+  explicit pre-p-value normalization rationale, strategy usage guidance
+  (`default`, `ensured`, `experimental.difficulty_normalized`, novelty-aware
+  variant), validity caveats, and Scenario 8-10 evaluation summary. Added a new
+  researcher-facing reference page at
+  `docs/researcher/advanced/difficulty_normalized_reject.md`.
+
+- **Global plot public API plugin routing:** Restored return-value propagation through `CalibratedExplainer.plot(...)` and `WrapCalibratedExplainer.plot(...)` so explicit non-legacy global styles now return the plugin renderer result through the normal public API, while omitted styles and explicit `use_legacy=True` continue to follow the existing default or forced-legacy behavior.
+
+- **PlotSpec default promotion (v0.11.3 Task 6):** Promoted PlotSpec to the
+  default user-facing plotting path for factual, alternative, triangular, global,
+  and batch explanation plotting entrypoints. Legacy plotting remains available
+  through explicit opt-out (`use_legacy=True`, `style_override="legacy"`, or
+  supported style configuration) and visible failure fallback. Hardened a
+  notebook-discovered factual plotting regression where non-uncertainty
+  probabilistic PlotSpec rendering could index the feature-weight payload by rule
+  id instead of using the canonical `predict` weights.
+
+- **PlotSpec figure parity — layout fixes (v0.11.3 Task 6):** Fixed four layout regressions in PlotSpec-rendered figures vs. legacy:
+  (1) Alternative probabilistic x-axis label now defaults to `"Probability for the positive class"` (was bare `"Probability"`);
+  (2) Alternative regression x-axis label now defaults to `"Prediction interval with 95% confidence"` (was `"Prediction interval"`);
+  (3) Alternative plot side labels (`"Alternative rules"` left, `"Instance values"` right) no longer clipped at the canvas boundary — fixed via `subplots_adjust(left=0.22, right=0.87, bottom=0.15)` for single-panel alternative specs;
+  (4) Dual-header (probabilistic factual/conjunction) P(y=0) x-axis tick labels no longer overlap the body panel — replaced 3-row GridSpec + `subplots_adjust(hspace=0.5)` with a stable 4-row GridSpec (`height_ratios=[1, 1.8, 0.4, num_bars+2]`) where an invisible spacer row absorbs the tick-label overhang.
+  Added 4 new parity tests (27 total in `tests/unit/viz/test_plot_parity_adapter.py`). 1318 unit tests green.
+- **ADR-011 deprecation closure (v0.11.3 Task 5):** Removed all remaining active deprecations before v1.0 (Groups A–K): core calibration shims (deleted `src/calibrated_explanations/core/calibration/` directory; closed namespace-package gap), reject-policy aliases (`RejectPolicy._missing_`, `_DEPRECATED_ATTRS`/`__getattr__`), reject wrapper delegators, plugin-manager delegators/state aliases on `CalibratedExplainer`, collection `as_lime`/`as_shap`, registry list-path APIs (`register`, `trust_plugin`, `find_for`, `find_for_trusted`), legacy plugin mode aliases, `perf.cache`/`perf.parallel`, calibration-helper lazy aliases, and `ParallelConfig(granularity="feature")`. Added fail-closed tests for all 11 groups, emptied the Active deprecations ledger, and introduced `make deprecation-closure` / `python scripts/local_checks.py --deprecation-closure` with timing artifacts under `reports/deprecations/`. Two red-team gaps found and closed post-implementation: (1) empty `src/calibrated_explanations/core/calibration/` directory was creating a Python namespace package after source file deletion — directory deleted and shim test extended to cover parent package; (2) `reports/coverage_task5.json` (1.7 MB) was tracked as a new file, exceeding the `check-added-large-files` pre-commit limit — added to `.gitignore` and untracked. Final gate: `make local-checks-pr` passed (1666 tests green, 96.42% docstring coverage, all quality gates green).
+- **ADR-011 Group L closure (v0.11.3 Task 5):** Closed the remaining reject-envelope deprecation blocker via reset path. Removed the active `deprecate()` warning in `reject_result_v2_to_legacy()` that targeted v1.0.0-rc, kept `RejectResult` as the stable v1.0.0 public return type, retained `RejectResultV2` as an opt-in strict schema, and updated reject tests/docs/ADR-029 accordingly.
+- **Optional uv contributor workflow (v0.11.3 Task 7):** Added an optional `uv pip install -e .[dev] -c constraints.txt` contributor fast path, introduced a pinned `uv-install-smoke` PR lane that compares pip and uv install timing without replacing existing pip-based CI, and removed stale `uv.lock` so no unvalidated lockfile appears authoritative.
+- **Windows install-smoke wheel hardening:** Updated `uv-install-smoke` to provision CI-aligned Python 3.11 virtualenvs via `uv venv` and require binary wheels for `numpy`, `scipy`, and `scikit-learn` so local host-Python drift (for example, 3.14) does not trigger compiler-dependent source builds. Relaxed the Python >=3.13 NumPy constraint to `numpy>=2.1.2` to avoid over-constraining newer interpreter resolution.
+- **Parameter naming consistency hardening (v0.11.3 Task 14):** Added `scripts/quality/check_parameter_naming.py` (CI-blocking gate against re-introduction of banned aliases `alpha`/`alphas`); inline documentation of the `threshold`→`y_threshold` internal rename in `IntervalRegressor.predict_probability`; consistent numpydoc `confidence`, `confidence_level`, and `significance` parameter cross-references; and a canonical parameter reference page at `docs/foundations/concepts/parameter-reference.md`.
+- **ADR gap closure sweep (v0.11.3 Task 15):** Closed six ADR gaps identified in the 2026-06-11 full sweep: (1) ADR-011 — active-deprecations ledger rebuilt with 9 correctly filed rows, `make deprecation-closure` passes (0 blocking); three raw `warnings.warn(DeprecationWarning)` bypass sites in `normalization_strategy.py`, `core/reject.py`, and `core/explain/__init__.py` migrated to `deprecate()` helper; (2) ADR-028/STD-005 — `api/config.py:265` warning site classified, `check_warning_policy.py` reports 0 UNCLASSIFIED; (3) ADR-032 — `get_guarded_audit` error message corrected to recommend `explain_factual(..., guarded_options=GuardedOptions())`; (4) ADR-036 — `validate_plot_artifact()` inserted at both build/render pipeline boundaries (`plotting.py:387`, `:439`); (5) ADR-037 — `plot_kinds`/`plot_modes` metadata declared on all four built-in plugin descriptors and validated by `validate_plugin_meta`; (6) ADR-034 — status-source conflict resolved (Open Items now document post-v1.0 deferral rationale).
+- **Dependency constraint minimization (v0.11.3 Task 16):** Removed four stale `constraints.txt` lines: `numpy<2` cap for Python < 3.13 (CE has no NumPy 2.x removed aliases; 2.4.4 passes all tests) and exact `scikit-learn==` pins (asymmetric wheel-availability artefact, not a CE requirement). Declared minimums in `pyproject.toml` (`numpy>=1.24`, `scikit-learn>=1.3`) are unchanged and were confirmed correct against sklearn 1.5.2–1.9.0 across Python 3.10–3.14.
+- **Call-time configuration taxonomy (v0.11.3 Task 17):** Accepted ADR-038. Introduced `GuardedOptions` frozen dataclass and `reject_confidence` qualified kwarg. Added four-tier taxonomy (`Options`/`Config`/`Spec`/plain kwargs) documented in ADR-038 §1. Added `[EXPERIMENTAL]` markers to `**kwargs` surfaces on `explain_factual`/`explore_alternatives`.
+- **ADR-011 compliance follow-up (2026-06-15):** Migrated two remaining raw `warnings.warn(DeprecationWarning)` sites in `core/calibrated_explainer.py` (the `guarded=True` boolean kwarg path in `explain_factual` and `explore_alternatives`) to `deprecate(key="guarded_true_boolean_kwarg", raise_on_error=False)`. `raise_on_error=False` is correct for user-facing deprecated kwargs so `pytest.warns(DeprecationWarning)` captures the warning even when `CE_DEPRECATIONS=error` is set.
+
+## [v0.11.2](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.11.2) - 2026-05-12
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.11.1...v0.11.2)
+
+### Documentation / Governance
+
+- **Full-SHA pinning (CI supply-chain hardening):** Pinned every external GitHub Action in `.github/workflows/**` to a full commit SHA, added enforcement in `scripts/quality/validate_ci_policy.py`, expanded `tests/scripts/test_validate_ci_policy.py` for SHA acceptance/rejection and local-action exemption, updated the CI workflow PR checklist, and documented the full-SHA rule in ADR-035 and `development/current-work/CI-upgrade.md`.
+
+- **ADR-035 conformance gap remediation (v0.11.2 Task 8):** Closed GAP 1/2/4. Added `_REUSABLE_FIRST_ALLOWLIST` in `scripts/quality/validate_ci_policy.py` for pre-reusable inline workflows (`ci-main.yml`, `ci-nightly.yml`, `deprecation-check.yml`, `maintenance.yml`, `update_baseline.yml`) while preserving strict local-repro parity checks (`scripts/local_checks.py` + `Makefile`). Added CODEOWNERS coverage for `/scripts/local_checks.py` with placeholder-team caveat notes. Updated ADR-035 §2 with an explicit rollout status note clarifying advisory-to-required enforcement transition. Added validation tests in `tests/scripts/test_validate_ci_policy.py` for allow-list behavior, strict-change non-suppression, review-by rationale tagging, and CODEOWNERS path coverage.
+
+- **Memory retention hardening (v0.11.2 Task 6):** Added explicit lifecycle cleanup semantics in `CalibratedExplainer` with a new `reset()` method and `close()` now calling `reset()` before parallel teardown. `reset()` clears `latest_explanation`, SHAP/LIME helper caches, plugin explanation cache/identifiers/contexts, and bridge monitors. Bounded `PluginManager` explanation-instance cache to 16 entries with LRU eviction and aligned orchestrator cache access. Added regression coverage in `tests/unit/core/test_memory_retention.py`, `tests/unit/plugins/test_manager.py`, and `tests/unit/core/explain/test_parallel_lifecycle.py`, plus RSS stabilization policy gate in `tests/test_reject_memory.py`. Published numeric evidence artifact `reports/memory/v0.11.2_retention_report.md`.
+
+- **Task 21 v0.11.2 removal phase (v0.11.2 Task 5A):** Removed eight deprecated core/wrapper LIME/SHAP entry points: `CalibratedExplainer.preload_lime`, `preload_shap`, `explain_lime`, `explain_shap`, `is_lime_enabled`, `is_shap_enabled`, and `WrapCalibratedExplainer.explain_lime`/`explain_shap`. Updated fail-closed tests to assert `AttributeError` and moved these rows from **Active deprecations** to **Removed deprecations (history)** in `docs/migration/deprecations.md`. Kept `CalibratedExplanations.as_lime`/`as_shap` active with v0.11.3 ETA per timeline.
+
+- **CI hygiene post-5A removal (v0.11.2 Task 5):** Post-5A CI hygiene audit confirmed zero references to removed LIME/SHAP symbols in `.github/workflows/`. Verified `deprecation-check.yml` behavioral correctness after symbol removals (removed-method tests assert `AttributeError`; active v0.11.3 deprecations still elevate correctly under `CE_DEPRECATIONS=error`). Added v0.11.2 removal notes to `development/finished-work/remediation_api_changes.md` for `preload_lime`, `preload_shap`, `is_lime_enabled`, `is_shap_enabled`. Recorded binding interpretation of RELEASE_PLAN_v1.md "complete migration by v0.11.2" for list-path APIs.
+
+- **Governance status artifact (v0.11.2 Task 4):** Added `scripts/quality/build_governance_status_artifact.py` — a CI-derived artifact producer that aggregates four quality report `ok` fields into a single `reports/governance/governance_status.json` payload. Added `docs/improvement/schemas/governance_status_schema_v1.json` (ADR-028 aligned, `additionalProperties: false`). Wired into `local_checks.py` (PR and main steps). Added 15-test suite `tests/scripts/test_build_governance_status_artifact.py`. CI wiring guide documented in `docs/improvement/governance_status_artifact.md`.
+
+- **ADR-034 post-acceptance conformance closure (v0.11.2 Task 2):** Synchronized ADR-034, `RELEASE_PLAN_v1.md`, and `RELEASE_PLAN_status_appendix.md` to accepted-state wording, added ADR-034 implementation summary for v0.11.1-v0.11.2, removed stale "Proposed→Accepted path" status text, and preserved only deferred v1.0 open items (redaction + export schema versioning).
+
+### Packaging / Release metadata
+
+- **Packaging metadata maturity correction (v0.11.2 Task 10):** Corrected the stale Python package development-status classifier from Alpha to Beta. This reflects the current pre-v1 release posture and does not declare v1.0 GA stability.
+
+
+## [v0.11.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.11.1) - 2026-04-18
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.11.0...v0.11.1)
+
+### ADR-033 Additive UX/Migration Gates
+
+#### Added
+
+- ADR-033: Added top-level modality shim modules `calibrated_explanations.vision` and `calibrated_explanations.audio`, delegating to `ce_vision`/`ce_audio` when installed and raising `MissingExtensionError` with install guidance otherwise.
+- ADR-033: Added `--modality` filtering support to `ce plugins list`, including modality alias normalization (`image` -> `vision`).
+- ADR-033: Added practitioner modality plugin guide and contributor modality/packaging contract documentation.
+- ADR-033: Hardened packaging smoke coverage to use real `importlib.metadata.EntryPoint` objects with module import resolution, including alias normalization and plugin API compatibility assertions.
+
+#### Changed
+
+- ADR-033: Tightened entry-point discovery to fail closed on `EntryPoint.load()` errors (removed weak alternative loader fallback paths) so metadata contract enforcement cannot be bypassed by non-standard loader attributes.
+- ADR-033: Missing-`data_modalities` deprecation warnings are now deterministic (emitted once per entry-point plugin identifier per process) to reduce warning noise while keeping migration pressure visible.
+
+#### Deprecated
+
+- ADR-033: Deprecated entry-point plugins that omit explicit `data_modalities` metadata. Discovery now emits `DeprecationWarning`; explicit declaration becomes required in `v0.11.3`.
+
+### v0.11.1 Closure Sync (Docs + Follow-up Fixes)
+
+#### Added
+
+- **v0.11.1 docs closure evidence:** Synced migration/release docs to reflect active deprecation ownership (v0.11.2/v0.11.3), modality migration timeline, reject strategy expansion status, ConfigManager precedence/snapshot guidance, and PlotSpec ADR supersession routing (ADR-036/ADR-037 authoritative).
+- **Multiclass CE-first experiment coverage:** Added CE-first multiclass experiment implementation and associated tests to harden multiclass explanation workflows.
+
+#### Fixed
+
+- **VennAbers multiclass normalization:** Corrected normalization behavior for multiclass outputs to keep calibrated probabilities stable and contract-compliant.
+- **Experiment import hardening:** Removed hard matplotlib import in multiclass experiment module to preserve optional dependency behavior in headless/core-first environments.
+
+### ADR-012 Notebook Execution Driver (v0.11.1 Task 6)
+
+#### Added
+
+- **`scripts/docs/run_notebooks.py`:** Deterministic notebook execution with per-cell (30 s) and per-notebook (300 s) timeouts; supports `"noexec"` and `"slow"` skip tags; emits `reports/docs/notebook_execution_report.json`.
+- **`notebook-exec-report` job** in `ci-nightly.yml`: advisory execution with `[notebooks,viz]` extras.
+- **`docs/contributor/notebook_policy.md`:** Contribution rules for notebooks (skip tags, timeouts, headless, seed).
+- **32 tests** in `tests/docs/test_notebook_driver.py` validating execution contract and schema.
+
+### Reject Framework Upgrade (since v0.11.0)
+
+#### Added
+
+- **Simplified reject NCF contract:** Public reject NCF choices are now `default` and `ensured`. Internal default scoring is task-dependent (`hinge` for binary + thresholded regression, `margin` for multiclass).
+- **`RejectPolicySpec`:** Structured policy+NCF configuration with deterministic constructors, validation, stable hashing, and round-trip serialization (`to_dict()` / `from_dict()`).
+- **Flexible policy resolution:** `resolve_policy_spec(...)` accepts `None`, enum values, canonical strings, `RejectPolicySpec` objects, and dict payloads.
+- **Richer reject metadata:** Added `prediction_set`, `prediction_set_size`, `epsilon`, `raw_total_examples`, and `raw_reject_counts` fields to reject flows.
+- **`RejectAlternativeExplanations`:** Reject-aware alternative collection preserving policy metadata through ensured filtering.
+
+#### Changed
+
+- **Memory-light reject wrappers:** `from_collection(...)` avoids copying calibration-heavy arrays and preserves shared explainer references.
+- **Metadata split:** `metadata()` returns lightweight aggregates; `metadata_full()` returns JSON-safe per-instance payloads.
+- **Hardened slicing:** Strict bounds/type validation with reject metadata sliced in lockstep; slices preserve `raw_total_examples`, recompute `error_rate` with `error_rate_defined` signaling.
+- **Deterministic predict-set computation:** Prefers p-value thresholding, uses `smoothing=False` fallback, degrades with user-visible warnings.
+- **Ensured scoring formula:** `ensured` now always computes `score = (1 - w) * interval_width + w * default_score`.
+- **Compatibility normalization:** Legacy `ncf="entropy"` inputs are silently normalized to `ncf="default"` in parsing/serialization paths.
+
+#### Fixed
+
+- **Policy parsing:** JSON-string payloads and unsupported types now raise `ValidationError` immediately.
+- **Pickling contract:** `__getstate__` prunes unpicklable runtime state and stamps `_ce_version`; unpickled collections are read-only until `reconstruct_runtime(...)` is called.
+- **NCF guard rails:** `w=0` and low-`w` guards now apply only to `ensured`.
+
+#### Removed
+
+- **Breaking NCF input removal:** Explicit user inputs `ncf="hinge"` and `ncf="margin"` are no longer accepted and now raise `ValidationError`.
+- **Guarded simplification (ADR-032):** Removed `use_bonferroni` parameter from `explain_guarded_factual`, `explore_guarded_alternatives`, and all orchestrator/core entrypoints. Removed `_SPARSE_THRESHOLD` constant and dense/sparse bin branching — all bins now use a single median-probe guard rule. Removed `emitted_lower`/`emitted_upper` fields from `GuardedBin` dataclass and audit payloads; interval conditions now always use `lower`/`upper`. Updated ADR-032, concept docs, and quickstart docs accordingly.
+
+#### Deprecated
+
+- **Legacy reject wrapper methods (ADR-011, removal ≥ v0.13.0):**
+  - `CalibratedExplainer.initialize_reject_learner(...)` / `predict_reject(...)`
+  - `WrapCalibratedExplainer.initialize_reject_learner(...)` / `predict_reject(...)`
+
+### Documentation / Governance
+
+- **STD-001 task-8 closure hardening:** Added `scripts/quality/check_std001_nomenclature.py` plus `tests/scripts/test_check_std001_nomenclature.py`, generated `reports/nomenclature_violation_inventory.json`, and wired the check into both local stacked checks and PR CI lint gating. The checker now blocks non-legacy double-underscore regressions (including mangled private-symbol patterns), inventories approved compatibility/transitional bridges, records explicit shim-surface decisions for `serialization.py` and `viz/builders.py`, and enforces thin delegator shape for retained shim surfaces. Added targeted parity/bridge tests in `tests/unit/test_std001_task8_closure.py`.
+- **ADR-034 closure (v0.11.1 Tasks 15 & 20):** Completed ConfigManager Phase A authority and `governance.config` lifecycle-event schema. Fixed snapshot semantics by injecting fresh ConfigManager instances in cache, parallel, and feature-filter tests; added pytest probe exemption and extended schema validation gates. All 10 affected tests stabilized with full ADR-034 audit compliance.
+- **ADR-035 proposed:** Added `development/adrs/ADR-035-ci-workflow-governance.md` to codify CI workflow governance and merge-blocking policy, with explicit advisory rollout and exception handling.
+- **ADR-011 reject wrapper deprecations aligned:** Deprecated `initialize_reject_learner` and `predict_reject` from both `CalibratedExplainer` and `WrapCalibratedExplainer`, and routed all four through the central `deprecate()` helper, and documented removal ETA (`v0.13.0/v1.0.0`) in `docs/migration/deprecations.md` and `development/current-work/RELEASE_PLAN_v1.md`.
+- **CI policy validator introduced:** Added `.github/workflows/ci-policy.yml`, local composite action `.github/actions/ci-policy/action.yml`, and `scripts/quality/validate_ci_policy.py` with targeted tests to enforce reusable workflows, constraints usage, permission posture, and CI PR metadata.
+- **CI governance scaffolding:** Added `.github/CODEOWNERS` CI ownership entries and CI-specific PR template `.github/PULL_REQUEST_TEMPLATE/ci_workflow_template.md`; wired local reproduction hooks via `scripts/local_checks.py` and `Makefile` target `check-ci-policy`.
+- **ADR-020 promoted to Accepted:** `ADR-020-legacy-user-api-stability.md` status promoted from Draft to Accepted. `development/current-work/legacy_user_api_contract.md` updated with a `## Removed in v0.11.0` section listing all symbols removed in v0.11.0 (`explain_counterfactual`, `get_explanation`, `register_plot_plugin`, `perf` facade, `alpha`/`alphas`/`n_jobs` aliases, top-level `viz`/`plotting` exports) with replacement guidance.
+- **ADR-028 promoted to Accepted:** `ADR-028-logging-and-governance-observability.md` status promoted from Draft to Accepted. Remaining open gaps (enforcement tooling, Standard-005 observability example alignment) are assigned to v0.11.1 Task 7.
+- **Standard-005 added to release plan:** `RELEASE_PLAN_v1.md` roadmap summary and Standards appendix updated to include Standard-005 (Logging and Observability Standard). Two open gap entries targeting v0.11.1 Task 7 recorded.
+- **ADR-029–034 appendix entries added:** `RELEASE_PLAN_v1.md` ADR status appendix extended with entries for ADR-029 (Reject Integration Strategy), ADR-030 (Test Quality Priorities), ADR-031 (Calibrator Serialization — no gaps), ADR-032 (Guarded Explanation Semantics), ADR-033 (Modality Extension Plugin Contract), and ADR-034 (Centralized Configuration Management) with unified severity gap tables.
+
+## [v0.11.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.11.0)  - 2026-03-02
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.10.4...v0.11.0)
+
+### Added
+
+- **Alternative Pareto filtering:** Added `pareto_cost` to `AlternativeExplanation.pareto_explanations()` / `AlternativeExplanations.pareto_explanations()` to select the minimized non-dominance dimension (`"uncertainty_width"` default, or `"rule_size"` to prefer simpler interventions).
+- **Claude Code Skill Library (ADR-030/012):** Implemented 37 specialized Claude Code skills for `calibrated_explanations`, covering everything from core pipeline setup and Mondrian fairness to plugin scaffolding, logging & observability (ADR-028), payload governance (ADR-005), and the role-based Test Quality Method (ADR-030) including specialized roles for Pruning, Dead-code Hunting, and Quality Auditing.
+- **Multiclass explanations (Issue#104):** Introduced first-class multiclass explanation support via `MultiClassCalibratedExplanations`, enabling per-instance all-class explanation access and multiclass-aware plotting for factual and alternative workflows. This addresses [#104](https://github.com/Moffran/calibrated_explanations/issues/104).
+- **ADR-009 task closure:** Completed preprocessing automation and mapping persistence hardening. `auto_encode='auto'` now activates the deterministic built-in encoder, unseen-category enforcement now raises actionable `ValidationError` when policy is `error` (with `ignore` preserving sentinel behavior), non-numeric input without preprocessing now fails with actionable guidance, and mapping export/import helpers remain available with telemetry visibility.
+- **ADR-030 test-quality enforcement upgrade:** Extended `detect_test_anti_patterns.py` with assertion and determinism checks, added baseline support (`--check` / `--rebaseline`), committed `.github/test-quality-baseline.json`, and wired reports into CI artifacts.
+
+- **ADR-011 deprecation coverage:** Standardized the deprecation helper behavior and testability by routing `deprecate()` through the public `should_raise()` wrapper to allow deterministic test patching and `CE_DEPRECATIONS=error` compatibility. Targeted deprecation-helper tests pass in a focused run; follow-up sweep to replace direct `warnings.warn(..., DeprecationWarning)` callsites with `deprecate()` is planned for v0.11.1.
+ - **Deprecation alias handling (fix):** Ensure ADR-011 conformance by routing alias deprecations through the central `deprecate()` helper with a non-raising flag so low-risk parameter/module aliases emit warnings (and are recorded) without escalating CI jobs configured with `CE_DEPRECATIONS=error`. This avoids import-time escalation while preserving centralised deprecation semantics and per-test recording.
+- **Pattern 1 hardening:** Emptied `.github/private_member_allowlist.json` and enforced private-member scanning in CI (`scan_private_usage.py --check`) with current violations remediated.
+- **Alternative Pareto filtering:** Added `pareto_explanations()` on `AlternativeExplanation` and `AlternativeExplanations` to return output-envelope Pareto alternatives over output/uncertainty space (interval-width uncertainty), always pruning equal-output higher-uncertainty rules while preserving output-span extrema. Also added the `ensured.ipynb` notebook to demonstrate the ensured framework.
+- **ADR-032 guarded explanations:** Introduced `explain_guarded_factual` and `explore_guarded_alternatives` for guarded factual/alternative explanations with in-distribution guardrails. Intended use: identical to standard CE in all aspects except rule conditions and the internal perturbation strategy. This update only affect feature rules, not predictions being explained. Added first-class guarded auditability via `get_guarded_audit()` on guarded explanations and guarded collections. The payload reports per-interval bounds/p-values/conformity/emission reasons and collection-level counts including `intervals_removed_guard` (strictly non-conforming intervals), without modifying existing `get_rules()` contracts. Updated guarded quickstart/concept docs with `get_guarded_audit()` usage, table interpretation guidance, and emission-reason semantics (`emitted`, `removed_guard`, `design_excluded`, `baseline_equal`, `zero_impact`, `ignored_feature`). Added `format_guarded_audit_table(...)` and `print_guarded_audit_table(...)` in `calibrated_explanations.ce_agent_utils` for compact tabular notebook inspection of guarded audit payloads.
+- `CalibratedExplanation.filter_features()` and `CalibratedExplanations.filter_features()` methods to exclude rules containing specified features by name or index.
+- **ADR-031 calibrator persistence:** Added primitive serialization/deserialization contracts for built-in calibrators (`VennAbers`, `IntervalRegressor`) and explainer persistence support in `WrapCalibratedExplainer`, including checksum validation and persistence-focused tests.
+- **Ensure API shorthand aliases:** Added concise aliases on both single-instance and collection alternatives (`.super()`, `.semi()`, `.counter()`, `.ensured()`, `.pareto()`) delegating to the corresponding `*_explanations()` methods.
+
+### Changed
+- **Project script and report reorganization:** Moved `api_diff.py`, `audit_notebook_api.py`, and `snapshot_public_api.py` to `scripts/quality/` to align with their purpose as quality gates. Archived legacy and debugging scripts (`compare_golden.py`, `migrate_aliases.py`, `run_feature_filter_debug.py`) to `scripts/archived/`. Cleaned up `reports/` by moving historical documentation and benchmark results to `reports/archived/`. Updated documentation and workflow references to reflect new locations.
+- **General test and code quality method:** Adopted a broader ADR-aligned quality method across tests and source code (behavior-first assertions, deterministic AAA structure, reduced implementation-detail coupling, stronger linting/analysis checks, and targeted removal of low-signal redundancy) while preserving regression protection and coverage gates.
+- **Ensured framework documentation refresh:** Expanded the alternatives concept page, updated the ensured playbook to use the first-class filtering APIs (`ensured_explanations`, `super_explanations`, `semi_explanations`, `counter_explanations`, `pareto_explanations`), documented regression semantics and ensured ranking controls (`rnk_metric`, `rnk_weight`, `filter_top`), and added `style="ensured"` as an alias for triangular alternative plots.
+- **Plain regression `semi` semantics:** Updated semi-alternative selection for plain regression to use conservative representative alternatives, and aligned docs/templates/tests with the new behavior.
+- **Adapter metadata retention:** Hardened explanation adapters and related collection flows to preserve provenance/metadata through conversions and serialization pathways.
+- **Public API contract parity:** Aligned guarded and unguarded entry-point contracts so user-facing argument and return behavior stays consistent across explain/predict wrappers.
+- **Validation and CI checks:** Extended local checks with parity snapshot comparison and tighter link-check ignores, plus follow-up CI/link fixes and dependency refreshes.
+
+### Removed
+- **ADR-011 deprecation removals (v0.11.0 window):** Removed top-level compatibility exports from `calibrated_explanations.__init__` (`viz`, `plotting`, explanation/discretizer/calibrator aliases), removed `WrapCalibratedExplainer.explain_counterfactual`, removed `CalibratedExplanations.get_explanation` (base collection helper), removed `plugins.registry.register_plot_plugin`, removed the deprecated `calibrated_explanations.perf` root facade API, and removed the obsolete legacy-core import deprecation warning path.
+- **ADR-011 alias removals (v0.11.0 window):** Removed deprecated parameter aliases `alpha`/`alphas` and `n_jobs`; call sites must use canonical keywords (`low_high_percentiles`, `parallel_workers`). Alias usage now fails fast with `ConfigurationError`.
+
+## [v0.10.4](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.10.4) - 2026-02-12
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.10.3...v0.10.4)
+
+### Added
+- **Non-destructive explanation filtering:** Added a `copy` parameter (default `True`) to `super_explanations`, `semi_explanations`, `counter_explanations`, and `ensured_explanations` in both `AlternativeExplanation` and `AlternativeExplanations` collection. This allows users to filter/reduce explanations without modifying the original object. Added `copy()` methods to `CalibratedExplanation` and `CalibratedExplanations` base classes for consistent object duplication.
+- **Over-testing workflow:**
+  - Documented the over-testing density gate in ADR-030 and grouped test-quality/perf scripts under `scripts/over_testing`, `scripts/quality`, and `scripts/perf`.
+  - Added `scripts/over_testing/evaluate_cov_fill_adr030.py` and `scripts/over_testing/prune_generated_tests.py` plus `reports/over_testing/cov_fill_adr30_scan.csv`/`prune_plan.json` support files to formalize ADR-030 compliance scanning and conservative pruning.
+- **Coverage improvement iteration:** Added integration tests for plotting style overrides and legacy fallbacks, plus cache fallback testing when cachetools is unavailable, to increase coverage in low-coverage modules (plotting.py, cache.py).
+
+### Fixed
+- **Conjunctive quality improvements:** Fixed a bug blocking conjunctive rules to materialise. Made performance improvements, making it possible to create arbitrary large conjunctives. Added feature size filtering and functions for retrieval of internal content.
+- **PlotSpec quality improvements:** Enhanced BarItem dataclass with missing fields, added AlternativeExplanation _rules_with_impact method, improved serialization robustness, added empty features_to_plot validation, and comprehensive RuleWithImpact test coverage to ensure data integrity and reliable plotting.
+- **Narrative quality improvements:** Ensured narratives support conjunctions, updated narrative formatting with possibility to align rules for easier oversight, adjusted default content in explain_template.yaml.
+- **Test quality cleanup:** Removed a duplicate conjunction parity test and normalized test helper naming to avoid private helper anti-patterns.
+ - **ADR-001 import-graph linting:** Resolved false-positive import-graph violations by refining the ADR-001 checker to correctly resolve package paths and broaden sanctioned allowlists. Re-generated `reports/import_graph.json` and ensured `scripts/quality/check_import_graph.py --report` reports no violations.
+- **CI workflow improvement:** Remodelled the entire CI workflow into a more streamlined setup. The update is documented `development/current-work/CI-upgrade.md`.
+- **Parity reference updates:** Updated the parity references with larger datasets and conjunctives.
+
+## [v0.10.3](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.10.3) - 2026-02-04
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.10.2...v0.10.3)
+
+### Changed
+
+- **Simplified RejectPolicy from 6 to 4 policies:** Refactored the `RejectPolicy` enum to use cleaner, operation-agnostic policy names that work consistently for both `predict()` and `explain()` operations:
+  - `FLAG` (replaces `PREDICT_AND_FLAG` and `EXPLAIN_ALL`) - Process all instances, include rejection status in results
+  - `ONLY_REJECTED` (replaces `EXPLAIN_REJECTS`) - Process only rejected (uncertain) instances
+  - `ONLY_ACCEPTED` (replaces `EXPLAIN_NON_REJECTS` and `SKIP_ON_REJECT`) - Process only accepted (confident) instances
+  - `NONE` - Unchanged, legacy behavior with no reject orchestration
+
+- **Transparent Rejection Integration:** `explain_factual` now returns a specialized `RejectCalibratedExplanations` collection when a rejection policy is active. This subclass behaves exactly like the standard collection (supporting `plot()`, slicing, and `add_conjunctions()`) while transparently carrying rejection metadata (ambiguity masks, etc.). This restores existing workflow compatibility while surfacing rejection signals.
+
+- **Linting and Security Compliance:** Replaced bare `except: pass` blocks with logged exceptions to satisfy Bandit security checks (B110) and ensure robust error visibility.
+
+- **Default condition_source to "prediction":** The default value for `condition_source` in `CalibratedExplainer` has been changed from `"observed"` to `"prediction"` to enhance consistency in calibrated explanations by basing condition labels on model predictions rather than observed labels. Users relying on the previous default behavior should explicitly set `condition_source="observed"`. A warning is issued when the parameter is not provided, guiding users to the new default.
+
+- **Explanation JSON Schema v1 strict validation:** Implemented strict JSON Schema validation for explanation payloads with test fixtures. The `validate_payload()` function now enforces schema compliance when `jsonschema` is available, and interval invariants are validated during serialization. Added golden fixture validation test (see ADR-005 addendum).
+
+- **Explanation domain model hardening:** Completed domain-model hardening with comprehensive adapter tests and round-trip compatibility between domain and legacy formats. Added unit tests for `domain_to_legacy` and `legacy_to_domain` adapters, ensuring data integrity in conversions (see ADR-008 addendum).
+
+- **Core-only matplotlib import clarity:** Ensured that core-only installs do not require matplotlib at import time by implementing lazy loading in package __init__.py and added verification test (ADR-010).
+
+- **Plugin authoring & override guidance (Standard-004):** Added comprehensive docs, headless examples, and tests for explanation, interval, and plot plugins (see `tests/docs/contributor/test_plugin_contract_examples.py`).
+
+- **Legacy API stability gates (checklist + audit):** Added PR checklist items and an audit workflow to enforce legacy API stability per ADR-020.
+
+- **CE-first agent helper coverage:** Added a `calibrated_explanations.ce_agent_utils` with helper functions for AI agents and summaries to surface explanations, conjunctions, uncertainty quantification, and probabilistic regression (thresholded regression) semantics, among other things. Also added a `ce_first_agent_guide.md` to document usage patterns.
+
+### Fixed
+
+- **Reject ambiguity/uncertainty breakdown:** Added a breakdown helper and metadata so callers can distinguish ambiguity (multi-label) vs uncertainty (empty-set) rejects; ambiguity is non-decreasing with confidence while uncertainty is non-increasing.
+
+- **Reject envelope contract:** When a `RejectPolicy` other than `NONE` is active, prediction APIs return a `RejectResult` envelope whose `prediction` field mirrors the invoked method's legacy payload (including regression UQ tuples such as `(proba, (low, high))`). The envelope `metadata` includes user-facing per-instance keys: `ambiguity_mask`, `uncertainty_mask`, `prediction_set_size`, and `epsilon` alongside aggregate rates. The `explanation` field contains the explanation object or `None` if no explanation was produced.
+
+### Deprecated
+
+- **Old RejectPolicy names:** The following policy names are deprecated and will be removed in v1.0.0. Using them will emit a `DeprecationWarning`:
+  - `PREDICT_AND_FLAG` → use `FLAG`
+  - `EXPLAIN_ALL` → use `FLAG`
+  - `EXPLAIN_REJECTS` → use `ONLY_REJECTED`
+  - `EXPLAIN_NON_REJECTS` → use `ONLY_ACCEPTED`
+  - `SKIP_ON_REJECT` → use `ONLY_ACCEPTED`
+
+## [v0.10.2](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.10.2) - 2026-01-22
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.10.1...v0.10.2)
+
+### Changed
+
+- **requirements.txt cleanup:** Updated requirements.txt to include only core runtime dependencies, strictly matching [project.dependencies] in pyproject.toml. Removed dev, viz, eval, and notebook dependencies. Rationale: Ensures pip installs and CI are minimal and consistent with canonical dependency list (see ADR-010, .github/copilot-instructions.md).
+
+### Fixed
+
+- **Fast Feature Filtering Integration:** Fixed a critical issue where the FAST feature filtering logic (ADR-027) was implemented but not invoked during factual/alternative explanation requests. Feature filtering now correctly runs the lightweight FAST pass and filters features according to the configuration.
+- **Test additions:** Added deterministic unit tests to exercise `ExplanationRequest` freezing/validation and the FAST feature filter behaviour to improve CI coverage and ensure adherence to ADR-030 testing priorities.
+
+### Added
+
+- **ADR-029: Reject policy orchestration (v0.10.2):** Added the `RejectPolicy` enum, `RejectResult` envelope, and `RejectOrchestrator` registry, wiring per-call and explainer-level policies through prediction/explanation entry points while keeping `NONE` fully backward compatible. Documented usage in `docs/improvement/reject_policy_usage.md` and linked ADR-029 into the release notes.
+- **Plugin discovery & CLI diagnostics:** Added `PluginDiscoveryReport` to surface accepted/skipped plugins, `ce.plugins report`, and `ce.plugins list --include-skipped` for diagnostic output; included unit tests for the API and CLI formatting.
+
+- **Parity reference harness & canonical fixtures:** Added `tests/parity_reference/run_parity_reference.py`, canonical datasets, and golden fixtures for classification, regression, multiclass, and probabilistic regression. Added `parity_compare` helper tests and CI parity job to run the harness across datasets; this harness is the canonical OSS parity/regression gate.
+
+- **ADR-030: Private Member Usage Remediation and CI Anti-Pattern Audit:** Remediated private-member usage in tests and added a CI anti-pattern audit to fail on new anti-patterns.
+- **ADR-028 & Standard-005: Normalized Logging & Context Propagation:** Implemented structured logging domains and threaded context propagation across the core engine.
+  - Normalized logger namespaces (e.g., `calibrated_explanations.core.explain`, `calibrated_explanations.plugins.registry`) for consistent filtering.
+  - Introduced `logging_context` usage in `PredictionOrchestrator` and `ExplanationOrchestrator` to automatically tag logs with `explainer_id` and `plugin_identifier`.
+  - Updated `PluginRegistry` to propagate logging context during plugin lifecycle events.
+  - Added "Logging and Observability" guidelines to `CONTRIBUTING.md` and `optional_telemetry.md`, enforcing Standard-005 governance.
+
+- **ADR-013 gap closure (v0.10.2_plan):** Interval context metadata is now guarded by `MappingProxyType` and plugins receive a mutable `plugin_state` scratch pad, letting orchestrator resets keep metadata immutable while still exposing per-plugin storage. Tests and the plugin contract guide were updated to clarify the new behaviour.
+- **ADR-027 gap closure (v0.10.2_plan):** FAST feature filtering now emits governance-domain logs via `calibrated_explanations.governance.feature_filter` for skips, errors, and strict-observability warnings, with Standard-005-aligned structured examples documented in the performance tuning guide and logging standard plus mentions in the governance telemetry reference.
+- **Practitioner docs:** Added `docs/practitioner/advanced/reject-policy.md` (linked from `docs/practitioner/advanced/index.md`) so users can learn about default vs per-call `RejectPolicy` wiring, the `RejectResult` envelope, and how `WrapCalibratedExplainer` reuses the same knobs.
+
+- **Release Task 6 (v0.10.2_plan.md):** Completed enforcement of zero private member usage in tests for v0.10.2. Pruned private_member_allowlist.json to legacy-only entries expiring v0.11.0. Refactored core violations to public APIs, including public properties for pyproject settings (fast, noise_type, scale_factor, severity), public aliases for CLI functions, and public method aliases for internal logic. Dead code violations resolved via public aliases. CI now enforces zero unallowlisted private member access.
+
+- **ADR-021 & ADR-026: Extended Telemetry and Payload Hardening:** Enhanced runtime payloads with deeper telemetry and enforced invariant safety for v1.0.0-rc.
+  - Surfaced FAST probability cubes and interval dependency hints in runtime payloads for enhanced transparency.
+  - Implemented frozen bin metadata to ensure deterministic explanation reconstruction across serialization boundaries.
+  - Enforced calorie-aligned interval safety across all explanation bridges, strictly maintaining `low <= predict <= high` invariants.
+  - Hardened JSON serialization to support complex nested telemetry and metadata objects.
+
+- **ADR-010: Optional Dependency Split + Packaging Compliance:** Completed lean core installation with optional extras for visualization, notebooks, and evaluation. Core dependencies now exclude heavy packages like `ipython`, `lime`, and `matplotlib`, moved to appropriate extras (`viz`, `notebooks`, `eval`). Added pytest hook to auto-skip visualization tests when `matplotlib` is unavailable. Provided evaluation lockfiles (`evaluation/requirements.txt` and `evaluation/environment.yml`) aligned with `[eval]` extras. Updated documentation in README and CONTRIBUTING for extras usage.
+
+- **ADR-015: Explanation Plugin Integration Hardening:** Delivered protocol-validated explanation plugins with trust enforcement, canonical reconstruction, and immutable handles.
+  - Implemented `FastExplanationPlugin` as the canonical v1-compliant plugin for fast explanations, replacing legacy internal logic.
+  - Hardened `CalibratedExplanations.from_batch` to ensure full instance reconstruction from batch payloads, preventing bypass of canonical initialization even when a template is provided.
+  - Implemented security warnings for untrusted explanation plugins used via explicit overrides in `ExplanationOrchestrator`, ensuring user awareness of potential risks.
+  - Aligned plugin discovery with `CE_TRUST_PLUGIN` and `CE_DENY_PLUGIN` environment variables for consistent security posture.
+  - Enforced immutable `ExplainerHandle` and `ExplanationContext` for plugin interaction, preventing side-effects on core state.
+  - Added comprehensive hardening tests in `tests/unit/plugins/test_adr015_hardening.py` to verify ADR-015 compliance.
+  - Added trusted-only enforcement warnings for explicit explanation plugin overrides, smoke coverage for in-tree FAST plugin registration, and clarified ADR-015 environment variable documentation.
+
+- **ADR-013: Interval Plugin Protocol Compliance:** Delivered protocol-validated interval calibrators with frozen contexts and CLI diagnostics.
+  - Implemented `FastIntervalCalibrator` wrapper for per-feature calibrator lists with all required protocol methods.
+  - Added runtime protocol validation in `PredictionOrchestrator.validate_interval_calibrator()` for `ClassificationIntervalCalibrator` and `RegressionIntervalCalibrator` compliance.
+  - Implemented context freezing with `_freeze_context_value()` to prevent plugin mutations while keeping metadata mutable.
+  - Updated `LegacyIntervalCalibratorPlugin.create()` to reuse cached calibrators, eliminating redundant initialization.
+  - Added CLI diagnostics: `ce.plugins validate-interval --plugin <id>` and `ce.plugins explain-interval --plugin <id>` for plugin validation and configuration details.
+
+- **ADR-006: Plugin Trust Controls and Diagnostics:** Implemented opt-in trust model for third-party plugins with deny list enforcement, discovery diagnostics, and security documentation.
+  - Constrained trust-by-default to in-tree plugins; third-party plugins require explicit approval via `CE_TRUST_PLUGIN` or `pyproject.toml` configuration.
+  - Implemented `CE_DENY_PLUGIN` enforcement at discovery and registration gates.
+  - Added `PluginDiscoveryReport` to track accepted, skipped, and denied plugins; exposed via `ce.plugins list --verbose`.
+  - Documented "no sandbox" security warning in `docs/plugins.md` with guidance for operators and plugin authors.
+
+- **ADR-027: FAST-Based Feature Filtering Finalization:** Completed implementation with observability policy alignment, metadata documentation, and performance tuning examples.
+  - Aligned runtime logging to emit debug messages by default, with warnings only in strict observability mode (`CE_STRICT_OBSERVABILITY`).
+  - Added detailed debug logs for per-instance and global feature acceptance/rejection in FAST filtering to trace accepted/rejected features.
+  - Renamed `features_to_ignore_per_instance` to `feature_filter_per_instance_ignore` across the codebase to align with internal naming conventions.
+  - Documented `feature_filter_per_instance_ignore` metadata in API reference for transparency and debugging.
+  - Added performance tuning guide in `docs/practitioner/performance-tuning.md` with configuration examples and telemetry event descriptions.
+
+- **Interval Summary Selection (Release Task 10):** Added `IntervalSummary` enum logic to `CalibratedExplainer`, `PredictionOrchestrator`, and `ExplainOrchestrator` to support choosing between `regularized_mean` (default), `mean`, `lower`, and `upper` for probabilistic predictions and explanations. Updated `predict_proba`, `predict_calibrated`, `explain_factual`, and `explore_alternatives` (including legacy paths) to respect the selected summary strategy.
+
+## [v0.10.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.10.1) - 2026-01-01
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.10.0...v0.10.1)
+
+### Changed
+
+- **Public API Enforcement & Regression Fixes:** Refactored 28 test files to eliminate private member usage, replacing internal helpers with public APIs like `predict_calibrated`. Resolved 35 integration regressions, including `crepes` 0.9.0 compatibility, numerical stability in golden tests (relaxed tolerance to 1e-8), and suppression of `scipy.optimize` and `pyparsing` deprecation warnings. Expanded the private member allow-list to cover legitimate internal unit tests and false positives from module imports and patches.
+- **Anti-Pattern Remediation & Plugin Stabilization:** Completed comprehensive remediation of internal logic testing (Pattern 1) and dead code (Pattern 3), alongside stabilization of the plugin architecture. Refactored private member accesses to public APIs, established a versioned allow-list for acceptable test internals, and removed dead code. Implemented CI enforcement for anti-pattern violations using the allow-list to prevent future regressions. Detailed API changes are documented in [development/finished-work/remediation_api_changes.md](development/finished-work/remediation_api_changes.md).
+
+### Fixed
+
+- **Python 3.13 Support & Dependency Management Refactor:**
+  - Emptied `constraints.txt` to only include absolutely necessary constraints (numpy and scikit-learn version splits for Python compatibility), allowing CI to use softer ranges from `requirements.txt` for most dependencies.
+  - Consolidated core dependencies and version ranges into `requirements.txt` for more active management.
+  - Removed experimental Python 3.14 from the CI matrix.
+- **Python 3.10 Compatibility:** Resolved critical regressions affecting Python 3.10 environments.
+  - Fixed `RecursionError` in `TTLCache` caused by `OrderedDict.pop` triggering recursive `__getitem__` calls; switched to `OrderedDict.__delitem__` for safe expiry.
+  - Fixed `AttributeError` in unit tests when patching `external_plugins` by switching to `patch.object` with explicit imports, ensuring robust resolution of namespace packages.
+  - Fixed `UnboundLocalError` in cache fallback tests by ensuring variables are bound before use in `finally` blocks.
+
+### Added
+
+- **Contribution Licensing & DCO:** Added explicit Developer Certificate of Origin (DCO) and BSD 3-Clause licensing statements to `README.md` and `GOVERNANCE.md` to clarify contribution expectations.
+
+- **ADR-005: Explanation schema v1 contract:** Confirmed `explanation_schema_v1.json` as the canonical v1 payload contract, relaxed the schema_version literal requirement (recommended but not required), clarified `provenance`/`metadata` as optional extension points, and aligned validation helpers/docs/fixtures with the serializer semantics.
+  - **Tests:** Added unit tests that (a) assert the canonical golden v1 payload validates with `jsonschema` when available, and (b) assert that missing required fields are rejected by the schema validator.
+  - **Docs:** Clarified `provenance` guidance in `docs/schema_v1.md` by suggesting minimal recommended keys (`library_version`, `created_at`, `generator`) as conventions (not enforced by schema).
+
+- **Streaming export (experimental):** Added an opt-in streaming export generator to `CalibratedExplanations.to_json_stream()` supporting `jsonl` and `chunked` modes with minimal export telemetry captured in collection metadata and a fuller record written to the explainer `_last_telemetry` when available. Marked the feature experimental and added a simple benchmark script under `scripts/stream_benchmark.py`. Validated memory profile with a benchmark report showing <3MB peak usage for 10k explanations.
+
+- **PlotSpec v0.10.1 (ADR-007/ADR-016):** Added PlotSpec metadata, validation, registry, and headless export support.
+  - Added `PlotKindRegistry` for kind-aware validation with supported plot kinds and their requirements.
+  - Migrated `PlotSpec`, `TriangularPlotSpec`, and `GlobalPlotSpec` to dataclasses with required metadata fields (`kind`, `mode`, `feature_order`, `plotspec_version`, `save_behavior`).
+  - Updated builders to return dedicated dataclass types and call `validate_plotspec` with preserved `feature_order`.
+  - Added headless export support to the matplotlib adapter (returns in-memory bytes for requested formats when `save_behavior` requests headless export).
+  - Created JSON schema (`plotspec_schema.json`) for PlotSpec validation alignment.
+  - Added unit tests verifying round-trip serialization, kind-aware validation, and bytes export behavior.
+
+  - **Legacy plotting maintenance (v0.10.1):** Documented legacy matplotlib plotting behavior and formally marked ADR-024 / ADR-025 as superseded. Consolidated maintenance guidance for legacy plot helpers, fallback visibility, and testing conventions in `docs/maintenance/legacy-plotting-reference.md`.
+    - **Tests:** Confirmed existing legacy plotting regression tests exercise parity; guidance added to assert visible fallbacks via `pytest.warns(UserWarning)` when applicable.
+
+  - **ADR-014: Visualization plugin architecture completion:** Restored the plot plugin architecture with base classes, metadata alignment, override resolution, legacy fallback, CLI tooling, and docs.
+    - **Code:** Added `BasePlotBuilder` / `BasePlotRenderer` helpers under `src/calibrated_explanations/viz/plugins.py`, introduced `PlotPluginError` in `src/calibrated_explanations/utils/exceptions.py`, and registered a legacy builder/renderer pair in `src/calibrated_explanations/plugins/builtins.py` that delegates to `legacy.plotting`.
+    - **Behavior:** `src/calibrated_explanations/plotting.py` now respects explicit `renderer`/`style` kwargs, environment overrides (`CE_PLOT_RENDERER`, `CE_PLOT_STYLE`), and pyproject configuration (`[tool.calibrated_explanations.plots]`). Plugin metadata includes `default_renderer` and versioning fields.
+    - **CLI & Docs:** Added plot-related CLI helpers (`ce.plugins list --plots`, `ce.plugins validate-plot`, `ce.plugins set-default --plot-style`) and a "Writing plot plugins" guide in `docs/plugins.md` with migration notes.
+    - **Tests:** Added unit tests asserting `.plot()` resolves to the legacy fallback when no plugin is configured, validation hooks raise `PlotPluginError` on invalid metadata, and CLI commands return expected output.
+
+## [v0.10.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.10.0) - 2025-12-21
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.9.1...v0.10.0)
+
+### Added
+
+- **Parallel Execution Framework**: Introduced a robust parallel execution framework (ADR-004) with workload-aware auto-strategy, telemetry, and resource guardrails.
+  - Added `ParallelConfig` with options for chunking, fallback strategies, and task size hints.
+  - Implemented automatic fallback to sequential execution on failure.
+  - Added support for process-based parallelism on Windows.
+- **Caching Strategy**: Implemented a comprehensive caching strategy (ADR-003) using `ExplanationCacheFacade` to improve performance.
+  - Added `pympler` dependency for precise memory profiling.
+  - Added telemetry for cache hits, misses, evictions, and resets.
+- **Validation & Error Handling**: Standardized validation and error handling across the library (ADR-002).
+  - Introduced a unified exception taxonomy (`ValidationError`, `DataShapeError`, `NotFittedError`, etc.) with structured error details.
+  - Enhanced `validate_inputs` and other validation helpers for consistent API contracts.
+  - Added `explain_exception` helper for human-readable error messages.
+- **Interval Safety**: Enforced robust `low <= predict <= high` invariants for all plugin predictions and serialization (ADR-021).
+- **Condition Source**: Added support for `condition_source` configuration (`"observed"` or `"prediction"`) to select conditioning data sources for discretizers and condition labels.
+- **Fallback Visibility**: Enforced visible notifications for all runtime fallbacks:
+  - Added info-level logs and `UserWarning` emissions for execution strategy fallbacks, plugin execution fallbacks, cache backend fallback, visualization simplifications, and perturbation fallbacks.
+  - Updated contributor guidance in `.github/copilot-instructions.md` and release plan to mandate no-silent-fallbacks.
+
+- **Pool-at-explainer initialization:** Added opt-in worker initializer and pool lifecycle API for warm-starting process pools at explainer creation.
+  - Added `ParallelConfig.worker_initializer` and `ParallelConfig.worker_init_args` to forward per-worker initializers.
+  - Added `CalibratedExplainer.initialize_pool()` and `CalibratedExplainer.close()` plus context-manager support for explainer-managed pools.
+  - Introduced `calibrated_explanations.core.explain.parallel_runtime.worker_init_from_explainer_spec` to install a per-worker `explain_slice` harness.
+
+### Changed
+
+- **Conjunction Analysis**: Overhauled the conjunction analysis engine to use batched prediction and shared state management, enabling significant performance improvements and support for `max_rule_size >= 4`.
+- **Package Structure**: Restructured the internal package layout (ADR-001) to enforce strict boundaries and reduce circular dependencies.
+  - Moved core logic into dedicated sub-packages (`core`, `calibration`, `explanations`, `cache`, `parallel`, `schema`, `plugins`, `viz`, `utils`).
+  - **Breaking Change**: Sanctioned the public API to `CalibratedExplainer`, `WrapCalibratedExplainer`, and `transform_to_numeric`.
+  - **Deprecation**: The following symbols now emit `DeprecationWarning` when imported from the top-level package and will be removed in v0.11.0:
+    - `AlternativeExplanation`, `FactualExplanation`, `FastExplanation`
+    - `AlternativeExplanations`, `CalibratedExplanations`
+    - `BinaryEntropyDiscretizer`, `EntropyDiscretizer`, `BinaryRegressorDiscretizer`, `RegressorDiscretizer`
+    - `IntervalRegressor`, `VennAbers`
+    - `viz` namespace
+- **Parallel Runtime**: Auto parallel backend now prefers `joblib` on all platforms, with process-based fallback.
+- **Terminology**: Standardized on "probabilistic regression" as the canonical user-facing term for regression with threshold-based probability predictions (ADR-021).
+- **Explanation Plugin Semantics**: Internalized `CalibratedExplainer.explain` to `_explain` and enforced immutable contexts (ADR-026). **Breaking Change**: `explain()` is no longer part of the public API.
+- **Documentation**: Comprehensive API reference updates with `autoclass` directives.
+
+### Fixed
+
+- **Private Member Usage in Tests:** Fixed 28 non-allowlisted private member usage violations in unit tests. Refactored internal utilities (`_split_csv`, `_first_or_none`, `_safe_len_feature_weights`) and `NarrativeGenerator` methods (`_serialize_rules`, `_expand_template`) to public APIs. Updated `Explanation` to use public `predict_calibrated` and exposed `ignored_features_for_instance` and `predict_conjunction_tuple`. Resolved remaining violations in `test_explanation_coverage.py` and `test_calibrated_explainer_extra.py` by using `setattr`/`getattr` for legitimate internal state testing.
+
+- **Windows Compatibility**: Fixed pickling issues to enable process-based parallelism on Windows.
+- **Serialization**: Fixed JSON serialization for explanation collections containing live objects.
+- **Interval Invariants**: Fixed `LegacyPredictBridge` to enforce `low <= predict <= high` invariants for regression tasks, raising `ValidationError` on violation (ADR-021).
+- **Plugin Semantics**: Fixed `PluginManager` to correctly wrap the predict bridge with `PredictBridgeMonitor` (ADR-026).
+- **Fallback enforcement**: Fixed pytest `filterwarnings` configuration to correctly match "falling back" messages so runtime fallback `UserWarning`s are enforced as test errors when appropriate.
+
+### Removed
+
+- **Legacy Alias**: Removed deprecated `_is_thresholded()` method from `CalibratedExplanations` (superseded by `is_probabilistic_regression`).
+- **Feature Parallelism**: Removed `FeatureParallel` execution strategy. A shim remains in `plugins/builtins.py` that falls back to `InstanceParallel` to maintain configuration compatibility.
+
+## [v0.9.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.9.1) - 2025-11-27
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.9.0...v0.9.1)
+
+### Release Plan Alignment (v0.9.1)
+
+- **Governance & observability hardening (Standard-001/018/019, ADR-020).** Added a per-module coverage gate script with suffix-aware path matching so Standard-003 thresholds are enforced in CI, tightened the `test` workflow to keep the core-only matrix from uploading coverage while still running the full gate on the main job, and switched editable installs for local test runs to reduce dependency skew. An accompanying notebook API auditor tracks use of the documented legacy surface (ADR-020) to keep examples in lockstep with the contract.【F:scripts/check_coverage_gates.py†L1-L102】【F:.github/workflows/test.yml†L33-L99】【F:scripts/audit_notebook_api.py†L1-L144】
+- **Runtime safety and regression coverage:** Added focused CalibratedExplainer regression tests that assert out-of-bag errors propagate, categorical features infer from label mappings, plugin override coercion handles callables/objects, and plugin manager requirements raise clear errors, strengthening the runtime guardrails promised for v0.9.1.【F:tests/unit/core/test_calibrated_explainer_runtime_helpers.py†L1-L220】
+- **Plugin fallback and serialization reliability:** Covered deprecated CalibratedExplainer surfaces with deletion-coupling notes and new tests for plugin fallback chains, interval regressors, and JSON round-trips so the v0.9.1 release ships with explicit removal guidance and resilient persistence paths.【F:src/calibrated_explanations/core/calibrated_explainer.py†L1125-L1914】【F:tests/unit/core/test_calibrated_explainer_additional.py†L1-L200】【F:tests/unit/core/test_calibrated_explainer_plugin_fallbacks.py†L1-L200】【F:tests/unit/core/test_interval_regressor.py†L1-L260】【F:tests/unit/test_serialization.py†L1-L220】
+- **Documentation standardisation.** Expanded the practitioner hub with an explicit wrapper-vs-direct API comparison so parity requirements from the governance plan remain visible, and published a researcher "future work" ledger to keep calibration and interval-regression research directions discoverable alongside the quickstarts.【F:docs/practitioner/index.md†L1-L34】【F:docs/practitioner/task_api_comparison.md†L1-L92】【F:docs/researcher/future_work.md†L1-L109】
+- **Interval regression hardening.** Improved interval regression storage and probabilistic threshold handling so calibration buffers resize safely, aligned with the practitioner/researcher documentation updates that now cross-link interval workflows with the existing probabilistic regression guidance.【F:src/calibrated_explanations/core/calibration/interval_regressor.py†L1-L200】【F:docs/practitioner/index.md†L1-L20】【F:docs/researcher/future_work.md†L1-L32】
+
+### Additional changes
+
+#### Narrative Generation API
+
+- **Introduced `to_narrative()` method for generating human-readable explanations** (contributed by @appraneethreddy)
+  - Added `to_narrative()` convenience method to `CalibratedExplanations` class for converting explanations into narrative text
+  - Created `NarrativeGenerator` class (`core/narrative_generator.py`) to handle template-based narrative generation with support for multiple expertise levels
+  - Implemented `NarrativePlotPlugin` (`viz/narrative_plugin.py`) integrating narrative generation with the plot system
+  - Supports multiple expertise levels: `"beginner"`, `"intermediate"`, `"advanced"` for tailored explanations
+  - Multiple output formats: DataFrame, plain text, HTML table, and dictionary structures
+  - Template-based customization with automatic fallback to default `explain_template.yaml`
+  - Problem type detection (classification vs regression) with threshold-aware narrative generation
+  - Proper handling of prediction intervals and uncertainty for calibrated predictions
+  - Comprehensive documentation in `docs/foundations/how-to/to_narrative.md` with usage examples
+
+#### Execution Strategy Plugins
+
+- **Introduced execution strategy wrapper plugins for user-configurable parallelism strategies**
+  - Created 6 new wrapper explanation plugins bridging explanation layer and execution layer:
+    - `core.explanation.factual.sequential` - Single-threaded sequential processing
+    - `core.explanation.factual.feature_parallel` - Parallel processing across features
+    - `core.explanation.factual.instance_parallel` - Parallel processing across instances
+    - `core.explanation.alternative.sequential` - Alternative mode sequential processing
+    - `core.explanation.alternative.feature_parallel` - Alternative mode feature parallelism
+    - `core.explanation.alternative.instance_parallel` - Alternative mode instance parallelism
+  - Implemented `_ExecutionExplanationPluginBase` class for consistent bridging behavior
+  - Each strategy declares automatic fallback chain for graceful degradation (instance_parallel → feature_parallel → sequential → legacy)
+  - Users can now select execution strategies via configuration:
+    - Keyword argument: `explainer.explain_factual(x, explanation_plugin="core.explanation.factual.feature_parallel")`
+    - Environment variable: `CE_EXPLANATION_PLUGIN_FACTUAL="core.explanation.factual.feature_parallel"`
+    - pyproject.toml: `[tool.calibrated_explanations.explanations]`
+  - All execution plugins registered as trusted and automatically available
+  - Maintains full backward compatibility - legacy plugins remain as ultimate fallback
+  - Updated ADR-015 with execution strategy plugin documentation
+  - Added comprehensive unit tests (25 test cases) covering registration, metadata, modes, and fallback chains
+
+#### CalibratedExplainer Streamlining
+
+- **Extracted core discretization and rule boundary computation to explain subpackage** to consolidate explanation logic and eliminate circular dependencies
+  - Created `explain._computation.discretize()` function: pure function extracting discretization logic from `CalibratedExplainer._discretize()`
+  - Created `explain._computation.rule_boundaries()` function: pure function extracting rule boundary extraction logic from `CalibratedExplainer.rule_boundaries()`
+  - Updated `CalibratedExplainer._discretize()` to delegate to extracted function (maintains backward compatibility)
+  - Updated `CalibratedExplainer.rule_boundaries()` to delegate to extracted function (maintains backward compatibility)
+  - Resolved circular dependency chain: `prediction_helpers.explain_predict_step()` now calls explainer methods that delegate to extracted functions instead of direct logic
+  - Both extracted functions exported in `explain._computation.__all__` for public use
+  - No breaking changes: all public and private APIs remain unchanged
+
+#### Terminology Standardization
+
+- **Standardized on "probabilistic regression" as the canonical user-facing term** for regression with threshold-based probability predictions. "Thresholded regression" is used in technical architecture documents (ADRs, design notes) to describe the implementation mechanism (CPS-based threshold calibration).
+  - Renamed internal method `_is_thresholded()` → `_is_probabilistic_regression()` in `CalibratedExplanations` class for consistency
+  - **Backward compatibility preserved:** `_is_thresholded()` kept as deprecated alias pointing to `_is_probabilistic_regression()` (will be removed in v0.10.0)
+  - Public method `is_thresholded()` on `Explanation` objects **unchanged** for full backward compatibility
+  - Updated ADR-021 with a "Terminology" section explaining the equivalence and usage guidance
+  - Added cross-reference in ADR-013 linking to ADR-021 terminology clarification
+  - Updated all docstrings to prefer "probabilistic regression" terminology
+  - Created migration guide: `docs/migration/v0.9-to-v0.10-terminology.md`
+  - See [Terminology Analysis](TERMINOLOGY_ANALYSIS_THRESHOLDED_VS_PROBABILISTIC_REGRESSION.md) for full context and rationale
+
+#### Additional minor changes
+
+- **CalibratedExplainer and plugin guards.** Refined plugin manager delegation and prediction bridge imports to avoid circular
+  dependencies, and extended explanation plugin validation to cope with deferred imports while preserving ADR-015 invariants on
+  batch payloads.【F:src/calibrated_explanations/core/calibrated_explainer.py†L232-L320】【F:src/calibrated_explanations/plugins/explanations.py†L1-L189】
+- **Runtime helper coverage.** Added extensive CalibratedExplainer runtime helper tests covering exception propagation, categorical
+  defaults, plugin override coercion, and telemetry delegation to improve reliability ahead of v0.9.1 gating.【F:tests/unit/core/test_calibrated_explainer_runtime_helpers.py†L1-L120】
+
+## [v0.9.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.9.0) - 2025-11-07
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.8.0...v0.9.0)
+
+## Highlights
+
+- **ADR alignment audit: Factual vs Alternative explanations.** Conducted comprehensive
+  review of all ADRs (ADR-005, ADR-008, ADR-013, ADR-015, ADR-021, ADR-026) to ensure
+  full alignment with paper-consistent semantics for factual and alternative explanations.
+  Added formal rule definitions to ADR-008, interval propagation contracts to ADR-013,
+  factual/alternative payload requirements to ADR-015, feature-level interval semantics
+  to ADR-021, and factual/alternative calibration contracts and validation criteria to
+  ADR-026. All ADRs now explicitly document that alternative explanations include a
+  reference calibrated prediction with uncertainty interval, feature weights in factual
+  rules have calibrated intervals, and all `[low, high]` pairs must satisfy the inclusive
+  bounds invariant. This audit ensures consistency across all explanation generation paths
+  and provides explicit guidance for plugin developers.【F:development/adrs/ADR-008-explanation-domain-model-and-compat.md†L45-L75】【F:development/adrs/ADR-013-interval-calibrator-plugin-strategy.md†L80-L110】【F:development/adrs/ADR-015-explanation-plugin.md†L151-L210】【F:development/adrs/ADR-021-calibrated-interval-semantics.md†L120-L150】【F:development/adrs/ADR-026-explanation-plugin-semantics.md†L84-L165】
+
+- **Plugin-based explain architecture.** All explain logic (sequential,
+  feature-parallel, instance-parallel) now lives in dedicated plugins under
+  `core/explain/`, replacing the monolithic branching in `CalibratedExplainer.explain`.
+  This clean separation improves maintainability, testability, and sets the foundation
+  for future distributed execution strategies.
+- **Faster calibrated explanations.** Explore the latest latency benchmarks and
+  optimization notes in the [explain performance evaluation
+  report](evaluation/explain_performance.md).
+- **Revamped documentation experience.** Dive into the reorganised guides,
+  role-based hubs, and refreshed quickstarts starting at the
+  [documentation homepage](docs/index.md).
+- **Plugin governance guardrails.** Optional extras, telemetry governance, and
+  plugin trust workflows now ship with automated enforcement across docs and
+  CI.
+- **Expanded export tooling.** Persist and reload explanation collections via
+  the new `CalibratedExplanations.to_json`/`.from_json` helpers and refreshed
+  how-to guides.
+
+### Release plan alignment
+
+- **Explanation schema v1 and ADR-005/008 compliance:** Updated explanation JSON schema v1 to include
+  `explanation_type` field distinguishing factual and alternative explanations, aligned ADR-005 with paper-compliant semantics from ADR-008, and ensured all domain models, serialization, and adapters preserve the calibrated prediction baseline for both explanation types. This establishes stable round-trip serialization for instance-based explanations as defined in the CE papers.【F:docs/schema_v1.md†L1-L50】【F:development/adrs/ADR-005-explanation-json-schema-versioning.md†L1-L80】【F:development/adrs/ADR-008-explanation-domain-model-and-compat.md†L1-L60】【F:src/calibrated_explanations/schemas/explanation_schema_v1.json†L1-L40】
+- **Explain executor decomposition (ADR-004 compliance):** Moved all explain execution
+  strategies into a plugin system (`src/calibrated_explanations/core/explain/`)
+  with three implementations: `SequentialExplainExecutor` (single-threaded fallback),
+  `FeatureParallelExplainExecutor` (executor-backed feature distribution), and
+  `InstanceParallelExplainExecutor` (instance-level chunking). `CalibratedExplainer.explain`
+  is now a thin 13-line delegator that selects and invokes the appropriate plugin
+  based on executor configuration. All legacy equivalence tests and instance-parallel
+  tests pass, confirming behavioral parity with the original implementation.
+  【F:src/calibrated_explanations/core/explain/__init__.py†L1-L175】
+  【F:src/calibrated_explanations/core/calibrated_explainer.py†L2299-L2351】
+- **Calibrated-explanations-first messaging (Tasks 1 & 5):** Rewrote the README,
+  overview landing page, and quickstarts so calibrated factual and alternative
+  flows lead every entry point, with telemetry, PlotSpec, and plugin extras
+  demoted into consistent "Optional extras" callouts and cross-linked research
+  hubs.【F:README.md†L1-L86】【F:docs/index.md†L1-L44】【F:docs/_shared/optional_extras_template.md†L1-L24】【F:docs/_shared/backed_by_research.md†L1-L20】
+- **Audience-specific hubs & triangular alternatives (Tasks 2 & 6):** Added
+  practitioner, researcher, and contributor landing pages that pair probabilistic
+  regression guidance with triangular alternative plot coaching so every
+  `explore_alternatives` mention narrates the calibrated decision boundary
+  story.【F:docs/practitioner/index.md†L1-L54】【F:docs/researcher/index.md†L1-L54】【F:docs/_shared/alternatives_triangular.md†L1-L14】【F:docs/get-started/quickstart_classification.md†L1-L84】
+- **Plugin extensibility & external distribution (Tasks 3, 12 & 13):** Reframed
+  `docs/plugins.md` around a calibration-preserving "hello plugin" example,
+  surfaced the `external_plugins/` namespace and curated installation extra, and
+  exposed `CE_DENY_PLUGIN` governance toggles across docs and CLI output so the
+  optional plugin lane remains discoverable yet clearly opt-in.【F:docs/plugins.md†L1-L200】【F:external_plugins/__init__.py†L1-L23】【F:README.md†L640-L686】【F:src/calibrated_explanations/plugins/cli.py†L74-L123】
+- **Research-forward storytelling (Task 5):** Maintained research hub call-outs
+  across README, overview, and concept guides so every onboarding path links to
+  `docs/research/` and `citing.md`, reinforcing the calibration pedigree.【F:README.md†L22-L60】【F:docs/overview/index.md†L1-L62】【F:docs/citing.md†L1-L140】
+- **Standard-002/017/019 enforcement (Tasks 8–10):** Elevated docstring coverage and
+  notebook lint to blocking status, retired transitional core/plot shims (removing
+  `legacy/_interval_regressor.py`, `legacy/_venn_abers.py`, and `legacy/_plots*.py`),
+  and tightened coverage thresholds to 88% alongside Codecov patch gates that focus
+  on runtime and calibration modules.【F:.github/workflows/lint.yml†L38-L86】【F:src/calibrated_explanations/core/_legacy_explain.py†L1-L110】【F:pytest.ini†L1-L8】【F:codecov.yml†L1-L32】【F:src/calibrated_explanations/legacy/__init__.py†L1-L6】
+- **Runtime performance polish (Task 11):** Implemented opt-in calibrator cache with LRU eviction, multiprocessing toggle via ParallelExecutor facade, and vectorized perturbation handling. Added performance guidance for plugin authors in docs/contributor/plugin-contract.md. Cache and parallel primitives integrated into explain pipeline without altering calibration semantics.【F:src/calibrated_explanations/perf/__init__.py†L1-L52】【F:src/calibrated_explanations/perf/cache.py†L1-L120】【F:src/calibrated_explanations/core/calibrated_explainer.py†L199-L377】
+- **Documentation-first plugin governance (Task 12):** Expanded CLI and
+  registry tests to surface denied identifiers, audit trusted plugins, and keep
+  the governance narrative inline with the release checklist.【F:tests/plugins/test_cli.py†L74-L152】【F:docs/foundations/governance/release_checklist.md†L1-L92】【F:src/calibrated_explanations/plugins/registry.py†L84-L154】
+- **External plugin bundle verification (Task 13):** Shipped packaging tests and
+  documentation for the `external-plugins` extra so the curated FAST bundle
+  stays optional yet discoverable.【F:tests/plugins/test_external_plugins_extra.py†L1-L90】【F:external_plugins/fast_explanations/__init__.py†L1-L92】
+- **Explanation export helpers (Task 14):** Added `CalibratedExplanations.to_json`
+  and `.from_json` wrappers and refreshed the export how-to so integration teams
+  can persist schema v1 collections with calibrated metadata intact.【F:src/calibrated_explanations/explanations/explanations.py†L180-L247】【F:docs/how-to/export_explanations.md†L1-L86】
+- **Streaming-friendly delivery status (Task 15):** Recorded the deferral and
+  interim batching guidance in the OSS scope inventory, closing the release gate
+  while signalling follow-up expectations.【F:docs/improvement/OSS_CE_scope_and_gaps.md†L1-L18】
+
+### Runtime
+
+- Accelerated categorical perturbations, discretisation, and prediction batching
+  for both factual and alternative explanations, backed by legacy parity helpers
+  preserved in `core/_legacy_explain.py` for regression testing.【F:src/calibrated_explanations/core/calibrated_explainer.py†L880-L1120】【F:src/calibrated_explanations/core/_legacy_explain.py†L1-L140】
+- Introduced calibration summary caching and telemetry-aware performance
+  factories so heavy workloads can reuse intermediate results without breaking
+  calibration guarantees.【F:src/calibrated_explanations/core/calibrated_explainer.py†L356-L416】【F:src/calibrated_explanations/perf/cache.py†L121-L320】
+
+### Documentation
+
+- Published practitioner/researcher/contributor hubs, refreshed quickstarts with
+  probabilistic regression walkthroughs, and rewrote plugins governance material
+  to foreground calibrated-explanations-first messaging while labelling extras
+  as optional.【F:docs/get-started/quickstart_regression.md†L1-L94】【F:docs/research/index.md†L1-L80】【F:docs/plugins.md†L200-L420】
+- Consolidated plugin documentation into a single Plugins hub (`docs/plugins.md`),
+  introduced a practitioner guide for using external plugins
+  (`docs/practitioner/advanced/use_plugins.md`), and surfaced the curated
+  `external-plugins` install extra in installation docs. Cross-links to the
+  external plugin index were added to ensure a coherent, optional plugin story
+  aligned with Standard-004 and the plugin ADRs (ADR-006/014/026).【F:docs/plugins.md†L1-L80】【F:docs/practitioner/advanced/use_plugins.md†L1-L200】【F:docs/get-started/installation.md†L1-L120】【F:docs/appendices/external_plugins.md†L1-L160】
+- Added runtime performance tuning, governance checklists, and optional telemetry
+  guides so compliance and SRE flows stay audience scoped.【F:docs/how-to/tune_runtime_performance.md†L1-L140】【F:docs/governance/release_checklist.md†L40-L92】
+
+### CI & QA
+
+- Hardened docs CI with the shared fragment checker, ensured Sphinx `-W`,
+  navigation smoke tests, and linkcheck remain blocking, and elevated docstring
+  coverage thresholds to 94% via lint automation.【F:.github/workflows/docs.yml†L19-L40】【F:.github/workflows/lint.yml†L38-L86】
+- Raised global coverage minimums to 88% and tightened Codecov calibration
+  patch targets so Standard-003 enforcement captures runtime changes.【F:pytest.ini†L1-L8】【F:codecov.yml†L1-L32】
+
+### Tests & Tooling
+
+- Expanded plugin registry, CLI, and builtin adapter suites, added dedicated
+  legacy plotting regression tests, and introduced performance benchmarks and
+  telemetry hooks to monitor the new runtime toggles.【F:tests/plugins/test_builtins_module.py†L1-L180】【F:tests/legacy/test_plotting.py†L1-L200】【F:evaluation/scripts/compare_explain_performance.py†L1-L200】
+- Refreshed reports documenting docstring coverage baselines and lint outputs to
+  back Standard-002's blocking rollout.【F:reports/docstring_coverage_20251025.txt†L1-L32】【F:reports/pydocstyle-baseline.txt†L1-L120】
+
+
+
+## [v0.8.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.8.0) - 2025-10-24
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.7.0...v0.8.0)
+
+### Added
+
+- ADR-023: Exempted `src/calibrated_explanations/viz/matplotlib_adapter.py` from coverage reporting due to matplotlib 3.8.4 lazy loading conflicts with pytest-cov instrumentation timing. All viz tests continue to run and validate functionality.
+- Telemetry payloads now propagate across preprocessing, calibration, and explanation batches, with new helpers like `build_rules_payload()`/`to_telemetry()` enabling JSON-ready exports of uncertainty intervals and rule tables. Export flows are validated by integration tests that enforce schema coverage for percentile and thresholded runs.
+- Plugin registry trust metadata enforces optional SHA256 checksum validation during registration and entry-point loading, expanding discovery helpers and surfacing provenance for third-party plugins.
+- Extended `ce.plugins` CLI trust/untrust coverage to include interval calibrators and plot components (builders/renderers), with list/show support via `--kind` selectors.
+
+
+### Changed
+
+- Promoted PlotSpec rendering to the canonical pipeline by introducing the
+  snake_case `calibrated_explanations.plotting` module, moving legacy
+  Matplotlib helpers into `legacy/plotting.py`, and keeping `_plots*` only as
+  warning shims to satisfy Standard-001 phase-two renames. Runtime and tests now
+  import from the new modules, and telemetry records the PlotSpec defaults for
+  auditability.
+- Raised pytest's coverage floor to 85% and enabled Codecov patch gating on calibration/runtime modules, keeping CI focused on uncertainty-critical paths.
+
+
+### Fixed
+
+- Resolved pytest test suite failures caused by matplotlib lazy loading conflicts with pytest-cov instrumentation. matplotlib 3.8+ uses lazy `__getattr__` to delay submodule loading, which breaks when pytest-cov instruments code before matplotlib initializes. Solution: Skip viz tests that directly call `render()` during CI/CD (8 test modules ignored), exempt `matplotlib_adapter.py` and legacy shims from coverage. Tests achieve 86.19% coverage (target: 85%) with 586 tests passing.
+
+- Reorganised the documentation site to follow ADR-022's role-based navigation with refreshed quickstarts, telemetry concept guides, troubleshooting material, and section ownership guidance.
+- Updated the README Quick Start to highlight telemetry inspection workflows and PlotSpec defaults, aligning the repository's front door with the new documentation narrative.
+
+## [v0.7.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.7.0) - 2025-10-07
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.6.1...v0.7.0)
+
+### Added
+
+- Interval calibrators now resolve through the plugin registry for both legacy
+  and FAST paths, enabling trusted override chains and capturing telemetry about
+  the `interval_source`/`proba_source` used for each explanation batch.
+- CalibratedExplainer accepts new keyword overrides (`interval_plugin`,
+  `fast_interval_plugin`, `plot_style`) and reads environment/pyproject
+  fallbacks so operators can configure intervals and plots without code changes.
+- Packaged a `ce.plugins` console script with smoke tests covering list/show and
+  trust management workflows.
+
+### Changed
+
+- Interval plugin contexts surface FAST reuse hints and metadata to keep
+  calibrator reuse efficient while routing through the registry.
+- README, developer docs, and contributing guides document the new CLI,
+  configuration knobs, and plugin telemetry expectations.
+
+### Docs
+
+- README Quick Start and `docs/plugins.md` now demonstrate PlotSpec-first
+  plotting, telemetry inspection (including preprocess metadata), and the
+  enhanced `ce.plugins` CLI output, folding the guardrail narrative into the
+  user-facing docs for the v0.8.0 release.
+
+- ADR-013 and ADR-015 marked Accepted with implementation notes summarising the
+  registry-backed runtime.
+- Standard-001/Standard-002 ratified with quick-reference style excerpts in
+  `CONTRIBUTING.md` and contributor docs.
+- Harmonised `core.validation` docstrings with numpy-style lint guardrails (Standard-002).
+
+### CI
+
+- Shared `.coveragerc` published and the test workflow now enforces
+  `--cov-fail-under=80` to meet Standard-003 phase 1 requirements (with gradual increase for each new version).
+- Lint workflow surfaces Ruff naming warnings and docstring lint/coverage
+  reports, providing guardrails for Standard-001/Standard-002 adoption.
+
+#### Public API updates in v0.7.0
+This document summarises the signature adjustments introduced while aligning the
+codebase with the new Ruff style baseline. Reference it from the v0.7.0 changelog
+when communicating breaking or user-visible updates.
+
+##### Function parameter renames
+The following parameters have been renamed across multiple functions and methods:
+- x_test → x
+- y_test → y
+
+##### Wrapper keyword normalisation
+The following `WrapCalibratedExplainer` entry points introduced alias
+normalization in v0.7.0:
+- `calibrate`
+- `explain_factual`
+- `explore_alternatives`
+- `explain_fast`
+- `predict`
+- `predict_proba`
+These aliases were fully removed in v0.11.0; passing `alpha`, `alphas`, or
+`n_jobs` now raises `ConfigurationError`. Use canonical keywords such as
+`low_high_percentiles` and `parallel_workers` instead.【F:src/calibrated_explanations/core/wrap_explainer.py†L201-L409】【F:src/calibrated_explanations/api/params.py†L16-L70】
+
+##### Explanation plugin toggle
+`CalibratedExplainer` now exposes a keyword-only `_use_plugin` flag across all
+explanation factories (`explain_factual`, `explore_alternatives`, `explain_fast`,
+`explain`, and the `__call__` shorthand). The flag defaults to `True`, enabling
+the plugin orchestrator. Pass `_use_plugin=False` to route through the legacy
+implementation when needed.【F:src/calibrated_explanations/core/calibrated_explainer.py†L1489-L1665】
+
+##### Conjunction helper parameters
+All `add_conjunctions` helpers across explanation containers use the renamed
+keyword arguments `n_top_features` and `max_rule_size` (previously exposed as
+`num_to_include` and `num_rule_size`). Update downstream code, documentation,
+and notebooks accordingly.【F:src/calibrated_explanations/explanations/explanations.py†L460-L501】
+
+### Fixed
+
+- Fixed test helper stubs and plugin descriptors to satisfy Ruff naming guardrails (Standard-001), keeping `ruff check --select N` green.
+
+## [v0.6.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.6.1) - 2025-10-05
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.6.0...v0.6.1)
+
+- Added runtime regression coverage to compare plugin-orchestrated factual, alternative, and fast explanations against the legacy `_use_plugin=False` code paths (`tests/integration/core/test_explanation_parity.py`).
+- Exercised schema v1 guardrails by asserting that payloads missing required keys are rejected when `jsonschema` is installed (`tests/unit/core/test_serialization_and_quick.py::test_validate_payload_rejects_missing_required_fields`).
+- Locked in `WrapCalibratedExplainer` keyword defaults and alias handling when using configuration objects (`tests/unit/core/test_wrap_keyword_defaults.py`).
+
+### Docs
+
+- Documented the v0.6.x hardening checklist covering plugin parity, schema validation, and wrapper default tests in `docs/plugins.md`.
+
+## [v0.6.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.6.0) - 2025-09-04
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.5.1...v0.6.0)
+
+### Highlights (Contract-first)
+
+- Internal domain model for explanations (ADR-008): added `Explanation` and `FeatureRule` types with adapters to preserve legacy dict outputs. No public API changes required; golden outputs unchanged.
+- Explanation Schema v1 (ADR-005): shipped a versioned JSON Schema (`schemas/explanation_schema_v1.json`) and utilities for `to_json`/`from_json` with validation. Round-trip tests included.
+- Preprocessing policy hooks (ADR-009): wrapper now supports configurable preprocessing with mapping persistence and unseen-category policy; default behavior unchanged for numeric inputs.
+- Optional extras split (Phase 2S): declared `viz`, `lime`, `notebooks`, `dev`, `eval` extras and lazy plotting import. Tests that need matplotlib are marked `@pytest.mark.viz` and skipped when extras are absent.
+- Docs: new Schema v1 and Migration (0.5.x → 0.6.0) pages; evaluation README and API reference updates.
+
+### Deprecations
+
+- Parameter alias deprecations wired; warnings emitted once per session (removal not before v0.8.0). See migration guide.
+
+### CI
+
+- Added docs build + linkcheck job and a core-only test job without viz extras to ensure core independence.
+
+### Notes
+
+- This release focuses on contract stability and does not change public serialized outputs. Performance features remain behind flags and will arrive in v0.7.x.
+
+### Acknowledgements
+
+We thank community contributors for overlapping PR work and early prototypes that informed the v0.6.0 contract-first implementation (domain model, schema/serialization, preprocessing hooks). Your feedback and ideas helped refine the final design.
+
+Also added explicit credit files:
+
+- AUTHORS.md (Main authors, authors listed in papers)
+- CONTRIBUTORS.md (community contributions)
+
+### Maintenance / Phase 1B completion
+
+- Phase 1B concluded: parameter canonicalization and lightweight validation wired at predict/predict_proba boundaries; strict typing with py.typed and targeted mypy overrides; documentation for error handling/validation/params added and linked; removed OnlineCalibratedExplainer and pruned legacy mentions; CI hygiene (branch conditions, perf guard) and repo lint/type gates green.
+
+### Features
+
+- Updated references to the paper [Calibrated Explanations for Regression](https://doi.org/10.1007/s10994-024-06642-8) in README and citing. The paper is now published in Machine Learning Journal.
+  - [Löfström, T](https://github.com/tuvelofstrom)., [Löfström, H](https://github.com/Moffran)., Johansson, U., Sönströd, C., and [Matela, R](https://github.com/rudymatela). (2025). [Calibrated Explanations for Regression](https://doi.org/10.1007/s10994-024-06642-8). Machine Learning 114, 100.
+- Plot Style Control: With [a series of commits](https://github.com/Moffran/calibrated_explanations/compare/4cbc4ff410df19a32899071daa2568e8904c2c47...4093496b1d938f3470f2d33715f0af286f239728), a `plot_config.ini` file and a `test_plot_config.py` file have been added. The style parameters are used by the plots. The style parameters for all plot functions can now be overridden using the `style_override` parameter. [Controlling figure width is also added](https://github.com/Moffran/calibrated_explanations/compare/86babfa1afed75fc8959cf072c21e932c3d08f07...e0d13f32907185a144781ff76b553ad5c8cc0f8d).
+- Optional extras and lazy plotting: Added optional dependency extras in `pyproject.toml` (`viz` for matplotlib, `lime` for LIME). Made matplotlib a lazy optional import used only when plotting is invoked, with a friendly runtime hint to install `calibrated_explanations[viz]`. Updated README with installation examples.
+
+### Breaking Changes
+
+- Removed the experimental `OnlineCalibratedExplainer` and its tests/docs. All references were purged from code, docs, configs, and packaging metadata.
+
+### Fixes
+
+- [fix: ensure figures are closed when not shown in plotting functions](https://github.com/Moffran/calibrated_explanations/commit/f20a047b2c4acb0eae6b5f6aed876f2db7d4d389)
+
+## [v0.5.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.5.1) - 2024-11-27
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.5.0...v0.5.1)
+
+### Features
+
+- String Targets Support: Added support for string targets, enhancing flexibility in handling diverse datasets. Special thanks to our new contributor [ww-jermaine](https://github.com/ww-jermaine) for the efforts on this feature ([issue #27](https://github.com/Moffran/calibrated_explanations/issues/27)).
+- Out-of-Bag Calibration: Introduced support for out-of-bag calibration when using random forests from `sklearn`, enabling improved calibration techniques directly within ensemble models. See the new [notebook](https://github.com/Moffran/calibrated_explanations/blob/main/notebooks/quickstart_wrap_oob.ipynb) for examples.
+- Documentation Enhancements: Updated and refined [documentation](https://calibrated-explanations.readthedocs.io/en/latest/?badge=latest), including fixes to existing sections and the addition of doctests for helper functions to ensure accuracy and reliability.
+- Minor updates: Added a `calibrated` parameter to the `predict` and `predict_proba` methods to allow uncalibrated results.
+
+### Fixes
+
+- Bug Fixes: Resolved multiple bugs to enhance stability and performance across the library.
+
+
+## [v0.5.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.5.0) - 2024-10-15
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.4.0...v0.5.0)
+
+### Features
+
+- Improved the introduction in README.
+- Added `calibrated_confusion_matrix` in `CalibratedExplainer` and `WrapCalibratedExplainer`, providing a leave-one-out calibrated confusion matrix using the calibration set. The insights from the confusion matrix are useful when analyzing explanations, to determine general prediction and error distributions of the model. An example of using the confusion matrix in the analysis is given in paper [Calibrated Explanations for Multi-class](https://raw.githubusercontent.com/mlresearch/v230/main/assets/lofstrom24a/lofstrom24a.pdf).
+- Embraced the update of `crepes` version 0.7.1, making it possible to add a seed when fitting. Addresses issue #43.
+- Updating terminology and functionality:
+  - Introducing the concept of _ensured_ explanations.
+    - Changed the name of `CounterfactualExplanation` to `AlternativeExplanation`, as it better reflects the purpose and functionality of the class.
+    - Added a collection subclass `AlternativeExplanations` inheriting from `CalibratedExplanations`, which is used for collections of `AlternativeExplanation`'s. Collection methods referring to methods only available in the `AlternativeExplanation` are included in the new collection class.
+    - Added an `explore_alternatives` method in `CalibratedExplainer` and `WrapCalibratedExplainer` to be used instead of `explain_counterfactual`, as the name of the later is ambiguous. The `explain_counterfactual` is still kept for compatibility reasons but only forwards the call to `explore_alternatives`. All files and notebooks have been updated to only call `explore_alternatives`. All references to counterfactuals have been changed to alternatives, with obvious exceptions.
+    - Added both filtering methods and a ranking metric that can help filter out ensured explanations.
+      - The parameters `rnk_metric` and `rnk_weight` has been added to the plotting functions and is applicable to all kinds of plots.
+      - Both the `AlternativeExplanation` class (for an individual instance) and the collection subclass `AlternativeExplanations` contains filter functions only applicable to alternative explanations, such as `counter_explanations`, `semi_explanations`, `super_explanations`, and `ensured_explanations`.
+        - `counter_explanations` removes all alternatives except those changing prediction.
+        - `semi_explanations` removes all alternatives except those reducing the probability while not changing prediction.
+        - `super_explanations` removes all alternatives except those increasing the probability for the prediction.
+        - The concept of potential (uncertain) explanations is introduced. When the uncertainty interval spans across probability 0.5, an explanation is considered a potential. It will normally only be counter-potential and semi-potential, but can in some cases also be super-potential. Potential alternatives can be included or excluded from the above methods using the boolean parameter `include_potentials`.
+        - `ensured_explanations` removes all alternatives except those with lower uncertainty (i.e. smaller uncertainty interval) than the original prediction.
+    - Added a new form of plot for probabilistic predictions is added, clearly visualizing both the aleatoric and the epistemic uncertainty.
+      - A global plot is added, plotting all test instances with probability and uncertainty as the x- and y-axes. The area corresponding to potential (uncertain) predictions is marked. The plot can be invoked using the `plot(x_test)` or `plot(x_test, y_test)` call.
+      - A local plot for alternative explanations, with probability and uncertainty as the x- and y-axes, is added, which can be invoked from an `AlternativeExplanation` or a `AlternativeExplanations` using `plot(style='triangular')`. The optimal use is when combined with the `filter_top` parameter (see below), to include all alternatives, as follows: `plot(style='triangular', filter_top=None)`.
+    - Added prerpint and bibtex to the paper introducing _ensured_ explanations:
+      - [Löfström, T](https://github.com/tuvelofstrom)., [Löfström, H](https://github.com/Moffran)., and [Hallberg Szabadvary, J](https://github.com/egonmedhatten). (2024). [Ensured: Explanations for Decreasing the Epistemic Uncertainty in Predictions](https://arxiv.org/abs/2410.05479). arXiv preprint arXiv:2410.05479.
+      - Bibtex:
+
+        ```bibtex
+        @misc{lofstrom2024ce_ensured,
+          title =        {Ensured: Explanations for Decreasing the Epistemic Uncertainty in Predictions},
+          author =          {L\"ofstr\"om, Helena and L\"ofstr\"om, Tuwe and Hallberg Szabadvary, Johan},
+          year =            {2024},
+          eprint =          {2410.05479},
+          archivePrefix =   {arXiv},
+          primaryClass =    {cs.LG}
+        }
+        ```
+
+  - Introduced _fast_ explanations
+    - Introduced a new type of explanation called `FastExplanation` which can be extracted using the `explain_fast` method. It differs from a `FactualExplanation` in that it does not define a rule condition but only provides a feature weight.
+    - The new type of explanation is using ideas from [ConformaSight](https://github.com/rabia174/ConformaSight), a recently proposed global explanation algorithm based on conformal classification. Acknowledgements have been added.
+  - Introduced a new form av probabilistic regression explanation:
+    - Introduced the possibility to get explanations for the probability of being inside an interval. This is achieved by assigning a tuple with lower and upper bounds as threshold, e.g., `threshold=(low,high)` to get the probability of the prediction falling inside the interval (low, high].
+    - To the best of our knowledge, this is the only package that provide this functionality with epistemic uncertainty.
+  - Introduced the possibility to add new user defined rule conditions, using the `add_new_rule_condition` method. This is only applicable to numerical features.
+    - Factual explanations will create new conditions covering the instance value. Categorical features already get a condition for the instance value during the invocation of `explain_factual`.
+    - Alternative explanations will create new conditions that exclude the instance value. Categorical features already get conditions for all alternative categories during the invocation of `explore_alternatives`.
+  - Parameter naming:
+    - The parameter indicating the number of rules to plot is renamed to `filter_top` (previously `n_features_to_show`), making the call including all rules (`filter_top=None`) makes a lot more sense.
+
+### Fixes
+
+- Added checks to ensure that the learner is not called unless the `WrapCalibratedExplainer` is fitted.
+- Added checks to ensure that the explainer is not called unless the `WrapCalibratedExplainer` is calibrated.
+- Fixed incorrect use of `np.random.seed`.
+
+## [v0.4.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.4.0) - 2024-08-23
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.3.5...v0.4.0)
+### Features
+- Paper updates:
+  - [Calibrated Explanations for Regression](https://doi.org/10.1007/s10994-024-06642-8) has been accepted to Machine Learning. It is currently in press.
+- Code improvements:
+  - __Substantial speedup__ achieved through the newly implemented `explain` method! This method implements the core algorithm while minimizing the number of calls to core._predict, substantially speeding up the code without altering the algorithmic logic of `calibrated_explanations`. The `explain` method is used exclusively from this version on when calling `explain_factual` or `explain_counterfactual`.
+    - Re-ran the ablation study for classification, looking at the impact of calibration set size, number of percentile samplings for numeric features and the number of features.
+      - Uploaded a pdf version of the [ablation study](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/Calibrated_Explanations_Ablation.pdf), making the results easier to overview.
+    - Re-ran the evaluation for regression, measuring stability, robustness and running times with and without normalization.
+  - Improved the `safe_import` to allow `import ... from ...` constructs.
+  - Restructured package
+    - Added a utils folder:
+      - Moved discretizers.py to utils
+      - Moved utils.py to utils and renamed to helper.py
+    - Made explanations public
+    - Made VennAbers and interval_regressor restricted
+  - Experimental functionality introduced:
+    - Several new experimental features have been introduced. These will be presented as Features once they are thoroughly tested and evaluated.
+- Code interface improvements:
+  - Added support for the `MondrianCategorizer` from crepes in the `WrapCalibratedExplainer`.
+  - Added wrapper functions in `WrapCalibratedExplainer` redirecting to `CalibratedExplainer`:
+    - Including `predict`, `predict_proba`, and `set_difficulty_estimator`.
+    - Moved any remaining implementations of functions in `WrapCalibratedExplainer` to `CalibratedExplainer`.
+  - Renamed the `plot_all` and `plot_explanation` functions to `plot`. Updated all usages of the `plot` function.
+  - Added `__len__` and `__getitem__` to `CalibratedExplanations`.
+    - `__getitem__` allow indexing with `int`, `slice`, and lists (both boolean and integer lists). When more than one explanation is retrieved, a new `CalibratedExplanations` is returned, otherwise, the indexed `CalibratedExplanation` is returned.
+- Documentation improvements:
+  - Restructured and extended the [documentation](https://calibrated-explanations.readthedocs.io/en/latest/?badge=latest).
+    - Updated the information at the entry page
+    - Added an API reference
+- Improvements of the CI setup:
+  - Updated CI to run pytest before pylint.
+  - Updated CI to avoid running tests when commit message starts with 'info:' or 'docs:'.
+- Testing improvements
+  - Improved tests to test `predict` and `predict_proba` functions in `CalibratedExplainer` better.
+  - Added several other tests to increase [coverage](https://app.codecov.io/github/Moffran/calibrated_explanations).
+### Fixes
+- Fixed minor errors in the `predict` and `predict_proba` functions in `CalibratedExplainer`.
+- Several other minor bug fixes have also been made.
+
+## [v0.3.5](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.3.5) - 2024-07-24
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.3.4...v0.3.5)
+### Features
+- Made several improvements of the `WrapCalibratedExplainer`:
+    - `WrapCalibratedExplainer` is introduced as the default way to interact with `calibrated-explanations` in README.md. The benefit of having a wrapper class as interface is that it makes it easier to add different kinds of explanations.
+    - Documentation of the functions has been updated.
+    - Initialization:
+      - The `WrapCalibratedExplainer` can now be initialized with an unfitted model as well as with a fitted model.
+      - The `WrapCalibratedExplainer` can now be initialized with an already initialized `CalibratedExplainer` instance, providing access to the `predict` and `predict_proba` functions.
+    - The `fit` method will reinitialize the explainer if the `WrapCalibratedExplainer` has already been calibrated, to ensure that the `explainer` is adapted to the re-fitted model.
+    - Added improved error handling.
+    - Made several other minor quality improving adjustments.
+- Code coverage tests are added and monitored at [Codecov](https://app.codecov.io/github/Moffran/calibrated_explanations).
+  - Tests are added in order to increase code coverage.
+  - Unused code is cleaned up.
+- Updated the [Further reading and citing](https://github.com/Moffran/calibrated_explanations#further-reading-and-citing) section in the README:
+  - Added a reference and bibtex to:
+    - [Löfström, T](https://github.com/tuvelofstrom)., [Löfström, H](https://github.com/Moffran)., Johansson, U. (2024). [Calibrated Explanations for Multi-class](https://easychair.org/publications/preprint/rqdD). <i>Proceedings of the Thirteenth Workshop on Conformal and Probabilistic Prediction and Applications</i>, in <i>Proceedings of Machine Learning Research</i>. In press.
+    - ```bibtex
+      @Booklet{lofstrom2024ce_multiclass,
+        author = {Tuwe Löfström and Helena Löfström and Ulf Johansson},
+        title = {Calibrated Explanations for Multi-Class},
+        howpublished = {EasyChair Preprint no. 14106},
+        year = {EasyChair, 2024}
+      }
+      ```
+  - Updated the [docs/citing.md](https://github.com/Moffran/calibrated_explanations/blob/main/docs/citing.md) with the above changes.
+### Fixes
+- Discretizers are limited to the default alternatives for classification and regression. BinaryDiscretizer removed. `__repr__` functions added.
+- Changed the `check_is_fitted` function to remove ties to sklearn.
+- Made the `safe_import` throw an `ImportError` when an import fail.
+
+## [v0.3.4](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.3.4) - 2024-07-10
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.3.3...v0.3.4)
+### Features
+- Updated the [Further reading and citing](https://github.com/Moffran/calibrated_explanations#further-reading-and-citing) section in the README:
+  - Added a reference and bibtex to:
+    - [Löfström, H](https://github.com/Moffran)., [Löfström, T](https://github.com/tuvelofstrom). (2024). [Conditional Calibrated Explanations: Finding a Path Between Bias and Uncertainty](https://doi.org/10.1007/978-3-031-63787-2_17). In: Longo, L., Lapuschkin, S., Seifert, C. (eds) Explainable Artificial Intelligence. xAI 2024. Communications in Computer and Information Science, vol 2153. Springer, Cham.
+    - ```bibtex
+      @InProceedings{lofstrom2024ce_conditional,
+      author="L{\"o}fstr{\"o}m, Helena
+      and L{\"o}fstr{\"o}m, Tuwe",
+      editor="Longo, Luca
+      and Lapuschkin, Sebastian
+      and Seifert, Christin",
+      title="Conditional Calibrated Explanations: Finding a Path Between Bias and Uncertainty",
+      booktitle="Explainable Artificial Intelligence",
+      year="2024",
+      publisher="Springer Nature Switzerland",
+      address="Cham",
+      pages="332--355",
+      abstract="While Artificial Intelligence and Machine Learning models are becoming increasingly prevalent, it is essential to remember that they are not infallible or inherently objective. These models depend on the data they are trained on and the inherent bias of the chosen machine learning algorithm. Therefore, selecting and sampling data for training is crucial for a fair outcome of the model. A model predicting, e.g., whether an applicant should be taken further in the job application process, could create heavily biased predictions against women if the data used to train the model mostly contained information about men. The well-known concept of conditional categories used in Conformal Prediction can be utilised to address this type of bias in the data. The Conformal Prediction framework includes uncertainty quantification methods for classification and regression. To help meet the challenges of data sets with potential bias, conditional categories were incorporated into an existing explanation method called Calibrated Explanations, relying on conformal methods. This approach allows users to try out different settings while simultaneously having the possibility to study how the uncertainty in the predictions is affected on an individual level. Furthermore, this paper evaluated how the uncertainty changed when using conditional categories based on attributes containing potential bias. It showed that the uncertainty significantly increased, revealing that fairness came with a cost of increased uncertainty.",
+      isbn="978-3-031-63787-2"
+      }
+      ```
+  - Updated the [docs/citing.md](https://github.com/Moffran/calibrated_explanations/blob/main/docs/citing.md) with the above changes.
+### Fixes
+- Changed np.Inf to np.inf for compatibility reasons (numpy v2.0.0).
+- Updated requirements for numpy and crepes to include versions v2.0.0 and v0.7.0, respecitvely.
+
+## [v0.3.3](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.3.3) - 2024-05-25
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.3.2...v0.3.3)
+### Features
+- Changed how probabilistic regression is done to handle both validity and speed by dividing the calibration set into two sets to allow pre-computation of the CPS. Credits to anonymous reviewer for this suggestion.
+- Added updated regression experiments and plotting for revised paper.
+- Added a new `under the hood` demo notebook to show how to access the information used in the plots,  like conditions and uncertainties etc.
+### Fixes
+- Several minor updates to descrptions and notebooks in the repository.
+
+## [v0.3.2](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.3.2) - 2024-04-14
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.3.1...v0.3.2)
+### Features
+- Added Fairness experiments and plotting for the XAI 2024 paper. Added a `Fairness` tag for the weblinks.
+- Added multi-class experiments and plotting for upcoming submissions. Added a `Multi-class` tag for weblinks.
+- Some improvements were made to the multi-class functionality. The updates included updating the VennAbers class to a more robust handling of multi-class (with or without Mondrian bins).
+### Fixes
+- Updated the requirement for crepes to v0.6.2, to address known issues with some versions of python.
+- The pythonpath for pytest was added to pyprojects.toml to avoid module not found error when running pytest locally.
+
+## [v0.3.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.3.1) - 2024-02-23
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.3.0...v0.3.1)
+### Features
+- Added support for Mondrian explanations, using the `bins` attribute. The `bins` attribute takes a categorical feature of the size of the calibration or test set (depending on context) indicating the category of each instance. For continuous attributes, the `crepes.extras.binning`can be used to define categories through binning.
+- Added `BinaryRegressorDiscretizer` and `RegressorDiscretizer` which are similar to `BinaryEntropyDiscretizer` and `EntropyDiscretizer` in that it uses a decision tree to identify suitable discretizations for numerical features. `explain_factual` and `explain_counterfactual` have been updated to use these discretizers for regression by default. In a future version, the possibility to assign your own discretizer may be removed.
+- Updated the [Further reading and citing](https://github.com/Moffran/calibrated_explanations#further-reading-and-citing) section in the README:
+  - Updated the reference and bibtex to the published version of the introductory paper:
+    - Löfström, H., Löfström, T., Johansson, U., and Sönströd, C. (2024). [Calibrated Explanations: with Uncertainty Information and Counterfactuals](https://doi.org/10.1016/j.eswa.2024.123154). Expert Systems with Applications, 1-27.
+
+    - ```bibtex
+      @article{lofstrom2024calibrated,
+        title = 	{Calibrated explanations: With uncertainty information and counterfactuals},
+        journal = 	{Expert Systems with Applications},
+        pages = 	{123154},
+        year = 	{2024},
+        issn = 	{0957-4174},
+        doi = 	{https://doi.org/10.1016/j.eswa.2024.123154},
+        url = 	{https://www.sciencedirect.com/science/article/pii/S0957417424000198},
+        author = 	{Helena Löfström and Tuwe Löfström and Ulf Johansson and Cecilia Sönströd},
+        keywords = 	{Explainable AI, Feature importance, Calibrated explanations, Venn-Abers, Uncertainty quantification, Counterfactual explanations},
+        abstract = 	{While local explanations for AI models can offer insights into individual predictions, such as feature importance, they are plagued by issues like instability. The unreliability of feature weights, often skewed due to poorly calibrated ML models, deepens these challenges. Moreover, the critical aspect of feature importance uncertainty remains mostly unaddressed in Explainable AI (XAI). The novel feature importance explanation method presented in this paper, called Calibrated Explanations (CE), is designed to tackle these issues head-on. Built on the foundation of Venn-Abers, CE not only calibrates the underlying model but also delivers reliable feature importance explanations with an exact definition of the feature weights. CE goes beyond conventional solutions by addressing output uncertainty. It accomplishes this by providing uncertainty quantification for both feature weights and the model’s probability estimates. Additionally, CE is model-agnostic, featuring easily comprehensible conditional rules and the ability to generate counterfactual explanations with embedded uncertainty quantification. Results from an evaluation with 25 benchmark datasets underscore the efficacy of CE, making it stand as a fast, reliable, stable, and robust solution.}
+      }
+      ```
+  - Added [Code and results](https://github.com/tuvelofstrom/calibrating-explanations) for the [Investigating the impact of calibration on the quality of explanations](https://link.springer.com/article/10.1007/s10472-023-09837-2) paper, inspiring the idea behind Calibrated Explanations.
+  - Added a bibtex to the software repository:
+    - ```bibtex
+      @software{Lofstrom_Calibrated_Explanations_2024,
+        author = 	{Löfström, Helena and Löfström, Tuwe and Johansson, Ulf and Sönströd, Cecilia and Matela, Rudy},
+        license = 	{BSD-3-Clause},
+        title = 	{Calibrated Explanations},
+        url = 	{https://github.com/Moffran/calibrated_explanations},
+        version = 	{v0.3.1},
+        month = 	feb,
+        year = 	{2024}
+      }
+      ```
+  - Updated the [docs/citing.md](https://github.com/Moffran/calibrated_explanations/blob/main/docs/citing.md) with the above changes.
+- Added a [CITATION.cff](https://github.com/Moffran/calibrated_explanations/blob/main/CITATION.cff) with citation data for the software repository.
+### Fixes
+- Extended `__repr__` to include additional fields when `verbose=True`.
+- Fixed a minor bug in the example provided in the [README.md](https://github.com/Moffran/calibrated_explanations/blob/main/README.md#classification) and the [getting_started.md](https://github.com/Moffran/calibrated_explanations/blob/main/docs/getting_started.md#classification), as described in issue #26.
+- Added `utils.transform_to_numeric` and a clarification about known limitations in [README.md](https://github.com/Moffran/calibrated_explanations/blob/main/README.md#classification) as a response to issue #28.
+- Fixed a minor bug in `FactualExplanation.__plot_probabilistic` that was triggered when no features where to be shown.
+- Fixed a bug with the discretizers in `core`.
+- Fixed a bug with saving plots to file using the `filename` parameter.
+
+## [v0.3.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.3.0) - 2024-01-02
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.2.3...v0.3.0)
+### Features
+- Updated to version 1.4.1 of venn_abers. Added `precision=4` to the fitting of the venn_abers model to increase speed.
+- Preparation for weighted categorical rules implemented but not yet activated.
+- Added a state-of-the-art comparison with scripts and notebooks for evaluating the performance of the method in comparison with `LIME` and `SHAP`: see [Classification_Experiment_sota.py](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/Classification_Experiment_sota.py) and [Classification_Analysis_sota.ipynb](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/Classification_Analysis_sota.ipynb) for running and evaluating the experiment. Unzip [results_sota.zip](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/results_sota.zip) and run [Classification_Analysis_sota.ipynb](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/Classification_Analysis_sota.ipynb) to get the results used in the paper [Calibrated Explanations: with Uncertainty Information and Counterfactuals](https://doi.org/10.1016/j.eswa.2024.123154).
+- Updated the parameters used by `plot_all` and `plot_explanation`.
+### Fixes
+- Filtered out extreme target values in the quickstart notebook to make the regression examples more realistic.
+- Fixed bugs related to how plots can be saved to file.
+- Fixed an issue where add_conjunctions with `max_rule_size=3` did not work.
+
+## [v0.2.3](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.2.3) - 2023-11-04
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.2.2...v0.2.3)
+### Features
+- Added an evaluation folder with scripts and notebooks for evaluating the performance of the method.
+  - One evaluation focuses on stability and robustness of the method: see [Classification_Experiment_stab_rob.py](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/Classification_Experiment_stab_rob.py) and [Classification_Analysis_stab_rob.ipynb](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/Classification_Analysis_stab_rob.ipynb) for running and evaluating the experiment.
+  - One evaluation focuses on how different parameters affect the method regarding time and robustness: see [Classification_Experiment_Ablation.py](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/Classification_Experiment_Ablation.py) and [Classification_Analysis_Ablation.ipynb](https://github.com/Moffran/calibrated_explanations/blob/main/evaluation/Classification_Analysis_Ablation.ipynb) for running and evaluating the experiment.
+
+### Fixes
+- Fix in `CalibratedExplainer` to ensure that greater-than works identical as less-than.
+- Bugfix in `FactualExplanation._get_rules()` which caused an error when categorical labels where missing.
+
+## [v0.2.2](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.2.2) - 2023-10-03
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.2.1...v0.2.2)
+### Fixes
+Smaller adjustments and fixes.
+
+## [v0.2.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.2.1) - 2023-09-20
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.2.0...v0.2.1)
+### Fixes
+The wrapper file with helper classes `CalibratedAsShapExplainer` and `CalibratedAsLimeTabularExplanainer` has been removed. The `as_shap` and `as_lime` functions are still working.
+
+## [v0.2.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.2.0) - 2023-09-19
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.1.1...v0.2.0)
+### Features
+- Added a `WrapCalibratedExplainer` class which can be used for both classificaiton and regression.
+- Added [quickstart_wrap](https://github.com/Moffran/calibrated_explanations/blob/main/notebooks/quickstart_wrap.ipynb) to the notebooks folder.
+- Added [LIME_comparison](https://github.com/Moffran/calibrated_explanations/notebooks/LIME_comparison.ipynb) to the notebooks folder.
+### Fixes
+- Removed the dependency on `shap` and `scikit-learn` and closed issue #8.
+- Updated the weights to match LIME's weights (to ensure that a positive weight has the same meaning in both).
+- Changed name of parameter `y` (representing the threshold in probabilistic regression) to `threshold`.
+
+## [v0.1.1](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.1.1) - 2023-09-14
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.1.0...v0.1.1)
+### Features
+- Exchanged the slow `VennABERS_by_def` function for the `VennAbers` class in the `venn-abers` package.
+### Fixes
+- Low and high weights are correctly assigned, so that low < high is always the case.
+- Adjusted the number of decimals in counterfactual rules to 2.
+## [v0.1.0](https://github.com/Moffran/calibrated_explanations/releases/tag/v0.1.0) - 2023-09-04
+
+[Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v0.0.2...v0.1.0)
+
+### Features
+
+- **Performance**: Fast, reliable, stable and robust feature importance explanations.
+- **Calibrated Explanations**: Calibration of the underlying model to ensure that predictions reflect reality.
+- **Uncertainty Quantification**: Uncertainty quantification of the prediction from the underlying model and the feature importance weights.
+- **Interpretation**: Rules with straightforward interpretation in relation to the feature weights.
+- **Factual and Counterfactual Explanations**: Possibility to generate counterfactual rules with uncertainty quantification of the expected predictions achieved.
+- **Conjunctive Rules**: Conjunctive rules conveying joint contribution between features.
+- **Multiclass Support**: Multiclass support has been added since the original version developed for the paper [Calibrated Explanations: with Uncertainty Information and Counterfactuals](https://arxiv.org/pdf/2305.02305.pdf).
+- **Regression Support**: Support for explanations from standard regression was developed and is described in the paper [Calibrated Explanations for Regression](https://arxiv.org/pdf/2308.16245.pdf).
+- **Probabilistic Regression Support**: Support for probabilistic explanations from standard regression was added together with regression and is described in the paper mentioned above.
+- **Conjunctive Rules**: Since the original version, conjunctive rules has also been added.
+- **Code Structure**: The code structure has been improved a lot. The `CalibratedExplainer`, when applied to a model and a collection of test instances, creates a collection class, `CalibratedExplanations`, holding `CalibratedExplanation` objects, which are either `FactualExplanation` or `CounterfactualExplanation` objects. Operations can be applied to all explanations in the collection directly through `CalibratedExplanations` or through each individual `CalibratedExplanation` (see the [documentation](https://calibrated-explanations.readthedocs.io)).
+
+### Fixes
+Numerous. The code has been refactored and improved a lot since the original version. The code is now also tested and documented.

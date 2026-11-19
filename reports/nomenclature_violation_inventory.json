@@ -1,0 +1,62 @@
+{
+  "package_root": "src/calibrated_explanations",
+  "records": [
+    {
+      "allowed_reason": "approved_helper_split_bridge",
+      "file": "calibrated_explanations/calibration/interval_learner.py",
+      "is_allowed": true,
+      "line": 15,
+      "symbol": "utils.helper",
+      "violation_kind": "utility_import_bridge",
+      "workstream": "utility_split"
+    },
+    {
+      "allowed_reason": "approved_helper_split_bridge",
+      "file": "calibrated_explanations/core/__init__.py",
+      "is_allowed": true,
+      "line": 51,
+      "symbol": "utils.helper",
+      "violation_kind": "utility_import_bridge",
+      "workstream": "utility_split"
+    },
+    {
+      "allowed_reason": "approved_helper_split_bridge",
+      "file": "calibrated_explanations/core/explain/_computation.py",
+      "is_allowed": true,
+      "line": 16,
+      "symbol": "utils.helper",
+      "violation_kind": "utility_import_bridge",
+      "workstream": "utility_split"
+    },
+    {
+      "allowed_reason": "approved_helper_split_bridge",
+      "file": "calibrated_explanations/explanations/explanation.py",
+      "is_allowed": true,
+      "line": 57,
+      "symbol": "utils.helper",
+      "violation_kind": "utility_import_bridge",
+      "workstream": "utility_split"
+    },
+    {
+      "allowed_reason": "approved_helper_split_bridge",
+      "file": "calibrated_explanations/explanations/explanations.py",
+      "is_allowed": true,
+      "line": 32,
+      "symbol": "utils.helper",
+      "violation_kind": "utility_import_bridge",
+      "workstream": "utility_split"
+    },
+    {
+      "allowed_reason": "approved_helper_split_bridge",
+      "file": "calibrated_explanations/explanations/legacy_conjunctions.py",
+      "is_allowed": true,
+      "line": 14,
+      "symbol": "utils.helper",
+      "violation_kind": "utility_import_bridge",
+      "workstream": "utility_split"
+    }
+  ],
+  "total_records": 6,
+  "total_violations": 0,
+  "version": 1
+}

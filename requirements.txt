@@ -1,0 +1,19 @@
+
+######################################################################
+# requirements.txt: Core runtime dependencies only
+#
+# This file lists only the core dependencies required to run
+# calibrated_explanations, as specified in pyproject.toml [project.dependencies].
+#
+# Do NOT add dev, test, viz, eval, or notebook dependencies here.
+# For development, use the appropriate extras or environment files.
+#
+# Rationale: Ensures pip installs and CI environments are minimal and
+# consistent with the canonical dependency list in pyproject.toml.
+# See ADR-001, ADR-010, and .github/copilot-instructions.md for policy.
+######################################################################
+crepes>=0.8.0
+venn-abers>=1.4.0
+numpy>=1.24
+pandas>=2.0
+scikit-learn>=1.3

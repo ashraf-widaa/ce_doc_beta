@@ -1,0 +1,107 @@
+> **Status note (2026-06-02):** Last edited 2026-06-02 · Archive after: Re-evaluate post-v1.0.0 maintenance review · Implementation window: v0.9.0–v1.0.0.
+>
+> **v0.11.3 full closure completed (2026-06-02):** All Standard-001 v0.11.3 obligations closed:
+>
+> **Public surface removals (2026-06-01):**
+> - `legacy/plotting.py` deleted; functions migrated to `viz/_matplotlib_compat.py`; callers updated.
+> - `serialization.validate_payload` removed; `_schema_validate_payload` (private) retained for internal use.
+> - `viz/builders.legacy_get_fill_color` alias removed; `_legacy_get_fill_color` (private) retained.
+> - Fail-closed attribute-absence tests added for all three surfaces.
+>
+> **Internal bridge and transitional helper renames (2026-06-02):**
+> - `calibration/state.py`: `__X_cal` bridge replaced with canonical protected accessor.
+> - `calibration/venn_abers.py`: `__is_multiclass`, `__predict_proba_with_difficulty` → single-underscore names.
+> - `core/calibrated_explainer.py`: all expired dunder state and helper symbols → single-underscore names.
+> - `explanations/explanation.py`: expired dunder helpers and fields → single-underscore names.
+> - `explanations/explanations.py`: `__convert_to_alternative_explanations` → single-underscore helper.
+> - `plotting.py`: `__require_matplotlib`, `__setup_plot_style`, `__plot_proba_triangle` → single-underscore helpers.
+>
+> **Checker cleanup:**
+> - `APPROVED_COMPATIBILITY_BRIDGES = {}` and `APPROVED_TRANSITIONAL_SHIMS = {}` — both empty.
+> - `reports/nomenclature_violation_inventory.json`: **0 expired `remove_by_v0.11.3` records**.
+>
+> **Verification:** `check_std001_nomenclature.py --check` exits 0. `pytest tests/unit/test_std001_task8_closure.py tests/unit/test_explanations_validate_payload.py` → 6 passed. `make local-checks-pr` → exit 0.
+>
+> Standard-001 is **CLOSED** for v0.11.3.
+
+# Standard-001 Nomenclature Remediation
+
+This consolidated plan combines the nomenclature review and standardization roadmap so the problem statement, phases, and success criteria live in one place. Terminology follows hard guardrails without accidentally breaking published workflows. Terminology follows [terminology](RELEASE_PLAN_v1.md#terminology-for-improvement-plans): phases are numbered plan segments, release milestones mark the gates, and any “stage” references belong only to ADR-001 historical material.
+
+## Severity assessment
+
+**Rating: High** – Inconsistent naming conventions appear throughout multiple core modules, affecting classes, helper functions, and file names. These inconsistencies make it harder to navigate the package, complicate refactors, and increase the cognitive load for new contributors. Key pain points include:
+
+- **Mixed module naming styles.** Core implementation files historically mixed CamelCase, snake_case, and legacy-style prefixes (for example, `core/venn_abers.py`, `core/interval_regressor.py`, `viz/plots.py`, and the now-removed `legacy/_plots_legacy.py` lived side-by-side), making it unclear which modules were public, private, or transitional. With the shim retired, `legacy/plotting.py` remains the sole legacy module bearing the plotting helpers.【F:src/calibrated_explanations/core/venn_abers.py†L1-L120】【F:src/calibrated_explanations/core/interval_regressor.py†L1-L40】【F:src/calibrated_explanations/viz/plots.py†L1-L40】【F:src/calibrated_explanations/legacy/plotting.py†L1-L120】
+- **Ambiguous package vs. module naming.** The repository exposes both a `core` package and a `core.py` module as a deprecation shim, encouraging imports that look almost identical but carry different semantics. This duality raises the risk of developers importing the wrong target or duplicating logic during migrations.【F:src/calibrated_explanations/core/__init__.py†L1-L60】【F:src/calibrated_explanations/core.py†L1-L14】
+- **Leaky private state references.** Helpers reach into double-underscore attributes such as `_CalibratedExplainer__initialized` and `_CalibratedExplainer__noise_type`, which bypass Python’s intended encapsulation and propagate mangled names into additional modules.【F:src/calibrated_explanations/core/calibration_helpers.py†L19-L115】
+- **Kitchen-sink helper modules.** Broad utility modules like `utils/helper.py` accumulate unrelated responsibilities (filesystem, type checks, numerical transforms), mixing snake_case verbs with legacy names like `safe_isinstance` and `immutable_array`. Without a convention for grouping or prefixing, it becomes difficult to predict where a helper lives or how it should be named.【F:src/calibrated_explanations/utils/helper.py†L1-L160】
+
+Collectively these issues indicate that nomenclature drift is systemic rather than localized, warranting a focused remediation plan.
+
+## v0.11.1 Task 8 closure evidence (2026-04-14)
+
+Task 8 closure is now split into two explicit outcomes:
+
+1. **Blocking regression enforcement is complete in v0.11.1.**
+   - `scripts/quality/check_std001_nomenclature.py` is wired into both `make local-checks-pr`
+     and PR CI lint to block new non-legacy dunder regressions.
+   - `reports/nomenclature_violation_inventory.json` is the machine-generated closure inventory.
+2. **Bounded compatibility/transitional bridges remain intentionally tracked to v0.11.3.**
+   - Retained bridges are explicitly allowlisted and recorded in the detector report.
+   - Retained shim surfaces are machine-checked for **thin delegator shape** (no extra runtime logic).
+   - Their bounded removal horizon is `v0.11.3`, consistent with ADR-020 compatibility posture.
+
+### Explicit shim decisions (Task 8 requirement)
+
+| Surface | Decision in v0.11.1 | Evidence |
+| --- | --- | --- |
+| `plotting.py` | Retained as transitional bridge; no new non-allowlisted dunder/shim regressions may be introduced. | `check_std001_nomenclature.py` allowlist + inventory report |
+| `serialization.py` | `validate_payload` retained as thin compatibility wrapper around `schema.validate_payload`. | `check_std001_nomenclature.py` shim-surface record + `tests/unit/test_std001_task8_closure.py` |
+| `viz/builders.py` | `legacy_get_fill_color` retained as a named compatibility alias to `_legacy_get_fill_color`. | `check_std001_nomenclature.py` shim-surface record + `tests/unit/test_std001_task8_closure.py` |
+
+### Targeted regression evidence added for Task 8
+
+- Checker behavior: `tests/scripts/test_check_std001_nomenclature.py` covers allowlist and disallowed
+  regressions, including mangled private-symbol detection and shim-surface recording.
+- Utility/shim parity and bridge behavior:
+  - `tests/unit/test_std001_task8_closure.py::test_should_keep_utility_import_bridge_parity_for_safe_mean`
+  - `tests/unit/test_std001_task8_closure.py::test_should_delegate_serialization_validate_payload_to_schema_validator`
+  - `tests/unit/test_std001_task8_closure.py::test_should_keep_builders_legacy_color_alias_parity`
+  - `tests/unit/test_std001_task8_closure.py::test_should_keep_calibration_state_dict_row_bridge_working`
+
+## Phase plan
+
+### Phase 0 – Preparatory work (week 0)
+1. Circulate Standard-001 for acceptance and add a shortstyle excerpt to `CONTRIBUTING.md`.
+2. Enable repository tooling (pre-commit hooks or CI) that flags non-snake_case filenames and new double-underscore attributes.
+3. Inventory external entry-points (e.g. notebooks, docs snippets) that import internal modules so that rename impacts are known ahead of time.
+
+### Phase 1 – Infrastructure & documentation (weeks 1–2)
+1. Split `utils/helper.py` into topical modules (`fs_utils`, `validation_utils`, etc.) without renaming the functions yet to minimize diff churn.【F:src/calibrated_explanations/utils/helper.py†L1-L160】
+2. Deprecate `core.py` by renaming the shim to `deprecated_core_module.py` and updating imports inside the package to target `calibrated_explanations.core`. Keep the old name as a thin import wrapper that emits a warning.【F:src/calibrated_explanations/core.py†L1-L14】
+3. Document the new naming policy inside `docs/architecture.md` and the developer guides so contributors can reference expectations.
+
+### Phase 2 – Module renames
+1. Rename CamelCase and underscored private modules (`core/venn_abers.py`, `_interval_regressor.py`, `viz/plots.py`) to descriptive snake_case equivalents. The canonical implementations now live in `core/venn_abers.py`, `core/interval_regressor.py`, and `viz/plots.py`; temporary import shims lived under `legacy/` until their scheduled v0.9.0 removal.【F:src/calibrated_explanations/core/venn_abers.py†L1-L120】【F:src/calibrated_explanations/core/interval_regressor.py†L1-L120】【F:src/calibrated_explanations/viz/plots.py†L1-L20】【F:src/calibrated_explanations/legacy/__init__.py†L1-L6】
+2. Move shim modules and other legacy helpers into a dedicated `legacy/` namespace to visually distinguish transitional code.
+3. Update internal imports, tests, and docs to reference the canonical module names and rely on the shims only for backwards compatibility.
+4. Measurement checkpoint: track % of modules renamed periodically (target ≥50% by end of the phase) and record remaining alias counts in the release checklist for v0.9.1.
+
+### Phase 3 – Attribute and helper cleanup
+1. Replace direct access to mangled attributes (e.g. `_CalibratedExplainer__initialized`) with public or protected accessors so that helper modules stop propagating mangled names.【F:src/calibrated_explanations/core/calibration_helpers.py†L19-L115】
+2. Rename helper functions to follow verb-first snake_case conventions, removing ambiguous prefixes such as `safe_` unless they convey a real semantic guarantee.
+3. Update plugin identifiers and schema keys to follow the dot-delimited lowercase format described in Standard-001. Audit docs and code comments for alignment.
+
+### Phase 4 – Enforcement & cleanup (weeks 9–10)
+1. Remove deprecated shims once warning periods expire and downstream projects have migrated.
+2. Lock linting rules in CI so regressions fail fast; add tests ensuring new modules adhere to the naming guide.
+3. Retrospectively review the directory tree to ensure no new kitchen-sink helpers have formed; adjust module boundaries where needed.
+
+## Success criteria
+- Every module and package uses descriptive snake_case names with legacy shims isolated under a `legacy/` namespace.
+- Helper modules are scoped by responsibility, and no new double-underscore attributes are introduced outside legacy compatibility layers.
+- Contributor docs and automated tooling reinforce the conventions, preventing future drift.
+- ADR-021 references link back to the terminology note relocated to the concepts library so interval semantics remain consistent.
+- Release mapping: Phases 1–2 align to v0.9.1 (with the % renamed and mangled attribute counts reported in the release checklist), Phase 3 cleanup and mangled-attribute removal ties to v0.10.0, and Phase 4 enforcement/cleanup completes before the v1.0.0 branch cut.
+- Legacy API contract stability: run ADR-020 notebook smoke tests and API diff checks after each rename wave to ensure `WrapCalibratedExplainer` and `CalibratedExplainer` signatures stay stable despite module moves.

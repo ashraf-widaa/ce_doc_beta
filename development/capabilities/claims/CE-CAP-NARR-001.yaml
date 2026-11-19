@@ -1,0 +1,62 @@
+claim_id: CE-CAP-NARR-001
+claim_type: capability
+owner: calibrated_explanations
+status: current
+
+adr_links:
+  - ADR-008
+  - ADR-042
+
+claim_text: >
+  calibrated_explanations generates human-readable natural language narratives for
+  factual and alternative explanations through CalibratedExplanations.to_narrative(),
+  returning non-None output suitable for downstream text pipelines.
+
+atomic_rationale: >
+  This claim maps to one requirement because the verifiable public-API outcome at
+  the api_contract level is that to_narrative() returns non-None output. Format-
+  specific contracts (DataFrame, HTML, dict variants) and the PyYAML-backed default
+  template are not verified at the api_contract level; they are documented assumption
+  boundaries. Narrative quality and regulatory suitability are explicitly out of
+  scope for automated testing. No additional requirements are warranted for this
+  verification pass beyond CE-REQ-NARR-API-001.
+
+public_api:
+  - calibrated_explanations.explanations.explanations.CalibratedExplanations.to_narrative
+
+task_types:
+  - binary_classification
+  - multiclass_classification
+  - regression
+  - probabilistic_regression
+
+requirements:
+  - CE-REQ-NARR-API-001
+
+verification:
+  proves:
+    - api_contract
+    - output_non_none
+  verification_type: automated
+
+assumptions:
+  - The explainer must be fitted and calibrated, and explain_factual or
+    explore_alternatives must have been called to produce explanations.
+  - Narrative quality (fluency, domain correctness, regulatory suitability) is NOT
+    verified by this claim. This claim asserts only that to_narrative() returns a
+    non-None result.
+  - Narrative templates are YAML (or JSON) files loaded with PyYAML and filled by plain
+    string substitution; PyYAML is declared by the optional `narrative` extra. If PyYAML
+    is absent, loading a YAML template, including the packaged default
+    explain_template.yaml, raises SerializationError (not ImportError) with no fallback;
+    only a caller-supplied .json template_path works without PyYAML.
+  - The output format is determined by the output_format parameter ('dataframe', 'text',
+    'html', 'dict', 'markdown'). Default is 'dataframe' which requires pandas.
+
+evidence_required:
+  - commit_sha
+  - package_version
+  - test_id
+  - dataset_id
+  - random_seed
+  - result

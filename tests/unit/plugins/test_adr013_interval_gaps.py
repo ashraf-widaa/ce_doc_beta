@@ -1,0 +1,359 @@
+"""ADR-013 interval calibrator plugin strategy gap closure tests.
+
+Covers:
+- Gap 1: Protocol signature alignment between protocol and IntervalRegressor
+- Gap 3: FAST calibrator must not be in non-fast fallback chains
+- Gap 4: Third-party plugin contract via structural typing (not just isinstance)
+"""
+
+from __future__ import annotations
+
+import inspect
+from pathlib import Path
+from unittest.mock import MagicMock
+
+import numpy as np
+import pytest
+
+from calibrated_explanations.plugins.manager import (
+    DEFAULT_INTERVAL_IDENTIFIERS,
+    PluginManager,
+)
+from calibrated_explanations.plugins.intervals import (
+    IntervalCalibratorContext,
+    validate_interval_calibrator_output,
+)
+from calibrated_explanations.utils.exceptions import ValidationError
+
+
+# ---------------------------------------------------------------------------
+# Gap 3: FAST identifier must not be in the non-fast fallback chain
+# ---------------------------------------------------------------------------
+
+
+def build_pm() -> PluginManager:
+    """Create a PluginManager and build all chains via the public build_interval_chain API."""
+    explainer = MagicMock()
+    explainer.plugin_manager = None
+    pm = PluginManager(explainer)
+    # Use public method to build chains
+    pm.interval_plugin_fallbacks = {
+        "default": pm.build_interval_chain(fast=False),
+        "fast": pm.build_interval_chain(fast=True),
+    }
+    return pm
+
+
+def test_should_exclude_fast_identifier_from_default_interval_chain():
+    """core.interval.fast must NOT appear in the non-fast (default) fallback chain."""
+    pm = build_pm()
+    default_chain = pm.interval_plugin_fallbacks.get("default", ())
+    fast_id = DEFAULT_INTERVAL_IDENTIFIERS["fast"]
+
+    assert fast_id not in default_chain, (
+        f"'{fast_id}' must not appear in the default (non-fast) interval chain; "
+        f"found in: {default_chain}"
+    )
+
+
+def test_should_keep_default_and_fast_chains_separate():
+    """Default and fast interval chains must be distinct and non-overlapping on the fast ID."""
+    pm = build_pm()
+
+    default_chain = set(pm.interval_plugin_fallbacks.get("default", ()))
+    fast_id = DEFAULT_INTERVAL_IDENTIFIERS["fast"]
+
+    # The fast identifier must not bleed into the default chain
+    assert fast_id not in default_chain, (
+        f"'{fast_id}' leaked into the non-fast default chain: {default_chain}"
+    )
+
+
+# ---------------------------------------------------------------------------
+# Gap 4: Protocol enforcement via structural typing (not just isinstance)
+# ---------------------------------------------------------------------------
+
+
+class ThirdPartyIntervalCalibrator:
+    """Minimal structural conformance without inheriting from any CE base class."""
+
+    def predict_proba(self, x, *, output_interval=False, classes=None, bins=None):
+        import numpy as np
+
+        n = len(x)
+        return np.full((n, 2), 0.5)
+
+    def is_multiclass(self) -> bool:
+        return False
+
+    def is_mondrian(self) -> bool:
+        return False
+
+
+def test_should_structurally_conform_when_third_party_implements_protocol():
+    """A third-party calibrator conforming to the protocol surface must be accepted structurally."""
+    calibrator = ThirdPartyIntervalCalibrator()
+
+    # Check structural conformance: required methods exist with expected signatures
+    required_methods = ["predict_proba", "is_multiclass", "is_mondrian"]
+    for method_name in required_methods:
+        assert hasattr(calibrator, method_name), (
+            f"Third-party calibrator missing required method: {method_name}"
+        )
+
+    # predict_proba must accept (x, *, output_interval, classes, bins)
+    sig = inspect.signature(calibrator.predict_proba)
+    params = sig.parameters
+    assert "output_interval" in params, "predict_proba must accept output_interval kwarg"
+    assert "classes" in params, "predict_proba must accept classes kwarg"
+    assert "bins" in params, "predict_proba must accept bins kwarg"
+
+    # is_multiclass and is_mondrian must be zero-arg callables
+    for method_name in ("is_multiclass", "is_mondrian"):
+        sig = inspect.signature(getattr(calibrator, method_name))
+        non_self_params = [
+            p
+            for name, p in sig.parameters.items()
+            if name != "self" and p.default is inspect.Parameter.empty
+        ]
+        assert non_self_params == [], f"{method_name} must have no required parameters"
+
+
+# ---------------------------------------------------------------------------
+# Gap 1: IntervalRegressor implements the required protocol methods
+# ---------------------------------------------------------------------------
+
+
+def test_should_confirm_interval_regressor_implements_required_protocol_methods():
+    """IntervalRegressor must implement all methods in the RegressionIntervalCalibrator protocol surface.
+
+    Design note (ADR-013 gap 1): IntervalRegressor is the REGRESSION reference implementation.
+    Its predict_proba has a simpler signature than the ClassificationIntervalCalibrator protocol
+    because the runtime never calls predict_proba(output_interval=..., classes=...) on it —
+    those kwargs are VennAbers-specific (classification path). Protocol structural conformance
+    is verified by isinstance(ir, RegressionIntervalCalibrator) which passes at runtime.
+    Strict signature conformance is enforced on VennAbers (classification) and the third-party
+    plugin contract test (see test_should_structurally_conform_when_third_party_implements_protocol).
+    """
+    from calibrated_explanations.calibration.interval_regressor import IntervalRegressor
+    from calibrated_explanations.plugins.intervals import (
+        ClassificationIntervalCalibrator,
+        RegressionIntervalCalibrator,
+    )
+
+    # All required method names must exist
+    required = [
+        "predict_probability",
+        "predict_uncertainty",
+        "pre_fit_for_probabilistic",
+        "compute_proba_cal",
+        "insert_calibration",
+        "predict_proba",
+        "is_multiclass",
+        "is_mondrian",
+    ]
+    ir = IntervalRegressor.__new__(IntervalRegressor)
+    for method_name in required:
+        assert hasattr(IntervalRegressor, method_name), (
+            f"IntervalRegressor missing required protocol method: {method_name}"
+        )
+
+    # Structural protocol conformance — isinstance checks pass at runtime
+    assert isinstance(ir, RegressionIntervalCalibrator), (
+        "IntervalRegressor must satisfy RegressionIntervalCalibrator structural protocol"
+    )
+    assert isinstance(ir, ClassificationIntervalCalibrator), (
+        "IntervalRegressor must satisfy ClassificationIntervalCalibrator structural protocol"
+    )
+
+    # is_multiclass and is_mondrian must accept no required positional args beyond self
+    for name in ("is_multiclass", "is_mondrian"):
+        method_sig = inspect.signature(getattr(IntervalRegressor, name))
+        required_pos = [
+            p
+            for pname, p in method_sig.parameters.items()
+            if pname != "self"
+            and p.default is inspect.Parameter.empty
+            and p.kind not in (inspect.Parameter.VAR_POSITIONAL, inspect.Parameter.VAR_KEYWORD)
+        ]
+        assert required_pos == [], f"IntervalRegressor.{name} must have no required parameters"
+
+
+def test_should_confirm_venn_abers_implements_full_classification_protocol_signature():
+    """VennAbers (classification impl) must implement the full ClassificationIntervalCalibrator signature.
+
+    VennAbers is the primary ClassificationIntervalCalibrator and the reference for
+    output_interval, classes, and bins kwargs — callers of the classification path use all three.
+    """
+    from calibrated_explanations.calibration.venn_abers import VennAbers
+    from calibrated_explanations.plugins.intervals import ClassificationIntervalCalibrator
+
+    required = ["predict_proba", "is_multiclass", "is_mondrian"]
+    for method_name in required:
+        assert hasattr(VennAbers, method_name), (
+            f"VennAbers missing required protocol method: {method_name}"
+        )
+
+    # Full signature conformance: output_interval, classes, bins must be present
+    sig = inspect.signature(VennAbers.predict_proba)
+    params = sig.parameters
+    assert "output_interval" in params, "VennAbers.predict_proba must accept output_interval kwarg"
+    assert "classes" in params, "VennAbers.predict_proba must accept classes kwarg"
+    assert "bins" in params, "VennAbers.predict_proba must accept bins kwarg"
+
+    # VennAbers satisfies the structural protocol
+    va = VennAbers.__new__(VennAbers)
+    assert isinstance(va, ClassificationIntervalCalibrator)
+
+
+def test_legacy_interval_context_design_decision_documented():
+    """ADR-013 must document the frozen context design decision."""
+    adr_path = (
+        Path(__file__).resolve().parents[3]
+        / "development"
+        / "adrs"
+        / "ADR-013-interval-calibrator-plugin-strategy.md"
+    )
+    adr_text = adr_path.read_text(encoding="utf-8")
+
+    assert "LegacyIntervalContext" in adr_text
+    assert "superseded by `IntervalCalibratorContext`" in adr_text
+
+
+@pytest.fixture
+def interval_context():
+    """Build a two-row interval calibration context."""
+    return IntervalCalibratorContext(
+        learner=object(),
+        calibration_splits=((np.zeros((2, 3)), np.zeros(2)),),
+        bins={},
+        residuals={},
+        difficulty={},
+        metadata={},
+        fast_flags={},
+    )
+
+
+def test_runtime_output_validation_rejects_shape_mismatch(interval_context):
+    """Runtime interval validation must reject mismatched sample counts."""
+    with pytest.raises(ValidationError, match="unexpected row count"):
+        validate_interval_calibrator_output(
+            np.asarray([[0.5, 0.5]], dtype=float),
+            interval_context,
+            identifier="tests.interval.bad_shape",
+        )
+
+
+def test_runtime_output_validation_rejects_wrong_dtype(interval_context):
+    """Runtime interval validation must reject non-floating probability outputs."""
+    with pytest.raises(ValidationError, match="non-floating output dtype"):
+        validate_interval_calibrator_output(
+            np.asarray([[1, 0], [0, 1]], dtype=int),
+            interval_context,
+            identifier="tests.interval.bad_dtype",
+        )
+
+
+def test_should_accept_interval_output_when_prediction_respects_bounds(interval_context):
+    """Runtime validation must accept interval tensors satisfying the CE invariant."""
+    result = np.asarray(
+        [
+            [[0.5, 0.4, 0.6], [0.5, 0.3, 0.7]],
+            [[0.6, 0.5, 0.8], [0.4, 0.2, 0.5]],
+        ],
+        dtype=float,
+    )
+
+    validation_result = validate_interval_calibrator_output(
+        result,
+        interval_context,
+        identifier="tests.interval.valid",
+        output_interval=True,
+    )
+
+    assert validation_result is None
+    assert np.all(result[..., 1] <= result[..., 0])
+    assert np.all(result[..., 0] <= result[..., 2])
+
+
+@pytest.mark.parametrize(
+    ("result", "message"),
+    [
+        (
+            np.asarray([[0.5, 0.4, 0.6], [0.5, 0.4, 0.6]], dtype=float),
+            "must have shape",
+        ),
+        (
+            np.asarray([[[0.5, 0.7, 0.6]], [[0.5, 0.4, 0.6]]], dtype=float),
+            "violates low <= high",
+        ),
+        (
+            np.asarray([[[0.8, 0.4, 0.6]], [[0.5, 0.4, 0.6]]], dtype=float),
+            "violates low <= predict <= high",
+        ),
+    ],
+)
+def test_should_reject_interval_output_when_interval_contract_is_violated(
+    result, message, interval_context
+):
+    """Runtime validation must reject malformed or incoherent interval tensors."""
+    with pytest.raises(ValidationError, match=message):
+        validate_interval_calibrator_output(
+            result,
+            interval_context,
+            identifier="tests.interval.invalid",
+            output_interval=True,
+        )
+
+
+@pytest.mark.parametrize(
+    ("result", "message"),
+    [
+        (np.asarray([0.5, 0.5], dtype=float), "must have shape"),
+        (np.asarray([[1.1, -0.1], [0.5, 0.5]], dtype=float), "outside \\[0, 1\\]"),
+        (np.asarray([[0.6, 0.6], [0.5, 0.5]], dtype=float), "must sum to 1"),
+    ],
+)
+def test_should_reject_probability_output_when_probability_contract_is_violated(
+    result, message, interval_context
+):
+    """Runtime validation must reject malformed, unbounded, or unnormalised probabilities."""
+    with pytest.raises(ValidationError, match=message):
+        validate_interval_calibrator_output(
+            result,
+            interval_context,
+            identifier="tests.probability.invalid",
+        )
+
+
+@pytest.mark.parametrize(
+    "calibration_splits",
+    [
+        (),
+        ((),),
+        ((object(), None),),
+    ],
+)
+def test_should_validate_probabilities_when_calibration_row_count_is_unavailable(
+    calibration_splits,
+):
+    """Probability validation must remain usable when calibration rows cannot be inferred."""
+    context = IntervalCalibratorContext(
+        learner=object(),
+        calibration_splits=calibration_splits,
+        bins={},
+        residuals={},
+        difficulty={},
+        metadata={},
+        fast_flags={},
+    )
+    result = np.asarray([[0.25, 0.75]], dtype=float)
+
+    validation_result = validate_interval_calibrator_output(
+        result,
+        context,
+        identifier="tests.probability.valid",
+    )
+
+    assert validation_result is None
+    assert np.allclose(result.sum(axis=1), 1.0)
