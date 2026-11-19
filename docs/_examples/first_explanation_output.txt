@@ -1,0 +1,5 @@
+Data rows: fit=90, calibrate=30, evaluate=30
+Predicted class: versicolor
+Class probabilities: 0.045, 0.910, 0.045
+Reported bounds for versicolor: [0.902, 0.992]
+Factual explanations: 1

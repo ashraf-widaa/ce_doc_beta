@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import re
+import runpy
 import subprocess
 import sys
 import tempfile
@@ -243,3 +244,30 @@ print("wheel-smoke-ok")
         )
         assert module_result.returncode != 0
         assert "__main__" in module_result.stderr
+
+
+def test_should_execute_shared_quickstart_and_render_factual_plot(tmp_path, monkeypatch, capsys):
+    """Check the actual downloadable example, its printed result and plotted data."""
+    from matplotlib import image as mpimg
+
+    from calibrated_explanations.explanations.explanation import FactualExplanation
+
+    root = Path(__file__).resolve().parents[2]
+    source = root / "docs/_examples/first_explanation.py"
+    expected = (root / "docs/_examples/first_explanation_output.txt").read_text()
+    monkeypatch.chdir(tmp_path)
+    original = FactualExplanation.plot
+
+    def save_plot(self, *args, **kwargs):
+        return original(self, *args, **kwargs, filename="first-explanation.png", show=False)
+
+    monkeypatch.setattr(FactualExplanation, "plot", save_plot)
+    result = runpy.run_path(str(source))
+    assert capsys.readouterr().out == expected
+    assert result["explainer"].fitted and result["explainer"].calibrated
+    assert (len(result["x_proper"]), len(result["x_cal"]), len(result["x_test"])) == (90, 30, 30)
+    assert result["probabilities"].shape == (1, 3)
+    assert result["class_name"] == "versicolor"
+    assert result["factual"][0].prediction["classes"] == result["class_index"]
+    image = mpimg.imread(tmp_path / "plots/first-explanation.png")
+    assert image.shape[0] > 200 and image.shape[1] > 200 and image.std() > 0.05

@@ -5,6 +5,11 @@ Start with the data roles, then follow the mechanism relevant to your task.
 
 ## Follow the workflow
 
+```{include} ../_shared/ce-workflow.md
+```
+
+The shared {doc}`predictive tasks and data roles <../foundations/concepts/predictive_tasks>` page defines the terms used here.
+
 | Stage | What it does | Where to continue |
 | --- | --- | --- |
 | Fit the model | Learn from model-fitting data. | The {doc}`classification <../get-started/quickstart_classification>` and {doc}`regression <../get-started/quickstart_regression>` tutorials show the data splits. |

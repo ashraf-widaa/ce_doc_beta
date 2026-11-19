@@ -12,6 +12,7 @@ mode-specific assumptions and limits. For papers and replication, use the
 
 | Concept | Why it matters |
 | --- | --- |
+| [Predictive tasks and data roles](predictive_tasks.md) | Shared definitions of features, targets, observations and separate data roles. |
 | [Interpret explanations](../how-to/interpret_explanations.md) | Reuses notebook screenshots and walks through dual uncertainty plus the triangular plot. |
 | [Probabilistic & interval regression](probabilistic_regression.md) | Shows how calibrated probabilities and interval regression stay in lockstep across quickstarts and notebooks. |
 | [Alternatives & triangular plots](alternatives.md) | Explains how the triangular view pairs with rule tables for calibrated alternatives. |
@@ -38,6 +39,7 @@ Entry-point tier: Tier 3.
 ```{toctree}
 :maxdepth: 1
 
+Predictive tasks and data roles <predictive_tasks>
 Probabilistic and interval regression <probabilistic_regression>
 Alternative explanations and ensured filters <alternatives>
 Guarded explanations <guarded_explanations>

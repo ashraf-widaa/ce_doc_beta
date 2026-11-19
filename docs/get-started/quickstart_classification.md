@@ -2,6 +2,19 @@
 
 Run calibrated explanations for binary or multiclass classification.
 
+**First visit?** {doc}`Quickstart <index>` runs this same Iris dataset and split
+through a complete result and plot. This page retains the broader classification
+calls, including the explicitly experimental all-class option below.
+
+```{warning}
+In the reviewed 1.0.2 source, some multiclass returned bounds can fall outside
+`[0, 1]`. For example, the first query in the split below produced an upper
+bound around `1.453` in the review environment. Keep this output for diagnosis;
+do not clip it or interpret it as a conventional bounded probability interval.
+The statistical interpretation and behavior need maintainer review.
+```
+
+
 ## Prerequisites
 
 ```bash
@@ -19,31 +32,16 @@ pip install calibrated-explanations scikit-learn
 
 ## 1. Load data and split sets
 
-```python
-from sklearn.datasets import load_iris
-from sklearn.model_selection import train_test_split
-
-dataset = load_iris()
-x = dataset.data
-y = dataset.target
-
-x_train, x_test, y_train, y_test = train_test_split(
-    x, y, test_size=0.2, stratify=y, random_state=0
-)
-x_proper, x_cal, y_proper, y_cal = train_test_split(
-    x_train, y_train, test_size=0.25, stratify=y_train, random_state=0
-)
+```{literalinclude} ../_examples/first_explanation.py
+:language: python
+:lines: 1-19
 ```
 
 ## 2. Fit and calibrate the explainer
 
-```python
-from sklearn.ensemble import RandomForestClassifier
-from calibrated_explanations import WrapCalibratedExplainer
-
-explainer = WrapCalibratedExplainer(RandomForestClassifier(random_state=0))
-explainer.fit(x_proper, y_proper)
-explainer.calibrate(x_cal, y_cal, feature_names=dataset.feature_names)
+```{literalinclude} ../_examples/first_explanation.py
+:language: python
+:lines: 21-23
 ```
 
 ## 3. Generate calibrated factual explanations
