@@ -11,10 +11,11 @@ DOCS = ROOT / "docs"
 def test_top_level_toctree_targets_exist() -> None:
     expected = (
         "get-started/index",
-        "practitioner/index",
-        "researcher/index",
-        "contributor/index",
-        "foundations/index",
+        "sections/what-and-why",
+        "sections/how-ce-works",
+        "sections/in-practice",
+        "sections/software-integration",
+        "sections/project-resources",
     )
     index_path = resolve_doc("index")
     index = index_path.read_text()
@@ -42,11 +43,9 @@ def test_safe_defaults_doc_exists() -> None:
 
 
 def test_upgrade_index_in_toctree() -> None:
-    # upgrade/index must be in the THIRD toctree group ("Extensions and project docs"),
-    # not in "Start here". test_top_level_toctree_targets_exist checks only "Start here"
-    # and must NOT be modified.
-    text = (DOCS / "index.md").read_text(encoding="utf-8")
-    assert "upgrade/index" in text
+    # Upgrade guidance belongs with installation and integration, not first use.
+    text = (DOCS / "sections" / "software-integration.md").read_text(encoding="utf-8")
+    assert "Upgrade guides <../upgrade/index>" in text
 
 
 def test_reject_policy_doc_contract_sections_exist() -> None:
@@ -65,3 +64,37 @@ def test_reject_policy_doc_contract_sections_exist() -> None:
 
     for snippet in required_snippets:
         assert snippet in content, f"Missing reject-policy contract snippet: {snippet}"
+
+
+def test_should_keep_one_reachable_sidebar_home_per_document() -> None:
+    """Shared pages remain reachable without repeated parents or navigation cycles."""
+    import posixpath
+    import re
+    from collections import defaultdict
+
+    parents = defaultdict(list)
+    children = defaultdict(list)
+    blocks = re.compile(r"^```\{toctree\}\n(.*?)^```", re.MULTILINE | re.DOTALL)
+    for page in DOCS.rglob("*.md"):
+        parent = page.relative_to(DOCS).as_posix()[:-3]
+        for block in blocks.findall(page.read_text(encoding="utf-8")):
+            for line in block.splitlines():
+                line = line.strip()
+                if not line or line.startswith(":") or line.endswith("<self>"):
+                    continue
+                match = re.match(r".*?\s*<([^>]+)>$", line)
+                target = match.group(1) if match else line
+                target = posixpath.normpath(posixpath.join(posixpath.dirname(parent), target))
+                parents[target].append(parent)
+                children[parent].append(target)
+    assert not {target: owners for target, owners in parents.items() if len(owners) > 1}
+    seen = set()
+
+    def walk(page, ancestors):
+        assert page not in ancestors, f"Navigation cycle: {page}"
+        seen.add(page)
+        for child in children[page]:
+            walk(child, ancestors | {page})
+
+    walk("index", set())
+    assert set(parents) <= seen

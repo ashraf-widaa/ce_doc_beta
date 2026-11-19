@@ -1,13 +1,14 @@
-# Concepts & architecture
+# Concepts and methods
 
-Understand the theory powering calibrated explanations across binary and
-multiclass classification plus probabilistic and interval regression.
-Start with interpretation and alternatives, then follow the architecture
-threads that keep calibration guarantees intact.
+<span id="concepts-architecture"></span>
 
-For proofs, benchmarks, and citations that underpin these concepts,
-visit the {doc}`../../researcher/index` hub before diving into individual
-guides.
+Use this collection to understand an output or mechanism after the
+{doc}`workflow overview <../../sections/how-ce-works>`. Choose a topic below;
+you do not need to read the software architecture first.
+
+The shared {doc}`semantics reference <calibrated_interval_semantics>` records
+mode-specific assumptions and limits. For papers and replication, use the
+{doc}`researcher hub <../../researcher/index>`.
 
 | Concept | Why it matters |
 | --- | --- |
@@ -23,19 +24,23 @@ guides.
 | [Terminology: thresholded vs probabilistic regression](terminology_thresholded_vs_probabilistic_regression.md) | Clarifies language used across ADR-021 and user-facing regression docs. |
 | [Parameter reference](parameter-reference.md) | Canonical definitions and disambiguation table for `threshold`, `confidence`, `significance`, `confidence_level`, and `low_high_percentiles`. |
 
+
+Entry-point tier: Tier 3.
+
+## Related pages
+
+- {doc}`Architecture <architecture>`.
+- {doc}`Error handling and validation <error_handling>`.
+- {doc}`Explanation Structures <explanation_structures>`.
+- {doc}`Glossary and terminology <terminology>`.
+- {doc}`Parameter reference <parameter-reference>`.
+
 ```{toctree}
 :maxdepth: 1
 
-probabilistic_regression
-alternatives
-architecture
-error_handling
-explanation_structures
-guarded_explanations
-calibrated_interval_semantics
-terminology
-terminology_thresholded_vs_probabilistic_regression
-parameter-reference
+Probabilistic and interval regression <probabilistic_regression>
+Alternative explanations and ensured filters <alternatives>
+Guarded explanations <guarded_explanations>
+Calibrated interval semantics <calibrated_interval_semantics>
+Terminology: thresholded vs probabilistic regression <terminology_thresholded_vs_probabilistic_regression>
 ```
-
-Entry-point tier: Tier 3.

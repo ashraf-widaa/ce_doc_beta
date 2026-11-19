@@ -18,14 +18,15 @@ Semantics and non-guarantees are documented in
 Use {doc}`advanced/index` only when you need performance, telemetry, or plugin
 extensions.
 
+
+Entry-point tier: Tier 1.
+
 ```{toctree}
 :maxdepth: 1
 :hidden:
 
-task_api_comparison
-playbooks/index
-advanced/index
-narrative_templates
+Task API Comparison <task_api_comparison>
+Practitioner playbooks <playbooks/index>
+Practitioner advanced topics <advanced/index>
+Narrative Template Customization <narrative_templates>
 ```
-
-Entry-point tier: Tier 1.

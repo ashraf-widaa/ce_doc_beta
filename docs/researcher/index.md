@@ -13,13 +13,14 @@ Use this hub for replication and method-focused analysis.
 
 Track unresolved questions in {doc}`future_work`.
 
+
+Entry-point tier: Tier 1.
+
 ```{toctree}
 :maxdepth: 1
 :hidden:
 
-replication/index
-advanced/index
-future_work
+Replication workflow <replication/index>
+Researcher advanced topics <advanced/index>
+Research Directions <future_work>
 ```
-
-Entry-point tier: Tier 1.

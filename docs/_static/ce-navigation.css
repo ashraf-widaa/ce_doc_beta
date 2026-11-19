@@ -1,0 +1,35 @@
+/* Keep shared navigation readable and operable without changing article styles. */
+.sidebar-tree a { overflow-wrap: anywhere; }
+.sidebar-tree .toctree-l1 > a {
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  min-height: 44px;
+  padding: .5rem 2.5rem .5rem .5rem;
+  line-height: 1.4;
+}
+.sidebar-tree .toctree-l1 > label {
+  width: 44px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.sidebar-tree a:focus-visible, .toc-tree a:focus-visible,
+.sidebar-tree input:focus-visible + label {
+  outline: 2px solid var(--color-brand-primary);
+  outline-offset: -2px;
+  border-radius: 3px;
+}
+@media (max-width: 50em) {
+  .sidebar-tree li > a {
+    box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    min-height: 44px;
+    padding-top: .5rem;
+    padding-bottom: .5rem;
+  }
+  .sidebar-tree label { min-width: 44px; min-height: 44px; }
+  .toc-tree a { display: block; padding: .5rem 0; }
+}

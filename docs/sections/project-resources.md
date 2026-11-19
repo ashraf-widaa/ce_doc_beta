@@ -15,3 +15,16 @@ These resources support the documentation; they are not required tutorial steps.
 Report library issues in the [official issue tracker](https://github.com/Moffran/calibrated_explanations/issues).
 This review copy is maintained separately in [ce_doc_beta](https://github.com/ashraf-widaa/ce_doc_beta).
 Return to the {doc}`homepage <../index>` to choose a learning route.
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+
+Glossary and terminology <../foundations/concepts/terminology>
+Researcher hub <../researcher/index>
+Citing calibrated-explanations <../citing>
+Roadmap <../ROADMAP>
+Contributor hub <../contributor/index>
+Governance & support <../foundations/governance/index>
+RTD tier map <../appendices/rtd_tier_map>
+```

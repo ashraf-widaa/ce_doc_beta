@@ -2,18 +2,19 @@
 
 Release policies, review cadences, and contact points for maintainers.
 
+
+Entry-point tier: Tier 3
+
 ```{toctree}
 :maxdepth: 1
 
-section_owners
-release_checklist
-nav_crosswalk
-optional_telemetry
-governance_events
-test_policy
-waivers_inventory
-release_notes
-pr_guide
+Release checklist <release_checklist>
+Documentation section owners <section_owners>
+Optional telemetry scaffolding <optional_telemetry>
+Navigation crosswalk <nav_crosswalk>
+Governance Events (Plugin + Config Lifecycle) <governance_events>
+Documentation test policy <test_policy>
+Coverage waiver inventory <waivers_inventory>
+Release notes <release_notes>
+Pull Request Guide <pr_guide>
 ```
-
-Entry-point tier: Tier 3

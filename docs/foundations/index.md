@@ -1,13 +1,20 @@
 # Shared foundations
 
-This section hosts the concepts, how-to guides, references, and governance
-materials shared across every audience path.
+These pages support all CE learning routes. Start with the topic needed for
+what you are reading; this collection is not a prerequisite course.
+
+- {doc}`Concepts and methods <concepts/index>`: regression, alternatives, guarded explanations and mode-specific semantics.
+- {doc}`Interpretation <how-to/interpret_explanations>`: reading predictions, rules and plots.
+- {doc}`Integration and operations <how-to/index>`: practical software tasks.
+- {doc}`Technical reference <reference/index>`: parameters, structures and internals.
+- {doc}`Governance and support <governance/index>`: project policies for maintainers.
+
+For a guided introduction, return to {doc}`What & Why <../sections/what-and-why>`
+or {doc}`Quickstart <../get-started/index>`.
 
 ```{toctree}
 :maxdepth: 1
+:hidden:
 
-concepts/index
-how-to/index
-reference/index
-governance/index
+Concepts and methods <concepts/index>
 ```

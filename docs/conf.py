@@ -189,7 +189,7 @@ html_theme = "furo"
 
 # Homepage styles are scoped to ce-home-* classes.
 html_static_path = ["_static"]
-html_css_files = ["ce-home.css"]
+html_css_files = ["ce-home.css", "ce-navigation.css"]
 
 # HTML theme options
 html_theme_options = {

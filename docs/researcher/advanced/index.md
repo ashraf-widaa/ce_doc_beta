@@ -20,9 +20,6 @@ experiments, or surveying the broader calibrated explanations literature.
 :maxdepth: 1
 :hidden:
 
-theory_and_literature
-difficulty_normalized_reject
-../../foundations/concepts/probabilistic_regression
-../../foundations/concepts/alternatives
-../../foundations/how-to/configure_telemetry
+Theory & literature <theory_and_literature>
+Difficulty-Normalized Reject for Conformal Classification <difficulty_normalized_reject>
 ```

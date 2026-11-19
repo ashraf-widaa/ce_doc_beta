@@ -59,6 +59,7 @@ Use {doc}`plugins` for companion extensions and
 environments. Direct routes remain available for {doc}`practitioners <practitioner/index>`,
 {doc}`researchers <researcher/index>` and {doc}`contributors <contributor/index>`.
 The {doc}`documentation map <appendices/rtd_tier_map>` supports maintainers.
+The {doc}`shared foundations <foundations/index>` support every learning route.
 
 </details>
 
@@ -69,64 +70,23 @@ For optional commercial integration, operational deployment or pilot discussions
 [visit Grejna AB](https://grejna.ai/?utm_source=ce_docs&utm_medium=referral&utm_campaign=ce_ecosystem).
 These services are separate from the open-source library and its license.
 
-```{toctree}
-:hidden:
-:maxdepth: 1
-:caption: Documentation sections
 
-sections/what-and-why
-sections/how-ce-works
-sections/in-practice
-sections/software-integration
-sections/project-resources
-```
 
-```{toctree}
-:hidden:
-:maxdepth: 1
-:caption: Start here
 
-get-started/index
-practitioner/index
-researcher/index
-contributor/index
-```
 
-```{toctree}
-:hidden:
-:maxdepth: 1
-:caption: Core references
-
-foundations/index
-tasks/index
-api/index
-```
-
-```{toctree}
-:hidden:
-:maxdepth: 1
-:caption: Companion projects
-
-plugins
-researcher/replication/index
-```
-
-```{toctree}
-:hidden:
-:maxdepth: 1
-:caption: Migration and project docs
-
-migration/index
-upgrade/index
-appendices/changelog_links
-appendices/rtd_tier_map
-get-started/ce_first_agent_guide
-get-started/copilot-setup
-maintenance/legacy-plotting-reference
-compare
-ROADMAP
-citing
-```
 
 
 Entry-point tier: Tier 1.
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+
+Home <self>
+Quickstart <get-started/index>
+CE: What & Why <sections/what-and-why>
+How CE Works <sections/how-ce-works>
+CE in Practice <sections/in-practice>
+CE Software & Integration <sections/software-integration>
+Project & Resources <sections/project-resources>
+```

@@ -20,19 +20,25 @@ Contributor-facing semantics references:
 - `development/adrs/ADR-021-calibrated-interval-semantics.md` (maintainer-only docs set)
 - `development/adrs/ADR-026-explanation-plugin-semantics.md` (maintainer-only docs set)
 
+
+Entry-point tier: Tier 1.
+
+## Related pages
+
+- {doc}`Migration guides <../migration/index>`.
+
 ```{toctree}
 :maxdepth: 1
 :hidden:
 
-plugin-contract
-notebook_policy
-performance_harness
-reject_policy_usage
-extending/plugin-advanced-contract
-extending/guides/index
-extending/advanced
-agent_skills
-../migration/index
+CE-First Calibrated Explanations Guide (OSS) <../get-started/ce_first_agent_guide>
+AI Agent Setup Guide for `calibrated_explanations` <../get-started/copilot-setup>
+Plugin contract <plugin-contract>
+Notebook Policy for `calibrated_explanations` <notebook_policy>
+Performance Harness <performance_harness>
+Reject Policy Usage <reject_policy_usage>
+Advanced plugin wiring and configuration <extending/plugin-advanced-contract>
+Extending guides <extending/guides/index>
+Advanced contributor tooling <extending/advanced>
+Agent skill catalogue <agent_skills>
 ```
-
-Entry-point tier: Tier 1.

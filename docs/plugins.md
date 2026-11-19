@@ -50,7 +50,8 @@ Install and register a plugin only when you trust its source and maintainer.
 Entry-point tier: Tier 1.
 
 ```{toctree}
+:maxdepth: 1
 :hidden:
 
-appendices/external_plugins
+Plugin catalog <appendices/external_plugins>
 ```

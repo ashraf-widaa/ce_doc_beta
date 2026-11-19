@@ -39,13 +39,9 @@ when promoting calibrated explanations into production pipelines.
 :maxdepth: 1
 :hidden:
 
-mondrian-calibration
-ensured-explanations
-decision-policies
-eu-ai-act-compliance
-eu-data-liability-compliance
-../../foundations/how-to/integrate_with_pipelines
-../../foundations/how-to/export_explanations
-../../foundations/governance/release_checklist
-../../foundations/governance/section_owners
+Mondrian (Conditional) Calibration Playbook <mondrian-calibration>
+Ensured Explanations Playbook <ensured-explanations>
+Decision Policies Guide <decision-policies>
+Satisfying EU AI Act Requirements with `calibrated_explanations` <eu-ai-act-compliance>
+Satisfying EU Data, Liability, and Algorithmic Regulations with `calibrated_explanations` <eu-data-liability-compliance>
 ```

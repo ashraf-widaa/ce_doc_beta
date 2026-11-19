@@ -1,18 +1,46 @@
 # CE Software & Integration
 
-Start here to install the library, connect a model and find exact technical details.
-Internal architecture and extension mechanisms are optional deeper material.
+How do you connect CE to your code and find the exact behavior of an operation?
+Start with the public interface; internals and extension contracts come later.
 
-**Start with {doc}`installation <../get-started/installation>`.**
-Then use the guide that matches your task:
+## Install, integrate or look up a call
 
-- **Find the main public calls:** {doc}`Quick API <../get-started/quick_api>`.
-- **Integrate preprocessing and a model:** {doc}`pipeline integration <../foundations/how-to/integrate_with_pipelines>`.
-- **Look up signatures and return values:** {doc}`API reference <../api/index>`.
-- **Configure runtime behavior:** {doc}`configuration guide <../foundations/how-to/configure_runtime>`.
-- **Resolve setup problems:** {doc}`troubleshooting <../get-started/troubleshooting>`.
-- **Upgrade an installation:** {doc}`upgrade guides <../upgrade/index>` and {doc}`migration guides <../migration/index>`.
+| Your task | Use this guide |
+| --- | --- |
+| Set up the package | {doc}`Installation <../get-started/installation>`. |
+| Find the public fit, calibrate, predict and explain calls | {doc}`Quick API <../get-started/quick_api>`. |
+| Connect preprocessing and a model | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>`. |
+| Check signatures, inputs and returned objects | {doc}`API reference <../api/index>`. |
+| Configure runtime behavior, plotting or exports | {doc}`Integration and operations guides <../foundations/how-to/index>`. |
+| Resolve an installation or environment problem | {doc}`Troubleshooting <../get-started/troubleshooting>`. |
 
-For extension work, use {doc}`plugins <../plugins>` and
-{doc}`architecture <../foundations/concepts/architecture>`.
-For an end-to-end example, switch to {doc}`CE in Practice <in-practice>`.
+For an executable introduction rather than a lookup, use
+{doc}`Quickstart <../get-started/index>`. The shared
+{doc}`interpretation guide <../foundations/how-to/interpret_explanations>` explains
+what the outputs mean; API details do not replace their scientific interpretation.
+
+## Maintain or extend an integration
+
+Use {doc}`upgrade guides <../upgrade/index>`, {doc}`migration guides <../migration/index>`
+and {doc}`release notes <../appendices/changelog_links>` when changing versions.
+For implementation work, use {doc}`technical reference and internals <../foundations/reference/index>`
+and {doc}`plugins <../plugins>`.
+
+**Apply CE to a task:** {doc}`CE in Practice <in-practice>`.
+**Find research or contribute:** {doc}`Project & Resources <project-resources>`.
+
+```{toctree}
+:maxdepth: 1
+:hidden:
+
+Installation <../get-started/installation>
+Quick API <../get-started/quick_api>
+API Reference <../api/index>
+Integration and operations guides <../foundations/how-to/index>
+Environment troubleshooting <../get-started/troubleshooting>
+Upgrade guides <../upgrade/index>
+Migration guides <../migration/index>
+Release notes <../appendices/changelog_links>
+Plugins <../plugins>
+Technical reference and internals <../foundations/reference/index>
+```

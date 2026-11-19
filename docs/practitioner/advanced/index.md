@@ -27,15 +27,12 @@ explanation workflow without introducing mandatory dependencies.
 :maxdepth: 1
 :hidden:
 
-use_plugins
-modality-plugins
-normalization-guide
-../../foundations/how-to/configure_telemetry
-../../foundations/how-to/tune_runtime_performance
-reject-policy
-parallel_execution_playbook
-explanation_retrieval
-../../foundations/how-to/plot_with_plotspec
-../../foundations/concepts/telemetry
-../performance-tuning
+Use external plugins <use_plugins>
+Modality plugin selection <modality-plugins>
+Normalization and Difficulty Estimation <normalization-guide>
+Reject Policy Guide <reject-policy>
+Parallel execution playbook (opt-in) <parallel_execution_playbook>
+Explanation retrieval <explanation_retrieval>
+Telemetry (relocated) <../../foundations/concepts/telemetry>
+Performance Tuning Guide <../performance-tuning>
 ```
