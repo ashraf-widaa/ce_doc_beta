@@ -2,6 +2,10 @@
 
 This reference documents the public API for the `calibrated_explanations` package. It includes the main explainer classes, the explanation containers, and the specific explanation types.
 
+For the reviewed source's multiclass bound limitation, see the
+{doc}`classification tutorial <../get-started/quickstart_classification>`. Keep unexpected
+raw output for diagnosis rather than clipping it.
+
 ## Core Explainers
 
 The core of the library is the `CalibratedExplainer`, which handles the calibration of the underlying model. For a scikit-learn compatible interface, use `WrapCalibratedExplainer`.
