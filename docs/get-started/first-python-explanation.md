@@ -143,5 +143,3 @@ A single example does not evaluate your model or establish deployment validity.
 | Find a method or parameter | {doc}`Quick API <quick_api>` or {doc}`API reference <../api/index>`. |
 
 Entry-point tier: Tier 1.
-
-
