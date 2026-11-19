@@ -663,8 +663,10 @@ class WrapCalibratedExplainer:
         guarantee the statistical validity of calibrated feature attributions for
         any particular instance. The calibration validity depends on the
         exchangeability assumption: the calibration set must be representative of
-        the test distribution. Feature attribution magnitudes reflect calibrated
-        probability shifts, not causal importances or ground-truth attribution
+        the test distribution. Feature weights reflect model-response comparisons:
+        target-unit differences for regression without a threshold, and
+        probability differences for classification or threshold-event questions.
+        They are not causal importances or proof of ground-truth attribution
         correctness.
 
         See Also
