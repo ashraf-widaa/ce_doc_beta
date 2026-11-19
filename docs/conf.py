@@ -187,6 +187,10 @@ def _load_shared_fragment(fragment_name: str) -> str:
 # HTML theme
 html_theme = "furo"
 
+# Homepage styles are scoped to ce-home-* classes.
+html_static_path = ["_static"]
+html_css_files = ["ce-home.css"]
+
 # HTML theme options
 html_theme_options = {
     "sidebar_hide_name": False,
