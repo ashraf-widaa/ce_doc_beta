@@ -1,35 +1,71 @@
 # CE: What & Why
 
-What does CE add to a machine-learning prediction? Start here for the purpose
-and ideas; no installation is needed.
+<!-- Preserve descriptive anchors from the previous review layout. -->
+<span id="choose-the-question-you-want-answered"></span>
+<span id="from-a-prediction-to-questions-about-it"></span>
 
-## From a prediction to questions about it
 
-A predictive model uses input features describing a case to estimate an outcome.
-The outcome may be a category, such as a class label, or a numeric target.
-A prediction alone does not explain how the model responds to the features
-of that case. A score that looks like a probability also needs interpretation.
+What can you learn about a prediction before relying on it? This route explains
+the purpose of CE without requiring code or a statistics course.
 
-CE combines prediction calibration with local explanations. It uses separate
-labelled calibration data and provides task-specific prediction information,
-feature conditions and reported ranges. These quantities have different
-meanings; a prediction range and a feature-weight range are not interchangeable.
+## Start with the question, not the software
 
-## Choose the question you want answered
+A predictive model estimates a target from a case's input features. A classifier
+might estimate a category; a regressor a numeric quantity. The shared
+{doc}`predictive-task page <../foundations/concepts/predictive_tasks>` defines
+these terms. CE combines calibration with local explanations of model responses.
 
-| Your question | Shared explanation |
+Prediction, explanation and decision answer different questions:
+
+| Question | Information you need |
 | --- | --- |
-| What can I ask CE to predict? | {doc}`Tasks and capabilities <../tasks/index>`. |
-| How do I read a prediction and its explanation? | {doc}`Interpretation guide <../foundations/how-to/interpret_explanations>`. |
-| How does CE relate to other explanation methods? | {doc}`Method comparison <../compare>`. |
-| What do the terms mean? | {doc}`Glossary and terminology <../foundations/concepts/terminology>`. |
-| What assumptions and limits matter? | {doc}`Calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`. |
+| What does the model predict? | The target, class or event definition and its output scale. |
+| What does the reported range describe? | Which quantity has a range and which method/conditions support it. |
+| Why does the model respond this way? | Feature conditions and comparison responses for this case. |
+| What should I do? | The prediction plus costs, constraints, relevant evidence and decision responsibility. |
 
-Reported ranges do not establish causal effects. Read their method-specific
-meaning with the assumptions on the shared semantics page.
+A housing-value estimate, for example, is not itself a purchase decision. An
+explanation can help you inspect a model response without establishing that a
+particular intervention will change the real outcome.
 
-**Try it:** {doc}`Quickstart <../get-started/index>`.
-**Go deeper:** {doc}`How CE Works <how-ce-works>` connects the workflow to its outputs.
+## What CE adds
+
+CE uses separate labelled calibration data with a trained model. Depending on
+the task, it returns class-probability information, numeric prediction intervals
+or probabilities for events on a numeric target. It also provides factual and
+alternative explanations where supported by the chosen interface and version.
+
+A factual explanation describes conditions holding for the query, with weights
+and ranges. An alternative asks what the model would report under another
+condition. These are model comparisons, not proofs of causation.
+
+Read {doc}`tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`
+for the distinction, or {doc}`inspect a real browser result <../get-started/expert-hub>`
+without installing anything.
+
+## Why calibration and explanation belong together
+
+Accuracy checks predictions against outcomes; probability calibration concerns
+how probability reports relate to observed frequencies. Explaining a model's
+score does not by itself calibrate that score. Conversely, prediction uncertainty
+alone does not explain feature conditions for the particular query.
+
+The {doc}`statistical background <../foundations/concepts/calibration_background>`
+develops those ideas. CE's different ranges must still be read separately;
+they do not share one universal guarantee.
+
+## Decide where CE fits
+
+You need a compatible predictive model and labelled calibration data with the
+required feature representation. Consider the task, available data, intended
+output and evaluation plan before selecting a tool. Use the
+{doc}`comparison with SHAP, LIME and other approaches <../compare>` for different
+questions and outputs, not an unsupported performance ranking.
+
+**Start with an experience:** {doc}`browser Quickstart <../get-started/index>`.
+**Learn the construction:** {doc}`How CE Works <how-ce-works>`.
+**Check exact limits:** {doc}`source-version semantics <../foundations/concepts/calibrated_interval_semantics>`.
+**Look up a term:** {doc}`Glossary <../glossary/index>`.
 
 ```{toctree}
 :maxdepth: 1

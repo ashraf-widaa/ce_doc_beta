@@ -12,6 +12,9 @@ mode-specific assumptions and limits. For papers and replication, use the
 
 | Concept | Why it matters |
 | --- | --- |
+| [Tasks, modes and capabilities](tasks_modes_capabilities.md) | Choose the output question and operation separately. |
+| [Calibration and statistical background](calibration_background.md) | Understand accuracy, calibration, quantiles and assumptions. |
+| [How explanations are built](how_explanations_are_built.md) | Connect conditions, comparison responses and reported quantities. |
 | [Predictive tasks and data roles](predictive_tasks.md) | Shared definitions of features, targets, observations and separate data roles. |
 | [Interpret explanations](../how-to/interpret_explanations.md) | Reuses notebook screenshots and walks through dual uncertainty plus the triangular plot. |
 | [Probabilistic & interval regression](probabilistic_regression.md) | Shows how calibrated probabilities and interval regression stay in lockstep across quickstarts and notebooks. |
@@ -40,6 +43,9 @@ Entry-point tier: Tier 3.
 :maxdepth: 1
 
 Predictive tasks and data roles <predictive_tasks>
+Tasks, modes and capabilities <tasks_modes_capabilities>
+Calibration and statistical background <calibration_background>
+How explanations are built <how_explanations_are_built>
 Probabilistic and interval regression <probabilistic_regression>
 Alternative explanations and ensured filters <alternatives>
 Guarded explanations <guarded_explanations>

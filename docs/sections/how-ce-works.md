@@ -1,40 +1,57 @@
 # How CE Works
 
-How does a trained model become the basis of a calibrated explanation?
-Start with the data roles, then follow the mechanism relevant to your task.
+<!-- Preserve descriptive anchors from the previous review layout. -->
+<span id="choose-an-output-to-understand"></span>
+<span id="follow-the-workflow"></span>
 
-## Follow the workflow
+
+How does CE turn a trained model and calibration data into prediction information
+and an explanation? This route moves from the workflow to mechanisms and their
+statistical conditions. You can stop at the depth needed for your question.
+
+## Follow the same model through the workflow
 
 ```{include} ../_shared/ce-workflow.md
 ```
 
-The shared {doc}`predictive tasks and data roles <../foundations/concepts/predictive_tasks>` page defines the terms used here.
+The model-fitting set, calibration set and evaluation set have different roles.
+A query uses features of the case to predict or explain. Read the shared
+{doc}`data-role definitions <../foundations/concepts/predictive_tasks>` before
+interpreting a split or reusing data.
 
-| Stage | What it does | Where to continue |
+## Choose what to understand next
+
+| Your question | Shared explanation | Afterward |
 | --- | --- | --- |
-| Fit the model | Learn from model-fitting data. | The {doc}`classification <../get-started/quickstart_classification>` and {doc}`regression <../get-started/quickstart_regression>` tutorials show the data splits. |
-| Calibrate | Use separate labelled calibration data for the task-specific calibration procedure. | {doc}`Shared concepts <../foundations/concepts/index>`. |
-| Query and explain | Use the features of a query case to obtain prediction information and explanations. | {doc}`Read CE explanations <../foundations/how-to/interpret_explanations>`. |
+| Which output answers my task? | {doc}`Tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`. | Try that route in the browser or Python. |
+| What is calibration, and how do the statistical methods differ? | {doc}`Calibration and statistical background <../foundations/concepts/calibration_background>`. | Check source-version assumptions and literature. |
+| How does a feature become a weight or alternative? | {doc}`How explanations are built <../foundations/concepts/how_explanations_are_built>`. | Read the resulting rules and plot. |
+| How do I interpret an actual object or figure? | {doc}`Interpret CE explanations <../foundations/how-to/interpret_explanations>`. | Compare one real example. |
+| What can the method guarantee? | {doc}`Canonical interval semantics <../foundations/concepts/calibrated_interval_semantics>`. | Check that the assumptions fit the intended use. |
 
-Calibration data is not the model-fitting set or the held-out evaluation set.
-For general background, see [dividing datasets](https://developers.google.com/machine-learning/crash-course/overfitting/dividing-datasets).
-The CE tutorials show the additional calibration split explicitly.
+## Keep the quantities separate
 
-## Choose an output to understand
+Class-probability bounds concern a probability. A numeric prediction interval
+concerns target values in their units. A threshold-event probability concerns a
+defined event on that target. Feature-weight ranges concern model-response
+comparisons. A similar-looking bar does not make them interchangeable.
 
-- **Class predictions:** use the {doc}`classification task guide <../tasks/classification>`
-  beside the shared {doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`.
-- **Numeric predictions and threshold events:** {doc}`probabilistic and interval regression <../foundations/concepts/probabilistic_regression>` distinguishes the questions.
-- **Factual and alternative explanations:** the {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
-  and {doc}`alternatives guide <../foundations/concepts/alternatives>` connect rules to model responses.
-- **Assumptions and guarantees:** use {doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`
-  as the authoritative reference for this source version.
+The {doc}`regression-mode guide <../foundations/concepts/probabilistic_regression>`
+shows how the same model can answer value and event questions. The
+{doc}`explanation-construction page <../foundations/concepts/how_explanations_are_built>`
+separates baseline predictions, factual weights and alternative predictions.
 
-A probability bound, a target prediction interval and a feature-weight range
-must be interpreted separately. None should be treated as evidence of a causal effect.
+## Go deeper without restarting
 
-**See the ideas in code:** {doc}`CE in Practice <in-practice>`.
-**Explore the papers:** {doc}`theory and literature <../researcher/advanced/theory_and_literature>`.
+Use {doc}`shared foundations <../foundations/index>` as a topic collection,
+and {doc}`theory and literature <../researcher/advanced/theory_and_literature>`
+for papers. Statistical claims need their method, assumptions and version;
+this introduction does not strengthen the canonical guarantees or resolve
+open author-review issues.
+
+**See it happen:** {doc}`browser Quickstart <../get-started/index>`.
+**Run a task:** {doc}`CE in Practice <in-practice>`.
+**Integrate an implementation:** {doc}`Software & Integration <software-integration>`.
 
 ```{toctree}
 :maxdepth: 1

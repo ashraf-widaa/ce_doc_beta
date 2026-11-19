@@ -8,6 +8,7 @@
 <p class="ce-home-lead">Understand predictions with Calibrated Explanations.</p>
 <p>Calibrated Explanations (CE) works with a trained machine-learning model and separate calibration data to provide calibrated prediction information and feature explanations. It supports classification and regression; the meaning of its reported ranges depends on the task and method.</p>
 <div class="ce-home-actions"><a class="ce-home-primary" href="get-started/index.html">Start with Quickstart <span aria-hidden="true">→</span></a><a class="ce-home-secondary" href="sections/what-and-why.html">New to CE? Understand the ideas</a></div>
+<p>No installation needed for the browser Quickstart. Python remains an optional route.</p>
 </div>
 
 ## Documentation
@@ -30,7 +31,7 @@ Find the research, terminology and open-source project.
 
 <div class="ce-home-grid ce-home-resources" role="navigation" aria-label="Project and resources">
 <a class="ce-home-card" href="sections/project-resources.html"><span class="ce-home-card-title">CE Project, Vision &amp; Evolution</span><span class="ce-home-card-description">Research, publications, development plans and ways to contribute.</span><span class="ce-home-card-action">Explore the project <span aria-hidden="true">→</span></span></a>
-<a class="ce-home-card" href="foundations/concepts/terminology.html"><span class="ce-home-card-title">Glossary</span><span class="ce-home-card-description">Start with the existing terminology reference and CE naming conventions.</span><span class="ce-home-card-action">Look up terminology <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="glossary/index.html"><span class="ce-home-card-title">Glossary</span><span class="ce-home-card-description">Shared scientific and software terms, with links for depth.</span><span class="ce-home-card-action">Find a definition <span aria-hidden="true">→</span></span></a>
 <a class="ce-home-card" href="https://github.com/Moffran/calibrated_explanations"><span class="ce-home-card-title">GitHub Repository</span><span class="ce-home-card-description">Official source code, issues and releases.</span><span class="ce-home-card-action">Visit GitHub <span aria-hidden="true">→</span></span></a>
 <a class="ce-home-card" href="https://github.com/Moffran/calibrated_explanations/blob/main/LICENSE"><span class="ce-home-card-title">BSD-3-Clause License</span><span class="ce-home-card-description">The open-source library’s license and reuse terms.</span><span class="ce-home-card-action">Read the license <span aria-hidden="true">→</span></span></a>
 </div>

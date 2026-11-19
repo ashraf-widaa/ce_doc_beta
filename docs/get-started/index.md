@@ -1,150 +1,137 @@
-# Quickstart: create and read your first explanation
+# Quickstart: understand CE and explore it in your browser
 
-<span id="get-started"></span>
-<span id="quickstart"></span>
+<!-- Preserve descriptive anchors from the previous review layout. -->
+<span id="quickstart-create-and-read-your-first-explanation"></span>
 
-See what CE adds to a prediction, run one complete example and read its plot.
-You need basic Python knowledge and Python 3.10 or later. The example uses
-Iris data included with scikit-learn; no account or separate dataset download
-is needed.
 
-## What CE adds
+<span id="get-started"></span><span id="quickstart"></span>
+
+No Python or CE installation is needed for this first learning route. Start
+with the big picture, choose a question, then explore one browser experience.
+For a complete local example instead, use {doc}`First explanation in Python <first-python-explanation>`.
+
+## 1. CE in 60 Seconds
+
+A supervised model uses the features of a case to predict a target: a class or
+a number. CE works with that trained model and separate labelled calibration
+data to provide task-specific prediction information and explanations of the
+model's response. This is a short orientation; allow more time to explore the exercises.
 
 ```{include} ../_shared/ce-workflow.md
 ```
 
-The figure shows the additional stages, not a claim that a conventional ML
-model cannot be calibrated or used with other explanation methods.
+CE need not retrain an already fitted model. Keep calibration data separate
+from the rows used to fit it.
 
-## Predictive tasks
+<details class="ce-home-details"><summary>Predictive tasks: features, targets and observations</summary>
 
 ```{include} ../foundations/concepts/predictive_tasks.md
 :start-after: <!-- predictive-tasks:start -->
 :end-before: <!-- predictive-tasks:end -->
 ```
 
-Here, each observation is one Iris flower. Its four features are sepal length,
-sepal width, petal length and petal width, measured in centimetres. The target
-is the species: **setosa**, **versicolor** or **virginica**. This is classification.
-For optional background, see [supervised learning](https://developers.google.com/machine-learning/intro-to-ml/supervised).
+For background, see [supervised learning](https://developers.google.com/machine-learning/intro-to-ml/supervised).
+The shared {doc}`data-role page <../foundations/concepts/predictive_tasks>`
+explains fitting, calibration and evaluation data.
 
-## 1. Install
+</details>
 
-Run this in the environment used by your script or notebook:
+## 2. Choose your predictive task and CE mode
 
-```bash
-python -m pip install "calibrated-explanations[viz]" scikit-learn
+There are **two predictive tasks** here, classification and regression.
+Regression supports two different output questions:
+
+```{include} ../_shared/task-mode-map.md
+:start-after: <!-- task-mode-map:start -->
+:end-before: <!-- task-mode-map:end -->
 ```
 
-The `viz` extra supplies plotting dependencies. In a notebook, use a kernel
-from that same environment. See {doc}`installation` if setup fails.
+A **capability** is an operation, not another task. A factual explanation
+reports conditions holding for a case with feature weights and ranges. An
+alternative reports what the model would predict under a different condition.
+Neither establishes a causal effect or guarantees a feasible action.
 
-## 2. Keep the data roles separate
+Use the {doc}`full task/mode/capability map <../foundations/concepts/tasks_modes_capabilities>`
+for depth. Browser support must be checked separately from library support.
 
-```{include} ../foundations/concepts/predictive_tasks.md
-:start-after: <!-- data-roles:start -->
-:end-before: <!-- data-roles:end -->
-```
+## 3. Choose your browser experience
 
-The code uses 90 model-fitting rows, 30 calibration rows and 30 evaluation rows.
-These are the existing classification tutorial's splits. Learn more in
-{doc}`the shared data-role explanation <../foundations/concepts/predictive_tasks>`
-or the general guide to [dividing datasets](https://developers.google.com/machine-learning/crash-course/overfitting/dividing-datasets).
+<div class="ce-route-grid" role="navigation" aria-label="Choose a browser learning route">
+<a class="ce-route-card" href="expert-hub.html"><strong>Expert Hub</strong><span>Inspect a dataset, prepare/calibrate and compare factual and alternative outputs.</span><span>Diabetes classification · Housing value and event questions</span><span>Follow the technical guide →</span></a>
+<a class="ce-route-card" href="decision-lab.html"><strong>Decision Lab</strong><span>Inspect model support before making a simulated decision.</span><span>Guided Mission Control · Precision Works</span><span>Follow the decision guide →</span></a>
+</div>
 
-Calibration is not another model-fitting step. For general probability-calibration
-background, see [scikit-learn's calibration guide](https://scikit-learn.org/stable/modules/calibration.html).
-For CE-specific assumptions and range meanings, use the
-{doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`.
+Choose one route; you do not need to finish both. Both apps are under active development.
 
-## 3. Run the complete example
+## 4. Explore one explanation
 
-Copy the block into one notebook cell or save it as `first_explanation.py` and
-run `python first_explanation.py`. You can also
-{download}`download the script <../_examples/first_explanation.py>`.
-The selected case is the second evaluation row, `x_test[1:2]`; no target value
-is supplied to explain it. Other cases can expose the multiclass range limitation
-described under **If the result differs** below.
+**Technical route:** open [Expert Hub](https://calibrated-explanations-demo.ju.se/expert),
+choose **Diabetes (Binary Classification)**, then **Next: Prepare & Calibrate →
+Prepare Random Forest + Calibrate**. Wait for **Calibrated**, select **Next:
+Explain**, then row **0** under **Test Set Instances**. Inspect **Factual** and
+**Alternatives (n)**. Follow the {doc}`verified guide <expert-hub>` for screenshots,
+regression mode controls and current interface qualifications.
 
-```{literalinclude} ../_examples/first_explanation.py
-:language: python
-```
+**Decision route:** open the [guided Mission Control WHY exercise](https://games.grejna.ai/learn/mission/l4?from=explanations-alternatives).
+Read the mission costs, **CHANCE OF SUCCESS** and **COULD BE ANYWHERE IN**.
+Inspect **WHY?** before choosing **GO** or **STOP**, then reflect on feedback.
+The {doc}`Decision Lab guide <decision-lab>` covers the verified exercise and
+numeric/event options. Its level-4 exercise does not expose every capability.
 
-The example uses the public wrapper to **fit → calibrate → predict → explain**.
-It should print:
+If an application is unavailable, the guides retain dated real captures to
+inspect. For an executable alternative, use the optional Python route below.
 
-```{literalinclude} ../_examples/first_explanation_output.txt
-:language: text
-```
+## 5. Understand what you see
 
-The three probabilities follow `dataset.target_names`: setosa, versicolor,
-virginica. The largest reported probability belongs to versicolor. Numeric
-values can vary with software versions; these values were checked in the
-review environment. Do not suppress warnings or clip bounds to force a match.
+Read **the output quantity → its units → its range → a feature condition →
+a weight or alternative prediction**. These are different quantities.
 
-## 4. Read the plot
+A captured Expert Hub Diabetes case reported probability 0.7448 and bounds
+[0.7273, 0.7959]. Its `plas < 147.50` alternative reported
+0.2719 [0.2487, 0.2811]. Those values came from the browser trial; they are not
+the expected output of a different Python case or a clinical recommendation.
 
-The last line displays the factual explanation. In a script, a supported
-Matplotlib window should open; close it to finish. In a notebook the plot
-normally appears beneath the cell. Here is the generated plot for this case:
+For a numeric prediction, read the interval in target units. For a threshold
+event, identify the event first and read its probability bounds on a probability
+scale. A feature-weight range does not inherit a universal per-feature coverage
+guarantee. Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
+and {doc}`canonical semantics <../foundations/concepts/calibrated_interval_semantics>`
+for detail. One game outcome or tutorial case does not validate a deployment.
 
-```{figure} assets/first-explanation.png
-:alt: CE factual explanation for the Iris versicolor case, with prediction information above four feature conditions and their weights and ranges.
-:width: 100%
+## 6. Continue learning
 
-Factual explanation generated by the example. Select the plot for a larger view.
-```
-
-[Download the full-size plot](assets/first-explanation.png).
-
-Read the figure in this order:
-
-1. **Prediction information:** the example reports versicolor with probability
-   about `0.910` and returned bounds `[0.902, 0.992]`. These are prediction
-   quantities; they are not feature weights or a confidence interval for the
-   individual's true class probability. In the figure, `y=1` means versicolor;
-   `y!=1` means either of the other species.
-2. **Feature conditions:** each label describes a condition that holds for this
-   flower, such as `petal width (cm) > 0.65`.
-3. **Feature weights:** positive weights here describe a higher model probability
-   for the explained class relative to CE's substituted feature scenarios;
-   negative weights describe a lower probability. They are not causal effects
-   or Shapley values.
-4. **Weight ranges:** read the range alongside the weight. For example, a positive
-   point weight can have a range that crosses zero. These ranges do not inherit
-   a universal per-feature coverage guarantee.
-
-The shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
-explains rules, records and plots in more detail. Different quantities require
-{doc}`different semantics and assumptions <../foundations/concepts/calibrated_interval_semantics>`.
-A single example does not evaluate your model or establish deployment validity.
-
-## If the result differs or no plot appears
-
-- **Import or environment error:** follow {doc}`troubleshooting` and check that
-  installation and execution use the same Python environment.
-- **No figure:** confirm that the `viz` extra and a notebook or desktop plotting
-  backend are available. A headless server needs a saved image instead of a GUI.
-- **Unexpected ranges:** the baseline can return multiclass bounds outside
-  `[0, 1]` for some cases. This worked case is not evidence that all multiclass
-  bounds are conventional probability intervals. Keep the raw output and seek
-  maintainer review; do not clip it. See the
-  {doc}`documented review limitation <quickstart_classification>`.
-
-## Choose your next step
-
-| Your goal | Continue with |
+| Your next question | Continue with |
 | --- | --- |
-| Explore more classification calls and alternatives | {doc}`Classification tutorial <quickstart_classification>`. |
-| Predict a numeric target or ask about a threshold | {doc}`Regression tutorial <quickstart_regression>`. |
-| Use an existing model and preprocessing | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>`. |
-| Understand the mechanisms and assumptions | {doc}`How CE Works <../sections/how-ce-works>`. |
-| Find a method or parameter | {doc}`Quick API <quick_api>` or {doc}`API reference <../api/index>`. |
+| Why use CE? | {doc}`CE: What & Why <../sections/what-and-why>`. |
+| How are calibration and explanations constructed? | {doc}`How CE Works <../sections/how-ce-works>`. |
+| Can I run a complete example? | {doc}`First explanation in Python <first-python-explanation>`. |
+| How do I install the library? | {doc}`Installation <installation>`; optional for the browser route. |
+| What about another task? | {doc}`Classification <quickstart_classification>` or {doc}`regression and event probabilities <quickstart_regression>`. |
+| How do I assess my own results? | {doc}`Practitioner Hub <../practitioner/index>` and {doc}`check results <../practitioner/check_results>`. |
+| Where are exact calls and settings? | {doc}`Quick API <quick_api>` and {doc}`Software & Integration <../sections/software-integration>`. |
+
+The earlier local workflow is retained in full at {doc}`first-python-explanation`,
+including its code, output, plot and multiclass limitation. No installation is
+required until you choose that route.
 
 Entry-point tier: Tier 1.
 
 ```{toctree}
-:maxdepth: 1
 :hidden:
+:maxdepth: 1
 
+Expert Hub: technical exploration <expert-hub>
+Decision Lab: learn through decisions <decision-lab>
+First explanation in Python <first-python-explanation>
 Choose your task <../getting_started_60s>
 ```
+
+<!-- Legacy headings bridge to the retained Python tutorial. -->
+<span id="what-ce-adds"></span>
+<span id="predictive-tasks"></span>
+<span id="install"></span>
+<span id="keep-the-data-roles-separate"></span>
+<span id="run-the-complete-example"></span>
+<span id="read-the-plot"></span>
+<span id="if-the-result-differs-or-no-plot-appears"></span>
+<span id="choose-your-next-step"></span>

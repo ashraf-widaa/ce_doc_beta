@@ -8,7 +8,7 @@ The core of the library is the `CalibratedExplainer`, which handles the calibrat
 
 ### CalibratedExplainer
 
-The `CalibratedExplainer` is the core class of the library. It takes a machine learning model (classifier or regressor) and a calibration dataset. It fits Venn-Abers calibrators (for classification) or Conformal Predictive Systems (for regression) to the model's predictions. This process ensures that the explanations generated are calibrated, meaning the predicted probabilities or intervals reflect the true underlying uncertainty.
+The `CalibratedExplainer` is the core class of the library. It takes a machine learning model (classifier or regressor) and a calibration dataset. It fits Venn-Abers calibrators (for classification) or Conformal Predictive Systems (for regression) to the model's predictions. These classes provide task-specific prediction information and explanation outputs. Their statistical meaning depends on the method and assumptions; see {doc}`canonical semantics <../foundations/concepts/calibrated_interval_semantics>`.
 
 For a task-oriented view of the same capabilities (classification, conformal interval regression via CPS, and probabilistic/thresholded regression), see {doc}`../tasks/index`.
 
@@ -22,8 +22,11 @@ from sklearn.model_selection import train_test_split
 
 # Load data
 X, y = load_iris(return_X_y=True)
-x_train, x_cal, y_train, y_cal = train_test_split(
+x_train, x_test, y_train, y_test = train_test_split(
     X, y, test_size=0.2, stratify=y, random_state=0
+)
+x_train, x_cal, y_train, y_cal = train_test_split(
+    x_train, y_train, test_size=0.25, stratify=y_train, random_state=0
 )
 
 # Train model
@@ -34,17 +37,10 @@ model.fit(x_train, y_train)
 explainer = CalibratedExplainer(model, x_cal, y_cal, mode='classification')
 
 # Explain a test instance
-x_test = x_cal[:1]
-explanations = explainer.explain_factual(x_test)
+explanations = explainer.explain_factual(x_test[:1])
 ```
 
-`{eval-rst}
-.. autoclass:: calibrated_explanations.core.calibrated_explainer.CalibratedExplainer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :inherited-members:
-`
+{doc}`Generated class and method reference <../_autosummary/calibrated_explanations.core.CalibratedExplainer>`
 
 ### WrapCalibratedExplainer
 
@@ -79,13 +75,7 @@ wrapper.calibrate(x_cal, y_cal)
 explanations = wrapper.explain_factual(x_test[:1])
 ```
 
-`{eval-rst}
-.. autoclass:: calibrated_explanations.core.wrap_explainer.WrapCalibratedExplainer
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :inherited-members:
-`
+{doc}`Generated class and method reference <../_autosummary/calibrated_explanations.core.WrapCalibratedExplainer>`
 
 ## Explanation Containers
 
@@ -116,13 +106,7 @@ When FAST-based feature filtering is enabled (experimental), the `CalibratedExpl
 
 - `feature_filter_per_instance_ignore`: On the returned collection, a best-effort list of per-instance feature-index masks produced by filtering. The `CalibratedExplainer` also exposes the transient mask from the most recent filtered batch under the same attribute name. This diagnostic metadata is not part of the stable API.
 
-`{eval-rst}
-.. autoclass:: calibrated_explanations.explanations.explanations.CalibratedExplanations
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :inherited-members:
-`
+{doc}`Generated class and method reference <../_autosummary/calibrated_explanations.explanations.CalibratedExplanations>`
 
 ## Explanation Types
 
@@ -132,13 +116,7 @@ Individual explanations are represented by specific classes depending on the typ
 
 This is the abstract base class for a single explanation. It contains the instance data, the prediction, and the feature weights (rules) that explain the prediction. It provides methods for plotting the explanation.
 
-`{eval-rst}
-.. autoclass:: calibrated_explanations.explanations.explanation.CalibratedExplanation
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :inherited-members:
-`
+{doc}`Generated class and method reference <../_autosummary/calibrated_explanations.explanations.CalibratedExplanation>`
 
 ### FactualExplanation
 
@@ -154,13 +132,7 @@ factual_explanation.plot()
 factual_explanation.add_conjunctions()
 ```
 
-`{eval-rst}
-.. autoclass:: calibrated_explanations.explanations.explanation.FactualExplanation
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :inherited-members:
-`
+{doc}`Generated class and method reference <../_autosummary/calibrated_explanations.explanations.FactualExplanation>`
 
 ### AlternativeExplanation
 
@@ -173,12 +145,6 @@ An `AlternativeExplanation` (often called a counterfactual explanation) explores
 alternative_explanation.plot()
 ```
 
-`{eval-rst}
-.. autoclass:: calibrated_explanations.explanations.explanation.AlternativeExplanation
-   :members:
-   :undoc-members:
-   :show-inheritance:
-   :inherited-members:
-`
+{doc}`Generated class and method reference <../_autosummary/calibrated_explanations.explanations.AlternativeExplanation>`
 
 Entry-point tier: Tier 3.

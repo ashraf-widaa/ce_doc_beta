@@ -1,6 +1,8 @@
 # Practitioner hub
 
-Start with a task quickstart, then move to interpretation and deployment playbooks.
+Choose a practical task, interpret its result and check it before adapting
+advanced workflows. Browser and Python routes are both available from
+{doc}`CE in Practice <../sections/in-practice>`.
 
 ## Core path
 
@@ -12,6 +14,11 @@ Start with a task quickstart, then move to interpretation and deployment playboo
 
 Semantics and non-guarantees are documented in
 {doc}`../foundations/concepts/calibrated_interval_semantics`.
+
+## Check your result before extending
+
+Use {doc}`check_results` for held-out probability, interval and event checks.
+An explanation or teaching game is not a deployment evaluation.
 
 ## Optional tools
 
@@ -25,6 +32,7 @@ Entry-point tier: Tier 1.
 :maxdepth: 1
 :hidden:
 
+Check results on your data <check_results>
 Task API Comparison <task_api_comparison>
 Practitioner playbooks <playbooks/index>
 Practitioner advanced topics <advanced/index>

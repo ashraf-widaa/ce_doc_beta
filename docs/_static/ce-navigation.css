@@ -42,3 +42,14 @@
 .ce-workflow-lane li { padding: .6rem .3rem; line-height: 1.5; }
 .ce-workflow figcaption { margin-top: .8rem; font-size: .9rem; line-height: 1.5; }
 @media (max-width: 600px) { .ce-workflow-grid { grid-template-columns: minmax(0,1fr); } }
+
+.ce-mode-grid { display: grid; grid-template-columns: repeat(3,minmax(0,1fr)); gap: 1rem; margin: 1.25rem 0; }
+.ce-mode-card, .ce-route-card { min-width: 0; padding: 1rem; border: 1px solid var(--color-background-border); border-radius: .6rem; background: var(--color-background-secondary); overflow-wrap: anywhere; }
+.ce-mode-card h3 { font-size: 1.1rem; margin: 0 0 .75rem; }
+.ce-mode-card p { margin: .5rem 0; }
+.ce-route-grid { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; margin: 1.25rem 0; }
+.ce-route-card { display: flex; flex-direction: column; gap: .75rem; color: var(--color-foreground-primary); text-decoration: none; }
+.ce-route-card:hover { border-color: var(--color-brand-primary); text-decoration: none; }
+.ce-route-card > span:last-child { margin-top: auto; color: var(--color-brand-content); font-weight: 650; }
+.ce-route-card:focus-visible { outline: 3px solid var(--color-brand-primary); outline-offset: 3px; }
+@media (max-width: 700px) { .ce-mode-grid, .ce-route-grid { grid-template-columns: minmax(0,1fr); } }

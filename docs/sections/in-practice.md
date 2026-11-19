@@ -1,32 +1,53 @@
 # CE in Practice
 
-What do you want to do with CE? Choose one task, run the example and use the
-shared interpretation guide to understand the result.
+<!-- Preserve descriptive anchors from the previous review layout. -->
+<span id="build-on-the-ordinary-example"></span>
+<span id="choose-a-practical-route"></span>
 
-## Choose a practical route
 
-| Your goal | Start | Continue |
+What do you want to do with CE? Choose one practical route, inspect the result,
+then check whether the workflow is appropriate for your own data.
+
+## Choose your starting activity
+
+| Your goal | Start here | Continue with |
 | --- | --- | --- |
-| Run CE for the first time | {doc}`Quickstart <../get-started/index>` | The tutorial for your task. |
-| Explain a category prediction | {doc}`Classification tutorial <../get-started/quickstart_classification>` | {doc}`Read the explanation <../foundations/how-to/interpret_explanations>`. |
-| Explain a numeric prediction or threshold event | {doc}`Regression tutorial <../get-started/quickstart_regression>` | The same interpretation guide, using the meaning for your mode. |
-| Use an existing model or preprocessing pipeline | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>` | {doc}`API reference <../api/index>` for exact inputs and returns. |
+| Explore without installation | {doc}`Browser Quickstart <../get-started/index>`. | {doc}`Expert Hub <../get-started/expert-hub>` or {doc}`Decision Lab <../get-started/decision-lab>`. |
+| Run a complete local example | {doc}`First explanation in Python <../get-started/first-python-explanation>`. | {doc}`Interpretation <../foundations/how-to/interpret_explanations>`. |
+| Use a classifier | {doc}`Classification tutorial <../get-started/quickstart_classification>`. | {doc}`Check results <../practitioner/check_results>`. |
+| Predict a number or an event on it | {doc}`Regression tutorial <../get-started/quickstart_regression>`. | {doc}`Regression mode meanings <../foundations/concepts/probabilistic_regression>`. |
+| Connect an existing model or preprocessing | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>`. | {doc}`Software & Integration <software-integration>`. |
 
-## Build on the ordinary example
+## Know which dataset and target you are using
 
-After a first explanation, use {doc}`guarded explanations <../get-started/quickstart_guarded>`
-if that filtering is relevant, or explore {doc}`practitioner playbooks <../practitioner/playbooks/index>`
-for more specific workflows. These are optional next choices.
+| Example | Target / task | Important distinction |
+| --- | --- | --- |
+| Browser Diabetes | Pima binary class | This is not Sklearn's numeric diabetes regression dataset. |
+| Browser California Housing | Numeric housing value; target units $100,000 | A threshold of 3 means $300,000 for this dataset. |
+| First Python example | Iris species / multiclass classification | It uses the reviewed library source and records its multiclass limitation. |
+| Existing Python regression tutorial | Numeric diabetes target | Numeric intervals and event probabilities answer different questions. |
 
-The {doc}`task map <../tasks/index>` helps distinguish output modes. The
-{doc}`practitioner hub <../practitioner/index>` collects advanced practical material.
+Use the example's actual labels, units, split and selected row. Do not transplant
+browser values into another dataset or assume a teaching game's backend matches
+the installed library version.
 
-One worked example does not establish validity for another dataset or deployment.
-Check the {doc}`method-specific assumptions and limits <../foundations/concepts/calibrated_interval_semantics>`
-when interpreting results on your data.
+## Interpret before extending
 
-**Understand why an output has that meaning:** {doc}`How CE Works <how-ce-works>`.
-**Configure or troubleshoot the library:** {doc}`CE Software & Integration <software-integration>`.
+Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
+for conditions, weights, predictions and ranges. Then move to
+{doc}`guarded explanations <../get-started/quickstart_guarded>` if filtering is
+relevant, or {doc}`practitioner playbooks <../practitioner/playbooks/index>` for
+specific decision workflows. These are optional, not prerequisites.
+
+## Check what the example does not establish
+
+One plot is not an evaluation. Use {doc}`checking results on your data <../practitioner/check_results>`
+for task-appropriate held-out checks and limitations. Keep scientific
+{doc}`assumptions and non-guarantees <../foundations/concepts/calibrated_interval_semantics>`
+visible when adapting the workflow.
+
+**Understand the mechanism:** {doc}`How CE Works <how-ce-works>`.
+**Find advanced material:** {doc}`Practitioner Hub <../practitioner/index>`.
 
 ```{toctree}
 :maxdepth: 1

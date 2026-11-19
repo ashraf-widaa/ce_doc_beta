@@ -1,0 +1,25 @@
+# Browser capture provenance
+
+These are unmodified screenshots of public built-in examples or simulated games,
+captured on 19 November 2026. They are not generated app interfaces or claims of
+independent backend validation. Values and labels can change with app versions.
+
+| Assets | Source and state |
+| --- | --- |
+| expert-calibrated, expert-factual, expert-factual-focus, expert-alternatives | https://calibrated-explanations-demo.ju.se/expert — Diabetes (Binary Classification), default split, calibrated, selected test row 0. |
+| housing-factual | Same Expert Hub — California Housing, numeric interval, test row 0. |
+| threshold-factual | Same Expert Hub — Housing with threshold switch on, threshold 3 in $100,000 units, row 0. |
+| mission-why, mission-feedback | https://games.grejna.ai/learn/mission/l4?from=explanations-alternatives — guided WHY practice, one decision and feedback. |
+| precision-forecast, precision-limit, precision-alternatives | https://games.grejna.ai/games/precision-works — assessed preset recipe; Characterisation batch/FORECAST, Heavy-duty shafts/LIMIT, and forecast alternatives. |
+
+The optional `scripts/docs/capture_browser_examples.cjs` reproduces the Expert
+Diabetes factual capture using real interactions. It needs Playwright and Chromium
+installed separately and is not run by Sphinx or RTD. Run it with a scratch output
+directory; check its text/manifest against the accompanying prose before replacing
+any asset. `CE_CHROMIUM_EXECUTABLE` can select an installed browser. The managed
+review environment's proxy required `CE_BROWSER_IGNORE_TLS_ERRORS=1`; normal
+capture environments should leave that disabled and use valid certificate trust.
+
+The focused image is an actual element screenshot, not edited or fabricated
+pixels. The full factual capture remains available as a download. No user uploads,
+login credentials, local storage or session-state files are included.

@@ -2,7 +2,7 @@
 
 Run calibrated explanations for binary or multiclass classification.
 
-**First visit?** {doc}`Quickstart <index>` runs this same Iris dataset and split
+**First visit?** {doc}`First explanation in Python <first-python-explanation>` runs this same Iris dataset and split
 through a complete result and plot. This page retains the broader classification
 calls, including the explicitly experimental all-class option below.
 
