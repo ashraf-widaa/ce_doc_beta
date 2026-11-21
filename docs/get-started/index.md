@@ -1,133 +1,89 @@
-# Quickstart: understand CE and explore it in your browser
+# CE big picture in 60 seconds
 
-<!-- Preserve descriptive anchors from the previous review layout. -->
-<span id="quickstart-create-and-read-your-first-explanation"></span>
+Calibrated Explanations (CE) works with **supervised machine-learning models**:
+models trained on examples with known outcomes. CE combines calibration with
+explanations of individual model predictions. Start with the overview below;
+follow the deeper links only when you need them.
 
+## What CE adds to the workflow
 
-<span id="get-started"></span><span id="quickstart"></span>
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-big-picture-mobile.svg">
+<img src="../_static/figures/ce-big-picture.svg" width="960" height="510" alt="White boxes show labelled training data, a fitted model and a conventional prediction for a new case. Orange boxes show separate labelled calibration data and CE, using the same fitted model and new case, to return calibrated prediction information and factual or alternative explanations with reported ranges.">
+</picture>
 
-No Python or CE installation is needed for this first learning route. Start
-with the big picture, choose a question, then explore one browser experience.
-For a complete local example instead, use {doc}`First explanation in Python <first-python-explanation>`.
+**White boxes:** the conventional prediction workflow shown here.
+**Orange boxes:** CE's additions. Other ML workflows can also include uncertainty
+or calibration methods. [Open the full-size figure](../_static/figures/ce-big-picture.svg).
 
-## 1. CE in 60 Seconds
+1. **Learn from labelled training data.** Each observation has input **features**
+   describing a case and a known **target**, the outcome to predict. Training
+   produces the fitted model.
+2. **Predict a new case.** The fitted model uses the new case's features to
+   estimate its target. A class, value or score alone does not describe the
+   feature conditions contributing to that response.
+3. **Calibrate with separate labelled data.** CE uses the fitted model and
+   calibration cases not used to fit it. This supports task-specific calibrated
+   prediction information; CE need not retrain the model. Keep a separate
+   evaluation set to check the resulting system.
+4. **Read prediction information and explanations.** For the new case, inspect
+   the calibrated output and its reported range. A factual explanation shows
+   feature conditions and their weights with ranges; alternatives show what the
+   model would report under different conditions. These comparisons help inspect
+   the model; they do not establish real-world causes or prescribe a decision.
 
-A supervised model uses the features of a case to predict a target: a class or
-a number. CE works with that trained model and separate labelled calibration
-data to provide task-specific prediction information and explanations of the
-model's response. This is a short orientation; allow more time to explore the exercises.
+For the data roles and vocabulary, see
+{doc}`Predictive tasks <../foundations/concepts/predictive_tasks>`.
+For general background, see
+[supervised learning — Google for Developers](https://developers.google.com/machine-learning/intro-to-ml/supervised).
 
-```{include} ../_shared/ce-workflow.md
-```
+## Task, mode and capability: three different choices
 
-CE need not retrain an already fitted model. Keep calibration data separate
-from the rows used to fit it.
-
-<details class="ce-home-details"><summary>Predictive tasks: features, targets and observations</summary>
-
-```{include} ../foundations/concepts/predictive_tasks.md
-:start-after: <!-- predictive-tasks:start -->
-:end-before: <!-- predictive-tasks:end -->
-```
-
-For background, see [supervised learning](https://developers.google.com/machine-learning/intro-to-ml/supervised).
-The shared {doc}`data-role page <../foundations/concepts/predictive_tasks>`
-explains fitting, calibration and evaluation data.
-
-</details>
-
-## 2. Choose your predictive task and CE mode
-
-There are **two predictive tasks** here, classification and regression.
-Regression supports two different output questions:
+A **task** says what the model predicts: **classification** predicts a category;
+**regression** predicts a numerical quantity. A **mode** says which question you
+ask CE about that prediction. Regression supports both value and event questions.
+A **capability** is an operation you perform, such as a factual explanation or
+exploring alternatives; it is not another predictive task.
 
 ```{include} ../_shared/task-mode-map.md
 :start-after: <!-- task-mode-map:start -->
 :end-before: <!-- task-mode-map:end -->
 ```
 
-A **capability** is an operation, not another task. A factual explanation
-reports conditions holding for a case with feature weights and ranges. An
-alternative reports what the model would predict under a different condition.
-Neither establishes a causal effect or guarantees a feasible action.
+In every mode, keep the prediction, factual weight and alternative prediction
+separate. Probability differences use a probability scale; numerical differences
+use the target's units. See the
+{doc}`task, mode and capability guide <../foundations/concepts/tasks_modes_capabilities>`
+for detailed distinctions and version-specific support. Conceptual modes are not
+three interchangeable constructor settings.
 
-Use the {doc}`full task/mode/capability map <../foundations/concepts/tasks_modes_capabilities>`
-for depth. Browser support must be checked separately from library support.
+## What can you rely on?
 
-## 3. Choose your browser experience
+CE's guarantees and assumptions are **mode-specific**. Probability bounds,
+target-value prediction intervals and feature-weight ranges do not share one
+universal guarantee. Read the
+{doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`
+for the precise statements and limitations; a range is not a guarantee for this
+individual case, a causal effect or protection against distribution shift.
 
-<div class="ce-route-grid" role="navigation" aria-label="Choose a browser learning route">
-<a class="ce-route-card" href="expert-hub.html"><strong>Expert Hub</strong><span>Inspect a dataset, prepare/calibrate and compare factual and alternative outputs.</span><span>Diabetes classification · Housing value and event questions</span><span>Follow the technical guide →</span></a>
-<a class="ce-route-card" href="decision-lab.html"><strong>Decision Lab</strong><span>Inspect model support before making a simulated decision.</span><span>Guided Mission Control · Precision Works</span><span>Follow the decision guide →</span></a>
-</div>
+## Choose one step-by-step example
 
-Choose one route; you do not need to finish both. Both apps are under active development.
+Choose your question first. Each example page then offers **browser** and
+**local Python** routes; you do not need to complete both.
 
-## 4. Explore one explanation
+- **Which class, and how probable?** Start the
+  {doc}`classification example <example-classification>`.
+- **What numerical value, and within what interval?** Start the
+  {doc}`interval regression example <example-interval>`.
+- **How probable is an event on a numerical target?** Start the
+  {doc}`event-probability example <example-event>`.
 
-**Technical route:** open [Expert Hub](https://calibrated-explanations-demo.ju.se/expert),
-choose **Diabetes (Binary Classification)**, then **Next: Prepare & Calibrate →
-Prepare Random Forest + Calibrate**. Wait for **Calibrated**, select **Next:
-Explain**, then row **0** under **Test Set Instances**. Inspect **Factual** and
-**Alternatives (n)**. Follow the {doc}`verified guide <expert-hub>` for screenshots,
-regression mode controls and current interface qualifications.
+Browser and local tutorials can use different datasets and software versions.
+Compare the workflow and output meanings, not identical numerical results.
 
-**Decision route:** open the [guided Mission Control WHY exercise](https://games.grejna.ai/learn/mission/l4?from=explanations-alternatives).
-Read the mission costs, **CHANCE OF SUCCESS** and **COULD BE ANYWHERE IN**.
-Inspect **WHY?** before choosing **GO** or **STOP**, then reflect on feedback.
-The {doc}`Decision Lab guide <decision-lab>` covers the verified exercise and
-numeric/event options. Its level-4 exercise does not expose every capability.
-
-If an application is unavailable, the guides retain dated real captures to
-inspect. For an executable alternative, use the optional Python route below.
-
-## 5. Understand what you see
-
-Start with one result rather than every setting. In the Diabetes browser example,
-the output is a probability for the positive class. In California Housing,
-first decide whether you asked for a housing value or for the probability of
-an event on that value. That choice determines the scale you should read.
-
-
-Read **the output quantity → its units → its range → a feature condition →
-a weight or alternative prediction**. These are different quantities.
-
-A captured Expert Hub Diabetes case reported probability 0.7448 and bounds
-[0.7273, 0.7959]. Its `plas < 147.50` alternative reported
-0.2719 [0.2487, 0.2811]. Those values came from the browser trial; they are not
-the expected output of a different Python case or a clinical recommendation.
-
-For a numeric prediction, read the interval in target units. For a threshold
-event, identify the event first and read its probability bounds on a probability
-scale. A feature-weight range does not inherit a universal per-feature coverage
-guarantee. Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
-and {doc}`canonical semantics <../foundations/concepts/calibrated_interval_semantics>`
-for detail. One game outcome or tutorial case does not validate a deployment.
-
-**Pause and check:** can you name the predicted quantity, its units and one
-feature condition? Can you distinguish that condition's weight from an
-alternative prediction? If not, keep the result open and use the
-{doc}`interpretation guide <../foundations/how-to/interpret_explanations>`.
-For the calculation behind a weight, continue to
-{doc}`How explanations are built <../foundations/concepts/how_explanations_are_built>`;
-for what a range does and does not establish, use the canonical semantics linked
-above. These are deeper explanations of the same result, not new exercises.
-
-## 6. Continue learning
-
-| Your next question | Continue with |
-| --- | --- |
-| Why use CE? | {doc}`CE: What & Why <../sections/what-and-why>`. |
-| How are calibration and explanations constructed? | {doc}`How CE Works <../sections/how-ce-works>`. |
-| Can I run a complete example? | {doc}`First explanation in Python <first-python-explanation>`. |
-| How do I install the library? | {doc}`Installation <installation>`; optional for the browser route. |
-| What about another task? | {doc}`Classification <quickstart_classification>` or {doc}`regression and event probabilities <quickstart_regression>`. |
-| How do I assess my own results? | {doc}`Practitioner Hub <../practitioner/index>` and {doc}`check results <../practitioner/check_results>`. |
-| Where are exact calls and settings? | {doc}`Quick API <quick_api>` and {doc}`Software & Integration <../sections/software-integration>`. |
-
-The earlier local workflow is retained in full at {doc}`first-python-explanation`,
-including its code, output, plot and multiclass limitation. No installation is
-required until you choose that route.
+**Go deeper:** {doc}`Why CE? <../sections/what-and-why>` ·
+{doc}`How CE works <../sections/how-ce-works>` ·
+{doc}`Read an explanation <../foundations/how-to/interpret_explanations>`.
 
 Entry-point tier: Tier 1.
 
@@ -135,18 +91,30 @@ Entry-point tier: Tier 1.
 :hidden:
 :maxdepth: 1
 
+Classification example <example-classification>
+Interval regression example <example-interval>
+Event-probability example <example-event>
 Expert Hub: technical exploration <expert-hub>
 Decision Lab: learn through decisions <decision-lab>
 First explanation in Python <first-python-explanation>
 Choose your task <../getting_started_60s>
 ```
 
-<!-- Legacy headings bridge to the retained Python tutorial. -->
-<span id="what-ce-adds"></span>
-<span id="predictive-tasks"></span>
+<!-- Preserve links from earlier Quick Start candidates. -->
+<span id="1-ce-in-60-seconds"></span>
+<span id="2-choose-your-predictive-task-and-ce-mode"></span>
+<span id="3-choose-your-browser-experience"></span>
+<span id="4-explore-one-explanation"></span>
+<span id="5-understand-what-you-see"></span>
+<span id="6-continue-learning"></span>
+<span id="choose-your-next-step"></span>
+<span id="get-started"></span>
+<span id="if-the-result-differs-or-no-plot-appears"></span>
 <span id="install"></span>
 <span id="keep-the-data-roles-separate"></span>
-<span id="run-the-complete-example"></span>
+<span id="predictive-tasks"></span>
+<span id="quickstart"></span>
+<span id="quickstart-create-and-read-your-first-explanation"></span>
 <span id="read-the-plot"></span>
-<span id="if-the-result-differs-or-no-plot-appears"></span>
-<span id="choose-your-next-step"></span>
+<span id="run-the-complete-example"></span>
+<span id="what-ce-adds"></span>

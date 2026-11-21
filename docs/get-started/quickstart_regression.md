@@ -57,14 +57,40 @@ explainer.calibrate(x_cal, y_cal, feature_names=dataset.feature_names)
 
 ## 3. Interval and threshold predictions
 
+### Ask for a value and its interval
+
+Without a threshold, read `pred`, `low` and `high` in this dataset's target units.
+The factual explanation compares numerical model responses; its weights are
+also in target units. This is the interval-regression route.
+
 ```python
 pred, (low, high) = explainer.predict(x_test[:3], uq_interval=True)
+value_factual = explainer.explain_factual(x_test[:1])
+value_alternatives = explainer.explore_alternatives(x_test[:1])
+```
+
+### Ask for an event probability
+
+Now keep the regression model but change the question to `P(Y <= 150)`.
+`probabilities` and `probability_interval` concern that event, not the numeric
+target itself. Passing the same threshold to the explanation call makes its
+weights probability differences for that event. Do not reinterpret the preceding
+`value_factual` weights as probability differences.
+
+```python
 probabilities, probability_interval = explainer.predict_proba(
     x_test[:1], threshold=150, uq_interval=True
 )
+event_factual = explainer.explain_factual(x_test[:1], threshold=150)
 ```
 
 ## 4. Explore alternatives
+
+Continue the event question with the same threshold. Each alternative describes
+the event probability under a different condition; it is not an established
+intervention effect. For interval-regression alternatives, use
+`value_alternatives` from the value route above instead.
+
 
 ```python
 alternatives = explainer.explore_alternatives(x_test[:2], threshold=150)

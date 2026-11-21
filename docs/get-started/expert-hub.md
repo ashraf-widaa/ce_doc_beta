@@ -8,6 +8,8 @@ not a promise that all labels or values remain unchanged.
 **Open the [Expert Hub](https://calibrated-explanations-demo.ju.se/expert).**
 Use a built-in example first. Uploads and advanced options are not prerequisites.
 
+(expert-classification)=
+
 ## Classification: inspect one Diabetes case
 
 1. On **Project**, under **Quick Start — Demo Datasets**, choose
@@ -68,6 +70,8 @@ full-size image may be easier than reading every label in the page-width view.
 Use the {doc}`shared interpretation guide <../foundations/how-to/interpret_explanations>`
 for the returned quantities, not colour alone.
 
+(expert-interval)=
+
 ## Numeric prediction: California Housing
 
 Repeat the preparation flow using **California Housing (Regression)**. On
@@ -79,6 +83,8 @@ In the captured row-0 trial the primary output was `0.5170`, interval
 about $51,700 with an interval of [$30,870, $79,480]. The Python CSV-based
 Housing example in another review version uses different features/units;
 its numbers are not expected browser output.
+
+(expert-event)=
 
 ## Event probability: a threshold on the same target
 
