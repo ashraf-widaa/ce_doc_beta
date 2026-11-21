@@ -4,6 +4,20 @@ Calibrated Explanations is published on PyPI and conda-forge. Install the base
 package first, then add extras that unlock plotting, notebook examples, or
 contributor tooling.
 
+## Choose an environment first
+
+Use Python 3.10 or later. A virtual environment keeps this tutorial's dependencies
+separate from other projects. Create one with `python -m venv .venv`, activate it
+using your platform's instructions, then run the installation command with that
+environment's Python. In a notebook, select a kernel from the same environment.
+[Python's virtual-environment guide](https://docs.python.org/3/tutorial/venv.html)
+provides optional platform-specific background.
+
+For the first plotted example, install the `viz` extra and scikit-learn as shown
+in {doc}`First explanation in Python <first-python-explanation>`; the base package
+is sufficient when you do not need plotting. A browser exercise does not require
+local installation.
+
 ## PyPI
 
 ```bash
@@ -39,7 +53,13 @@ package via conda and then add the relevant extras with `pip`.
 python -c "import calibrated_explanations; print(calibrated_explanations.__version__)"
 ```
 
-This prints the version selected by your package manager (`1.0.0` or later).
+This should print a version string rather than an import error. Its exact value
+depends on the selected package release; this Beta's examples were reviewed
+against the 1.0.2 source. Printing a version verifies import in this interpreter,
+not a successful model fit or statistically valid calibration.
+
+**Continue:** run {doc}`First explanation in Python <first-python-explanation>`.
+If import fails, use {doc}`Troubleshooting <troubleshooting>` before proceeding.
 
 ## Optional contributor fast path
 

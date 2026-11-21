@@ -1,0 +1,10 @@
+VALUE_START
+Value predictions: [273.36 248.15 172.11]
+Lower endpoints: [186.45 161.24  85.2 ]
+Upper endpoints: [409.2  383.99 307.95]
+VALUE_END
+EVENT_START
+Event probabilities: [[0.923 0.077]]
+Event lower bounds: [0.]
+Event upper bounds: [0.083]
+EVENT_END

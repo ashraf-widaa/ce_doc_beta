@@ -8,6 +8,17 @@ not a promise that all labels or values remain unchanged.
 **Open the [Expert Hub](https://calibrated-explanations-demo.ju.se/expert).**
 Use a built-in example first. Uploads and advanced options are not prerequisites.
 
+## What you will learn
+
+Follow one case from dataset selection through calibration to explanation.
+Classification is the first complete exercise; the later sections reuse that
+workflow for numerical values and events. You can stop after one mode. This is
+an interface guide, not a prerequisite for the local Python tutorials.
+
+Keep the {doc}`task and mode guide <../foundations/concepts/tasks_modes_capabilities>`
+nearby if needed. After each result, identify the quantity, its units, the range
+and one feature condition before changing settings.
+
 (expert-classification)=
 
 ## Classification: inspect one Diabetes case
@@ -37,6 +48,12 @@ The Diabetes example is a binary classifier using public Pima data. It is an
 educational example, not diagnosis or treatment advice. The table uses abbreviated
 feature names such as `plas`, `mass` and `preg`; do not assume another tutorial's
 feature labels or selected patient are identical.
+
+Before continuing, check that the status is calibrated and that you are reading
+a held-out test case. Preparation fits the model; calibration uses separate
+labelled rows. The screenshot is evidence of the interface state, not a test of
+the calibration assumptions. For the mechanism, read
+{doc}`How CE Works <../sections/how-ce-works>`, then return to the result below.
 
 ## Read the factual result, then an alternative
 
@@ -98,6 +115,15 @@ The `Longitude < -121.63` alternative reported `0.9331 [0.9319,0.9418]`.
 Those are event probabilities, not dollar intervals. The selected-case factual
 and alternative paths worked; the final threshold batch was still running at
 capture, so its completion was not verified in this review.
+
+## Check your understanding
+
+Can you identify which result is a prediction and which is a feature weight?
+Can you explain why the housing-value interval has monetary units but its
+threshold-event probability does not? If not, use
+{doc}`Interpret calibrated explanations <../foundations/how-to/interpret_explanations>`
+with the result still open, then return here. To move from the browser to code,
+choose the matching {doc}`task example <index>`; the datasets need not match.
 
 ## Interface qualifications to keep visible
 

@@ -9,6 +9,17 @@ lessons and selected scenarios were inspected on 19 November 2026. The games
 identify CE-E model services; this is not evidence that every scenario exposes
 every feature or has the same guarantees as the CE Python library.
 
+## Understand the learning goal
+
+A prediction describes a model's assessment; a decision also depends on rewards,
+costs and constraints. The exercise lets you inspect both before choosing an
+action and reflect afterward. The purpose is not to maximize a score or prove
+CE's validity from a few game outcomes.
+
+Start with one guided mission. Treat the production game as an optional second
+exercise. For the distinction between model explanations and real-world causes,
+use {doc}`What & Why <../sections/what-and-why>`.
+
 ## First choice: a guided classification decision
 
 Open [Explanations and alternatives need interpretation](https://games.grejna.ai/learn/explanations-alternatives),
@@ -84,6 +95,17 @@ These are probabilistic-regression questions. A two-ended event is not the same
 as asking for a numeric prediction interval. Both prediction displays worked;
 the event-specific explanation panels were not fully tested in this review.
 For a tested event factual/alternative route, use {doc}`Expert Hub <expert-hub>`.
+
+## Finish the learning loop
+
+Write down the prediction question, one supporting condition and the costs that
+influenced your choice. After the outcome, separate “my action succeeded” from
+“the model is calibrated”: assessing the latter needs an appropriate collection
+of held-out cases and assumptions. The shared
+{doc}`evaluation guide <../practitioner/check_results>` explains that next step.
+For the library's own objects and API, move to
+{doc}`First explanation in Python <first-python-explanation>`; do not assume the
+game service and local library have identical interfaces or guarantees.
 
 ## Other scenarios and limits
 

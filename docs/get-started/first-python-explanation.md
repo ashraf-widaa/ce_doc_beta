@@ -60,19 +60,47 @@ For CE-specific assumptions and range meanings, use the
 
 ## 3. Run the complete example
 
-Copy the block into one notebook cell or save it as `first_explanation.py` and
-run `python first_explanation.py`. You can also
+Run the following cells in order in one Python session, or save the complete
+script as `first_explanation.py` and run `python first_explanation.py`. You can also
 {download}`download the script <../_examples/first_explanation.py>`.
 The selected case is the second evaluation row, `x_test[1:2]`; no target value
 is supplied to explain it. Other cases can expose the multiclass range limitation
 described under **If the result differs** below.
 
+### Prepare the labelled examples
+
+Load Iris and create the three data roles described above. This cell creates
+arrays; it does not print a result. The 30 evaluation rows remain outside fitting
+and calibration.
+
 ```{literalinclude} ../_examples/first_explanation.py
 :language: python
+:lines: 1-19
 ```
 
-The example uses the public wrapper to **fit → calibrate → predict → explain**.
-It should print:
+### Fit the model, then calibrate
+
+The wrapper fits the random forest on `x_proper, y_proper`, then builds CE's
+calibration using `x_cal, y_cal`. Feature names label the explanation; they do not
+change the feature order. This cell prepares the explainer without printing output.
+
+```{literalinclude} ../_examples/first_explanation.py
+:language: python
+:lines: 21-23
+```
+
+### Predict and explain one held-out flower
+
+`case` contains one row's features. Select the largest reported class probability,
+map its column to the species name, and request a factual explanation. The final
+print statements let you check both the split and the returned quantities.
+
+```{literalinclude} ../_examples/first_explanation.py
+:language: python
+:lines: 25-36
+```
+
+Verified output from the review environment:
 
 ```{literalinclude} ../_examples/first_explanation_output.txt
 :language: text
@@ -85,7 +113,14 @@ review environment. Do not suppress warnings or clip bounds to force a match.
 
 ## 4. Read the plot
 
-The last line displays the factual explanation. In a script, a supported
+Display the factual explanation from the same session:
+
+```{literalinclude} ../_examples/first_explanation.py
+:language: python
+:lines: 38
+```
+
+This cell produces a figure rather than a text result. In a script, a supported
 Matplotlib window should open; close it to finish. In a notebook the plot
 normally appears beneath the cell. Here is the generated plot for this case:
 
