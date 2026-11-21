@@ -11,16 +11,12 @@ How does CE turn a trained model and calibration data into prediction informatio
 and an explanation? This route moves from the workflow to mechanisms and their
 statistical conditions. You can stop at the depth needed for your question.
 
-## Read this path as a tutorial
+## Start here
 
-The shared chapters provide the detailed teaching, code and output. Start with
-{doc}`data roles <../foundations/concepts/predictive_tasks>` if features, targets
-or calibration sets are new. Then work through
-{doc}`calibration and its methods <../foundations/concepts/calibration_background>` →
-{doc}`explanation construction <../foundations/concepts/how_explanations_are_built>` →
-{doc}`interpretation <../foundations/how-to/interpret_explanations>`.
-The same Iris session continues across those chapters. The overview below helps
-you see how they connect; it is not a second copy of their detailed explanations.
+If features, targets or separate data roles are new, first read
+{doc}`Predictive tasks and data roles <../foundations/concepts/predictive_tasks>`.
+Otherwise, begin with the workflow below. You will learn what CE constructs,
+read code and output from one Iris session, and distinguish the quantities it reports.
 
 ## Follow the same model through the workflow
 
@@ -112,15 +108,20 @@ separate the output definition from its guarantee, and
 {doc}`Checking results <../practitioner/check_results>` to plan held-out evaluation.
 That is the bridge from understanding the construction to applying it.
 
-## Find the explanation you need
+## Continue through the shared chapters
 
-| Your question | Shared explanation | Afterward |
-| --- | --- | --- |
-| Which output answers my task? | {doc}`Tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`. | Try that route in the browser or Python. |
-| What is calibration, and how do the statistical methods differ? | {doc}`Calibration and statistical background <../foundations/concepts/calibration_background>`. | Check source-version assumptions and literature. |
-| How does a feature become a weight or alternative? | {doc}`How explanations are built <../foundations/concepts/how_explanations_are_built>`. | Read the resulting rules and plot. |
-| How do I interpret an actual object or figure? | {doc}`Interpret CE explanations <../foundations/how-to/interpret_explanations>`. | Compare one real example. |
-| What can the method guarantee? | {doc}`Canonical interval semantics <../foundations/concepts/calibrated_interval_semantics>`. | Check that the assumptions fit the intended use. |
+Read these in order for a method tutorial, or enter at the question you have now:
+
+1. {doc}`Tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>` — choose the prediction question before the operation.
+2. {doc}`Calibration and statistical background <../foundations/concepts/calibration_background>` — understand the methods, then run calibration.
+3. {doc}`How explanations are built <../foundations/concepts/how_explanations_are_built>` — connect comparisons to weights and alternatives.
+4. {doc}`Interpret explanations <../foundations/how-to/interpret_explanations>` — read the same case's rules and plot.
+
+For numerical targets, continue to
+{doc}`Regression: values and events <../foundations/concepts/probabilistic_regression>`.
+Use {doc}`Range meanings and assumptions <../foundations/concepts/calibrated_interval_semantics>`
+for the precise conditions behind a reported range. These are shared references,
+not a second course to repeat after Quick Start.
 
 ## Keep the quantities separate
 
@@ -150,11 +151,20 @@ open author-review issues.
 :maxdepth: 1
 :hidden:
 
-Shared foundations <../foundations/index>
+Tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>
+Calibration and statistical background <../foundations/concepts/calibration_background>
+How explanations are built <../foundations/concepts/how_explanations_are_built>
 Read CE explanations <../foundations/how-to/interpret_explanations>
+Regression: values and events <../foundations/concepts/probabilistic_regression>
+Range meanings and assumptions <../foundations/concepts/calibrated_interval_semantics>
+More shared topics <../foundations/index>
 ```
 
 <!-- Entry-point tier: Tier 1. -->
 
 <span id="read-the-workflow-at-three-depths"></span>
 <span id="choose-what-to-understand-next"></span>
+
+<!-- Preserve section links from earlier review versions. -->
+<span id="read-this-path-as-a-tutorial"></span>
+<span id="find-the-explanation-you-need"></span>

@@ -13,17 +13,18 @@
 
 ## Documentation
 
-Choose what you want to understand or do. Each section offers its own starting point.
+Choose one route for your goal. Quick Start gives you a first result; the four
+routes below help you understand, apply or integrate it at the depth you need.
 
 <div class="ce-home-grid" role="navigation" aria-label="Documentation sections">
-<a class="ce-home-card" href="sections/what-and-why.html"><span class="ce-home-card-title">CE: What &amp; Why</span><span class="ce-home-card-description">Why a prediction alone can leave questions open—and what calibration and explanations add.</span><span class="ce-home-card-action">Understand CE <span aria-hidden="true">→</span></span></a>
-<a class="ce-home-card" href="sections/how-ce-works.html"><span class="ce-home-card-title">How CE Works</span><span class="ce-home-card-description">Follow a prediction from separate calibration data to explanations, and understand the conditions.</span><span class="ce-home-card-action">Explore the method <span aria-hidden="true">→</span></span></a>
-<a class="ce-home-card" href="sections/in-practice.html"><span class="ce-home-card-title">CE in Practice</span><span class="ce-home-card-description">Get a first result, read it, then adapt and check the workflow on your data.</span><span class="ce-home-card-action">Try an example <span aria-hidden="true">→</span></span></a>
-<a class="ce-home-card" href="sections/software-integration.html"><span class="ce-home-card-title">CE Software &amp; Integration</span><span class="ce-home-card-description">Connect CE to your application: public calls, returned results, preprocessing and operation.</span><span class="ce-home-card-action">Use the library <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/what-and-why.html"><span class="ce-home-card-title">CE: What &amp; Why</span><span class="ce-home-card-description">Learn why CE was developed, what it adds to a prediction, and when its explanations help.</span><span class="ce-home-card-action">Understand CE <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/how-ce-works.html"><span class="ce-home-card-title">How CE Works</span><span class="ce-home-card-description">Learn the construction: data roles, calibration, explanation weights and task-specific assumptions.</span><span class="ce-home-card-action">Explore the method <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/in-practice.html"><span class="ce-home-card-title">CE in Practice</span><span class="ce-home-card-description">Run a worked example, interpret its output, then adapt and evaluate the workflow.</span><span class="ce-home-card-action">Try an example <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/software-integration.html"><span class="ce-home-card-title">CE Software &amp; Integration</span><span class="ce-home-card-description">Install CE, connect your model and preprocessing, then configure and maintain an integration.</span><span class="ce-home-card-action">Use the library <span aria-hidden="true">→</span></span></a>
 </div>
 
-Reported ranges have task-specific meanings and assumptions. See
-{doc}`calibrated interval semantics <foundations/concepts/calibrated_interval_semantics>`.
+Each route links to the same shared concept and interpretation pages. You can
+switch routes when your question changes; you do not need to complete them all.
 
 ## Project & Resources
 

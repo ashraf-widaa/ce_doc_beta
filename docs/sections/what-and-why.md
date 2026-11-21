@@ -111,12 +111,14 @@ assumptions govern the formal results; an intuitive explanation or successful
 code cell does not add a guarantee. We use “alternative” for model-condition
 comparisons without assuming real-world causal or actionable counterfactuals.
 
-## Continue as a guided tutorial
+## Continue from motivation to understanding
 
-The chapters below develop one Iris example, reusing the same data and Python
-session. Read the concept, inspect the code and output, then explain what changed
-before moving on. You can choose browser exercises or a numerical-target tutorial
-after the common foundation; the chapters are not extra compulsory homepage steps.
+Begin with the shared data-role chapter, then follow the same Iris case through
+calibration, explanation and interpretation. The prose teaches the concepts;
+the code and captured output let you investigate them. Reading without running
+Python is also useful. If your main question is how the method is constructed,
+the {doc}`How CE Works overview <how-ce-works>` introduces the workflow before
+these same chapters. You will not need to repeat a different set of definitions.
 
 1. {doc}`Features, targets and separate data roles <../foundations/concepts/predictive_tasks>`.
 2. {doc}`Choose a task, output question and operation <../foundations/concepts/tasks_modes_capabilities>`.
@@ -138,7 +140,8 @@ teaching narrative as an additional historical or statistical claim.
 :maxdepth: 1
 :hidden:
 
-Calibrated Explanations comparisons (CE-first) <../compare>
+Predictive tasks and data roles <../foundations/concepts/predictive_tasks>
+Compare CE with other approaches <../compare>
 ```
 
 <!-- Entry-point tier: Tier 1. -->
@@ -156,3 +159,6 @@ Calibrated Explanations comparisons (CE-first) <../compare>
 ## Continue the guided introduction
 
 **Next chapter:** {doc}`Predictive tasks and data roles <../foundations/concepts/predictive_tasks>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+
+<!-- Preserve section links from earlier review versions. -->
+<span id="continue-as-a-guided-tutorial"></span>

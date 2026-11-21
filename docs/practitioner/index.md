@@ -6,13 +6,13 @@ Choose a practical task, interpret its result and check it before adapting
 advanced workflows. Browser and Python routes are both available from
 {doc}`CE in Practice <../sections/in-practice>`.
 
-## Core path
+## Begin with the result you already have
 
-1. Run {doc}`../get-started/quickstart_classification` or
-   {doc}`../get-started/quickstart_regression`.
-2. Read {doc}`../foundations/how-to/interpret_explanations`.
-3. Choose API style in {doc}`task_api_comparison`.
-4. Apply production workflows in {doc}`playbooks/index`.
+If you have not run an example yet, follow {doc}`CE in Practice <../sections/in-practice>`
+first. Otherwise, identify the prediction, its range and one explanation in your
+result using the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`.
+Then choose one practical goal below; you do not need to restart the introductory course.
+For a particular interface, consult {doc}`task_api_comparison` as a lookup.
 
 Semantics and non-guarantees are documented in
 {doc}`../foundations/concepts/calibrated_interval_semantics`.
@@ -59,3 +59,6 @@ Practitioner playbooks <playbooks/index>
 Practitioner advanced topics <advanced/index>
 Narrative Template Customization <narrative_templates>
 ```
+
+<!-- Preserve section links from earlier review versions. -->
+<span id="core-path"></span>

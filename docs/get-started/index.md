@@ -82,10 +82,9 @@ or protection against distribution shift.
 Classification example <example-classification>
 Interval regression example <example-interval>
 Event-probability example <example-event>
-Expert Hub: technical exploration <expert-hub>
-Decision Lab: learn through decisions <decision-lab>
 First explanation in Python <first-python-explanation>
-Choose your task <../getting_started_60s>
+Browser workflow: Expert Hub <expert-hub>
+Decision practice: Decision Lab <decision-lab>
 ```
 
 <!-- Preserve previous section links. -->

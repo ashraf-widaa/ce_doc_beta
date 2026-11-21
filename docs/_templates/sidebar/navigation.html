@@ -1,0 +1,28 @@
+{# Keep Sphinx's single-owner tree and Furo's accessible branch controls. #}
+<nav class="ce-route-switcher" aria-label="Documentation routes">
+  <a class="ce-nav-home" href="{{ pathto('index') }}"{% if pagename == 'index' %} aria-current="page"{% endif %}>Home</a>
+  <a class="ce-nav-start" href="{{ pathto('get-started/index') }}"{% if pagename == 'get-started/index' %} aria-current="page"{% endif %}>Quick Start</a>
+  <details{% if pagename == 'index' %} open{% endif %}>
+    <summary>Choose a learning path</summary>
+    <ul>
+      <li><a href="{{ pathto('sections/what-and-why') }}">Understand CE: What &amp; Why</a></li>
+      <li><a href="{{ pathto('sections/how-ce-works') }}">Learn how CE works</a></li>
+      <li><a href="{{ pathto('sections/in-practice') }}">Apply CE in practice</a></li>
+      <li><a href="{{ pathto('sections/software-integration') }}">Use and integrate the software</a></li>
+      <li><a href="{{ pathto('sections/project-resources') }}">Research and contribute</a></li>
+    </ul>
+  </details>
+</nav>
+{% if pagename != 'index' and (parents or pagename == 'get-started/index' or pagename.startswith('sections/')) %}
+<nav class="sidebar-tree ce-local-tree" aria-label="Current path chapters">
+  {{ furo_navigation_tree }}
+</nav>
+{% endif %}
+<nav class="ce-reference-links" aria-label="Reference shortcuts">
+  <p>Look up</p>
+  <ul>
+    <li><a href="{{ pathto('api/index') }}">API reference</a></li>
+    <li><a href="{{ pathto('glossary/index') }}">Glossary</a></li>
+    <li><a href="{{ pathto('foundations/concepts/calibrated_interval_semantics') }}">Range meanings and assumptions</a></li>
+  </ul>
+</nav>

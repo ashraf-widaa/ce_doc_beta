@@ -19,17 +19,19 @@ fitted predictive model, calibrate with separate labelled data, then predict or
 explain a new case. Prediction and explanation are operations on the calibrated
 system; a separate prediction call is not required before an explanation.
 
-## Follow the software guide alongside the concepts
+## Follow the integration sequence
 
-The practical sequence is {doc}`the complete Python example <../get-started/first-python-explanation>` →
-{doc}`Quick API <../get-started/quick_api>` →
-{doc}`pipeline integration <../foundations/how-to/integrate_with_pipelines>` →
-{doc}`runtime configuration <../foundations/how-to/configure_runtime>` and
-{doc}`troubleshooting <../get-started/troubleshooting>` as needed. Each destination
-has a different job: obtain a result, find a call, connect preprocessing, then
-operate the configured system. Use the shared
-{doc}`calibration chapter <../foundations/concepts/calibration_background>` when you
-need the mechanism; implementation documentation should not redefine its theory.
+| Stage | Use this guide | What you should achieve |
+| --- | --- | --- |
+| Install and run | {doc}`Installation <../get-started/installation>` and {doc}`First explanation in Python <../get-started/first-python-explanation>` | A working environment and one interpreted result. |
+| Select the interface | {doc}`Quick API <../get-started/quick_api>` | Identify the call, inputs and returned quantity. |
+| Connect preprocessing | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>` | Consistent feature transformations across data roles. |
+| Pass results onward | {doc}`Export explanations <../foundations/how-to/export_explanations>` | Preserve quantities, units and reported ranges. |
+| Configure and maintain | {doc}`Runtime configuration <../foundations/how-to/configure_runtime>` and {doc}`Troubleshooting <../get-started/troubleshooting>` | Understand configuration and investigate failures. |
+
+Read the following sections alongside those guides. The shared
+{doc}`calibration chapter <../foundations/concepts/calibration_background>` explains
+the statistical mechanism when you need it; this route concentrates on using it in software.
 
 ## Connect your model and preprocessing
 
@@ -108,3 +110,6 @@ Technical reference and internals <../foundations/reference/index>
 <span id="maintain-or-extend-an-integration"></span>
 <span id="maintain-or-extend-the-software"></span>
 <span id="start-with-the-public-lifecycle"></span>
+
+<!-- Preserve section links from earlier review versions. -->
+<span id="follow-the-software-guide-alongside-the-concepts"></span>

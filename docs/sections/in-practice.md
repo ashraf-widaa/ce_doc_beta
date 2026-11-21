@@ -6,7 +6,7 @@ Use this path to obtain an explanation, understand its output and check the
 workflow before adapting it to your own data. Start with one case and one
 question; advanced filters and deployment settings can wait.
 
-## Start with one worked result
+## 1. Obtain one worked result
 
 If you are new to CE, follow the
 {doc}`classification example <../get-started/example-classification>`. It offers
@@ -23,7 +23,7 @@ Each example provides browser and local routes. Choose one; they need not use
 the same dataset or produce matching numbers. If the workflow itself is unfamiliar,
 the {doc}`Quick Start <../get-started/index>` explains the big picture first.
 
-## Read the result before adding features
+## 2. Interpret the result
 
 Name the quantity and units before interpreting its range. Then read one factual
 condition: which feature does it concern, what comparison does its weight describe,
@@ -34,6 +34,20 @@ real-world intervention.
 The shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
 explains each element of the records and plots. Keep it beside your result when
 needed; you do not need to learn every payload field for a first reading.
+
+## 3. Adapt and check the workflow
+
+Follow the {doc}`pipeline integration guide <../foundations/how-to/integrate_with_pipelines>`
+when adding CE to a model with preprocessing. Keep fitting, calibration and
+held-out evaluation roles separate, and use the same feature representation.
+The {doc}`Software & Integration path <software-integration>` connects this
+workflow to installation, public calls, configuration and error handling.
+
+A working example is not an evaluation. Before relying on your results, use
+{doc}`Checking results on your data <../practitioner/check_results>` to choose
+probability, interval or event checks appropriate to your question. Read the
+{doc}`method-specific assumptions <../foundations/concepts/calibrated_interval_semantics>`
+together with any claimed guarantee.
 
 ## Choose a browser learning environment for a purpose
 
@@ -50,21 +64,7 @@ successful game outcome as a calibration check. If you want the underlying
 construction, the {doc}`shared guided introduction <what-and-why>` provides concept,
 code and output chapters instead of a separate set of definitions.
 
-## Use your own model and data
-
-Follow the {doc}`pipeline integration guide <../foundations/how-to/integrate_with_pipelines>`
-when adding CE to a model with preprocessing. Keep fitting, calibration and
-held-out evaluation roles separate, and use the same feature representation.
-The {doc}`Software & Integration path <software-integration>` connects this
-workflow to installation, public calls, configuration and error handling.
-
-A working example is not an evaluation. Before relying on your results, use
-{doc}`Checking results on your data <../practitioner/check_results>` to choose
-probability, interval or event checks appropriate to your question. Read the
-{doc}`method-specific assumptions <../foundations/concepts/calibrated_interval_semantics>`
-together with any claimed guarantee.
-
-## Go further for a specific reason
+## 4. Extend the workflow when needed
 
 The {doc}`Practitioner Hub <../practitioner/index>` groups existing guides by goal:
 calibration, intervals, alternatives, subgroups, rejection and evidence review.
@@ -112,3 +112,9 @@ Practitioner hub <../practitioner/index>
 <span id="follow-one-case-before-changing-the-workflow"></span>
 <span id="interpret-before-extending"></span>
 <span id="know-which-dataset-and-target-you-are-using"></span>
+
+<!-- Preserve section links from earlier review versions. -->
+<span id="start-with-one-worked-result"></span>
+<span id="read-the-result-before-adding-features"></span>
+<span id="use-your-own-model-and-data"></span>
+<span id="go-further-for-a-specific-reason"></span>

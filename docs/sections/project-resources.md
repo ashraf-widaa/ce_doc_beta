@@ -7,6 +7,17 @@ and contribution process. Use it to understand the project, reproduce research
 or find a focused way to participate. You do not need to complete it before
 trying an explanation.
 
+## Choose a project route
+
+- **Investigate or reproduce a method:** start with the research section below,
+  then enter the {doc}`Researcher Hub <../researcher/index>`.
+- **Understand or change the implementation:** read how CE is developed, then
+  enter the {doc}`Contributor Hub <../contributor/index>`.
+- **Apply CE rather than study its development:** use {doc}`CE in Practice <in-practice>`
+  or {doc}`Software & Integration <software-integration>`.
+
+Follow the relevant route; these are different goals, not successive requirements.
+
 ## Understand the research behind the software
 
 Begin with {doc}`Citing CE <../citing>` to identify the method and software
@@ -87,12 +98,12 @@ see the {doc}`homepage <../index>`. For a first hands-on result instead, start w
 :maxdepth: 1
 :hidden:
 
+Research and reproduction <../researcher/index>
+Contribute to CE <../contributor/index>
+Citing calibrated-explanations <../citing>
+Project roadmap <../ROADMAP>
 Glossary <../glossary/index>
 Naming and compatibility terms <../foundations/concepts/terminology>
-Researcher hub <../researcher/index>
-Citing calibrated-explanations <../citing>
-Roadmap <../ROADMAP>
-Contributor hub <../contributor/index>
 Governance & support <../foundations/governance/index>
 RTD tier map <../appendices/rtd_tier_map>
 ```
