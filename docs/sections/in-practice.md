@@ -18,6 +18,22 @@ then check whether the workflow is appropriate for your own data.
 | Predict a number or an event on it | {doc}`Regression tutorial <../get-started/quickstart_regression>`. | {doc}`Regression mode meanings <../foundations/concepts/probabilistic_regression>`. |
 | Connect an existing model or preprocessing | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>`. | {doc}`Software & Integration <software-integration>`. |
 
+## Follow one case before changing the workflow
+
+Choose one route above and keep its dataset, selected case and output question
+unchanged for the first run. Identify the prediction, its units and its reported
+range before inspecting feature conditions. Then inspect one alternative and
+ask which model output changed. This gives you a complete first pass without
+requiring every available capability.
+
+If a plot is hard to read, use the
+{doc}`interpretation guide <../foundations/how-to/interpret_explanations>` beside
+the example. When you are ready to understand how its numbers are constructed,
+follow {doc}`How CE Works <how-ce-works>`. Before adapting the example to your
+own data, use {doc}`Checking results <../practitioner/check_results>` to plan
+held-out evaluation. A successful tutorial run is the beginning of that check,
+not evidence that your deployment is reliable.
+
 ## Know which dataset and target you are using
 
 | Example | Target / task | Important distinction |
@@ -59,3 +75,5 @@ Guarded explanations (advanced) <../get-started/quickstart_guarded>
 Tasks and capabilities <../tasks/index>
 Practitioner hub <../practitioner/index>
 ```
+
+Entry-point tier: Tier 1.

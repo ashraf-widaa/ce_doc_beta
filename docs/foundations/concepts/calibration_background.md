@@ -4,6 +4,19 @@ Why can a confident-looking prediction still need calibration? This page
 introduces the statistical ideas; it does not replace the version-specific
 {doc}`guarantees and limits <calibrated_interval_semantics>`.
 
+## Choose the background you need
+
+For a first example, you mainly need to distinguish a probability range from a
+numeric prediction interval and keep training, calibration and evaluation data
+separate. The sections below explain why. The equations are optional background;
+they are not prerequisites for following the Quick Start.
+
+If supervised learning is new to you, start with
+[Google's introduction to supervised learning](https://developers.google.com/machine-learning/intro-to-ml/supervised),
+then return to CE's {doc}`predictive tasks and data roles <predictive_tasks>`.
+External resources explain general concepts; CE's own output meanings and
+limitations remain in the linked internal guides.
+
 ## Accuracy and calibration answer different questions
 
 Classification accuracy checks how often predicted labels match observed labels.

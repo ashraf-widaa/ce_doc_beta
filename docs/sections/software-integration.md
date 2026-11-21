@@ -30,6 +30,26 @@ Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_expla
 for output meanings and {doc}`checking results <../practitioner/check_results>`
 for held-out evaluation. Keep warnings visible while integrating.
 
+## Choose how far into the software to go
+
+**Use the public interface.** Begin with the wrapper tutorial and Quick API.
+Check the feature order and preprocessing used for fitting, calibration and
+queries. Read the returned quantity and its shape before passing it to another
+component. The {doc}`API reference <../api/index>` is where to check the exact
+contract for the installed version.
+
+**Integrate and operate.** Use the existing pipeline and operations guides when
+connecting CE to preprocessing or an application. Preserve the output mode,
+units and reported ranges in the presentation layer; a probability bound must
+not be relabelled as a target-value interval. Keep evaluation and troubleshooting
+alongside integration rather than postponing them until deployment.
+
+**Understand or extend the internals.** Read the technical reference and plugin
+guides when you need implementation details or extension points. They are a
+deeper route, not prerequisites for using the public wrapper. Statistical meaning
+still belongs to the shared
+{doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`.
+
 ## Maintain or extend the software
 
 Use {doc}`release notes <../appendices/changelog_links>`,
@@ -57,3 +77,5 @@ Release notes <../appendices/changelog_links>
 Plugins <../plugins>
 Technical reference and internals <../foundations/reference/index>
 ```
+
+Entry-point tier: Tier 1.

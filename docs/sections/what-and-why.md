@@ -8,6 +8,23 @@
 What can you learn about a prediction before relying on it? This route explains
 the purpose of CE without requiring code or a statistics course.
 
+## Begin with one prediction
+
+Imagine a model estimating a district's median housing value. The number answers
+“What value does the model predict?” It does not, by itself, explain how the model
+responds to this district's features or describe a range for the target value.
+
+CE helps you inspect these different questions together. For a value question,
+you can read a prediction interval in the target's units. For an event question,
+such as “Is the value at most $300,000?”, you read a probability and its reported
+bounds instead. Factual and alternative explanations then help you inspect the
+model's response. They do not determine whether buying a property is a good decision.
+
+**See one result first:** follow the {doc}`Quick Start <../get-started/index>`.
+**Understand the choices:** read the
+{doc}`task and mode guide <../foundations/concepts/tasks_modes_capabilities>`.
+You can return here afterward; neither route requires a statistics course.
+
 ## Start with the question, not the software
 
 A predictive model estimates a target from a case's input features. A classifier
@@ -73,3 +90,5 @@ questions and outputs, not an unsupported performance ranking.
 
 Calibrated Explanations comparisons (CE-first) <../compare>
 ```
+
+Entry-point tier: Tier 1.

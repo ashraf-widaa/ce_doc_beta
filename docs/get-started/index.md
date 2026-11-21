@@ -83,6 +83,12 @@ inspect. For an executable alternative, use the optional Python route below.
 
 ## 5. Understand what you see
 
+Start with one result rather than every setting. In the Diabetes browser example,
+the output is a probability for the positive class. In California Housing,
+first decide whether you asked for a housing value or for the probability of
+an event on that value. That choice determines the scale you should read.
+
+
 Read **the output quantity → its units → its range → a feature condition →
 a weight or alternative prediction**. These are different quantities.
 
@@ -97,6 +103,15 @@ scale. A feature-weight range does not inherit a universal per-feature coverage
 guarantee. Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
 and {doc}`canonical semantics <../foundations/concepts/calibrated_interval_semantics>`
 for detail. One game outcome or tutorial case does not validate a deployment.
+
+**Pause and check:** can you name the predicted quantity, its units and one
+feature condition? Can you distinguish that condition's weight from an
+alternative prediction? If not, keep the result open and use the
+{doc}`interpretation guide <../foundations/how-to/interpret_explanations>`.
+For the calculation behind a weight, continue to
+{doc}`How explanations are built <../foundations/concepts/how_explanations_are_built>`;
+for what a range does and does not establish, use the canonical semantics linked
+above. These are deeper explanations of the same result, not new exercises.
 
 ## 6. Continue learning
 

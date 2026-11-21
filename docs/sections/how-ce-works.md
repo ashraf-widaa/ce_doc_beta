@@ -19,6 +19,28 @@ A query uses features of the case to predict or explain. Read the shared
 {doc}`data-role definitions <../foundations/concepts/predictive_tasks>` before
 interpreting a split or reusing data.
 
+## Read the workflow at three depths
+
+**The overview:** the fitted model supplies predictions, separate labelled
+calibration data support the calibration procedure, and CE produces prediction
+information and explanations for a new case. Calibration uses known targets;
+explaining a new case does not require knowing that case's target in advance.
+
+**The mechanism:** a factual explanation compares the calibrated output with
+responses obtained under feature conditions. For a simple difference, subtracting
+a comparison response from the original response gives a weight. The exact
+construction and aggregation matter: it is not a causal effect or a universal
+formula for every explanation type. Follow the
+{doc}`worked construction <../foundations/concepts/how_explanations_are_built>`
+to understand the comparisons and their units.
+
+**The statistical detail:** calibration means different things for different
+outputs. Start with the
+{doc}`calibration background <../foundations/concepts/calibration_background>`;
+then use the {doc}`canonical semantics <../foundations/concepts/calibrated_interval_semantics>`
+for CE's method-specific assumptions and limitations. You do not need to read
+all the theory before trying an example.
+
 ## Choose what to understand next
 
 | Your question | Shared explanation | Afterward |
@@ -60,3 +82,5 @@ open author-review issues.
 Shared foundations <../foundations/index>
 Read CE explanations <../foundations/how-to/interpret_explanations>
 ```
+
+Entry-point tier: Tier 1.
