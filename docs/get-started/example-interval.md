@@ -4,6 +4,24 @@
 
 The browser example uses California Housing. Its target is median housing value in units of $100,000: 0.517 corresponds to $51,700. The existing local regression tutorial uses a different numeric diabetes target; retain its own units.
 
+## See the mode-specific workflow
+
+<figure>
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-mode-interval-mobile.svg">
+<img src="../_static/figures/ce-mode-interval.svg" width="1000" height="570" alt="Interval regression: fitted model and separate labelled calibration data, method-specific calibration, new-case features, prediction information and factual or alternative explanations.">
+</picture>
+</figure>
+
+[Open the full-size figure](../_static/figures/ce-mode-interval.svg).
+
+The arrows show information flow, not a required sequence of API calls.
+Prediction and explanation operate on the same calibrated system; the
+explanation call can obtain its own prediction. Read the result in this mode's
+units and keep the prediction range separate from a feature-weight range.
+For exact assumptions and limitations, use
+{doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`.
+
 ## Choose where to run it
 
 ### In your browser

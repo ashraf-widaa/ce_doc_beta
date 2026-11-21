@@ -4,6 +4,24 @@
 
 The browser example uses Pima Diabetes: the target is a binary class. The existing local tutorial uses Iris species, a multiclass task. These are different cases; the local tutorial records a multiclass-bound limitation.
 
+## See the mode-specific workflow
+
+<figure>
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-mode-classification-mobile.svg">
+<img src="../_static/figures/ce-mode-classification.svg" width="1000" height="570" alt="Classification: fitted model and separate labelled calibration data, method-specific calibration, new-case features, prediction information and factual or alternative explanations.">
+</picture>
+</figure>
+
+[Open the full-size figure](../_static/figures/ce-mode-classification.svg).
+
+The arrows show information flow, not a required sequence of API calls.
+Prediction and explanation operate on the same calibrated system; the
+explanation call can obtain its own prediction. Read the result in this mode's
+units and keep the prediction range separate from a feature-weight range.
+For exact assumptions and limitations, use
+{doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`.
+
 ## Choose where to run it
 
 ### In your browser

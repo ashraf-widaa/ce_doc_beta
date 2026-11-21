@@ -4,6 +4,24 @@
 
 Use a regression model, but change the question from a value to an event. In browser California Housing, P(Y ≤ 3) asks whether the value is at most $300,000. Enter 3 in that dataset’s units, not 300000. The local regression tutorial uses its own target and threshold.
 
+## See the mode-specific workflow
+
+<figure>
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-mode-event-mobile.svg">
+<img src="../_static/figures/ce-mode-event.svg" width="1000" height="570" alt="Event-probability regression: fitted model and separate labelled calibration data, method-specific calibration, new-case features, prediction information and factual or alternative explanations.">
+</picture>
+</figure>
+
+[Open the full-size figure](../_static/figures/ce-mode-event.svg).
+
+The arrows show information flow, not a required sequence of API calls.
+Prediction and explanation operate on the same calibrated system; the
+explanation call can obtain its own prediction. Read the result in this mode's
+units and keep the prediction range separate from a feature-weight range.
+For exact assumptions and limitations, use
+{doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`.
+
 ## Choose where to run it
 
 ### In your browser

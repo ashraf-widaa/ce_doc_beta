@@ -13,13 +13,19 @@ statistical conditions. You can stop at the depth needed for your question.
 
 <figure>
 <picture>
-<source media="(max-width: 600px)" srcset="../_static/figures/ce-how-workflow-mobile.svg">
-<img src="../_static/figures/ce-how-workflow.svg" width="960" height="590" alt="Orange boxes show model fitting on training data, calibration with separate labelled data, then prediction information and explanations as two operations on the calibrated system using new-case features.">
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-reference-workflow-mobile.svg">
+<img src="../_static/figures/ce-reference-workflow.svg" width="1000" height="860" alt="Blue conventional model training, prediction and evaluation steps; orange CE calibration and explanation steps using a separate calibration set and new-case features.">
 </picture>
-<figcaption>Orange boxes show the workflow stages; the dashed box shows what you provide when querying it. Both branches use the same calibrated system. You can request a prediction, an explanation, or both; a separate prediction call is not required before an explanation. The background is transparent.</figcaption>
 </figure>
 
-[Open the full-size workflow](../_static/figures/ce-how-workflow.svg).
+[Open the full-size figure](../_static/figures/ce-reference-workflow.svg).
+
+The blue route shows a conventional predictive workflow; the orange route shows
+CE's additions around the same fitted model. Other ML workflows can also include
+calibration and uncertainty methods. The labelled dataset is separated into
+training, calibration and evaluation roles. A new query needs features, not its
+unknown target. Interpret one result directly; evaluate performance on separate
+labelled cases. These are different activities.
 
 1. **Fit the predictive model.** Training examples contain features and known
    targets. Fitting learns the predictive model. If your model is already fitted,
@@ -43,6 +49,16 @@ For the inputs to these stages, read the shared
 For the calls, use {doc}`Quick API <../get-started/quick_api>`. A completed workflow
 alone does not verify the statistical assumptions: guarantees remain mode-specific
 as described in the {doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`.
+
+## Follow the workflow for your question
+
+The same structure produces different quantities in the three modes. Each
+example below starts with a mode-specific figure, then offers browser and local
+Python routes. Read the figure together with its assumptions note.
+
+- {doc}`Classification: class-probability information <../get-started/example-classification>`.
+- {doc}`Interval regression: value and target-value interval <../get-started/example-interval>`.
+- {doc}`Probabilistic regression: event probability and bounds <../get-started/example-event>`.
 
 ## Read the workflow at three depths
 
