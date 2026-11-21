@@ -11,13 +11,38 @@ statistical conditions. You can stop at the depth needed for your question.
 
 ## Follow the same model through the workflow
 
-```{include} ../_shared/ce-workflow.md
-```
+<figure>
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-how-workflow-mobile.svg">
+<img src="../_static/figures/ce-how-workflow.svg" width="960" height="355" alt="Orange boxes show model fitting on training data, calibration with separate labelled data, then prediction information and explanations as two operations on the calibrated system using new-case features.">
+</picture>
+<figcaption>CE's conceptual lifecycle. Orange boxes identify the stages; the figure background is transparent. After calibration, prediction and explanation are separate operations, not a compulsory sequence of calls.</figcaption>
+</figure>
 
-The model-fitting set, calibration set and evaluation set have different roles.
-A query uses features of the case to predict or explain. Read the shared
-{doc}`data-role definitions <../foundations/concepts/predictive_tasks>` before
-interpreting a split or reusing data.
+[Open the full-size workflow](../_static/figures/ce-how-workflow.svg).
+
+1. **Fit the predictive model.** Training examples contain features and known
+   targets. Fitting learns the predictive model. If your model is already fitted,
+   CE can use it without requiring you to train it again.
+2. **Calibrate with separate labelled data.** CE uses that fitted model and
+   calibration examples not used to fit it. Calibration supports the prediction
+   information appropriate to your task and mode; it is not another model-fitting
+   step. Keep evaluation data separate to check the resulting system.
+3. **Read prediction information for a new case.** Supply its features and choose
+   the question: a class probability, a numerical value with an interval, or the
+   probability of an event on a numerical target. Identify the quantity and units
+   before reading its range.
+4. **Inspect factual or alternative explanations.** A factual explanation reports
+   conditions holding for the case and their weights with ranges. Alternatives
+   report the model's predictions under different conditions. An explanation call
+   can obtain the prediction information it needs; a separate prediction call is
+   not a prerequisite. Neither explanation establishes a real-world causal effect.
+
+For the inputs to these stages, read the shared
+{doc}`data-role definitions <../foundations/concepts/predictive_tasks>`.
+For the calls, use {doc}`Quick API <../get-started/quick_api>`. A completed workflow
+alone does not verify the statistical assumptions: guarantees remain mode-specific
+as described in the {doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`.
 
 ## Read the workflow at three depths
 
