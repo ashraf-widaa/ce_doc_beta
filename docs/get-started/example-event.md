@@ -1,10 +1,51 @@
-# Probabilistic regression: explain an event probability
+# Event probabilities: first result
 
-**Your question:** How probable is a specified event on a numerical target?
+**Goal:** define an event on a numerical target, then read its probability and
+bounds. This is probabilistic regression. The question has changed from “What value?”
+to “How probable is this event?”
 
-Use a regression model, but change the question from a value to an event. In browser California Housing, P(Y ≤ 3) asks whether the value is at most $300,000. Enter 3 in that dataset’s units, not 300000. The local regression tutorial uses its own target and threshold.
+## Choose where to run it
 
-## See the mode-specific workflow
+**In the browser — a housing threshold.** Follow the
+{ref}`Expert Hub threshold exercise <expert-event>`. Prepare California Housing,
+enable **Use Threshold** and enter **3**. In this dataset's units, that means
+**$300,000**, not $3. The guide records a misleading interval badge; keep the
+event definition and raw probability values in view.
+
+**In Python — a disease-progression threshold.** Follow the
+{doc}`regression tutorial <quickstart_regression>` from setup through “Ask for an
+event probability”. Its event is `Y <= 150` on a different target. Pass the same
+threshold to its factual and alternative calls; do not reuse target-value weights
+as event-probability weights.
+
+## Read the housing event result
+
+The event is **Y ≤ 3**: median housing value at most **$300,000**. One captured
+case reports probability **0.9986**, with bounds **[0.9986, 1.0000]**.
+These are probability quantities. They are neither a predicted house value nor
+a dollar-valued interval. A high probability does not make the event certain.
+
+A captured alternative, `Longitude < -121.63`, reports **0.9331**, bounds
+**[0.9319, 0.9418]**. Compare this with the original event probability. A factual
+weight instead measures a probability difference for the event. Neither explains
+the causal effect of relocating an area.
+
+These numbers come from the dated {doc}`Expert Hub guide <expert-hub>`.
+The Python tutorial's output identifies both the requested event probability and
+its complement; read the column labels before selecting a number.
+
+## Check your understanding
+
+Can you name the predicted quantity, its units and the class or event if applicable?
+Can you distinguish the prediction range, a factual weight and an alternative
+prediction? If not, use {doc}`Interpret calibrated explanations <../foundations/how-to/interpret_explanations>`
+with the result still open. You do not need to learn every API field to read one case.
+
+<details><summary>Go deeper: how this mode produces its outputs</summary>
+
+<span id="see-the-mode-specific-workflow"></span>
+
+**Mode-specific workflow**
 
 <figure>
 <picture>
@@ -22,31 +63,8 @@ units and keep the prediction range separate from a feature-weight range.
 For exact assumptions and limitations, use
 {doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`.
 
-## Choose where to run it
 
-### In your browser
-
-No installation is needed. Follow the {ref}`Expert Hub guide: California Housing threshold probability <expert-event>`.
-Prepare and calibrate California Housing first, then enable Use Threshold, enter 3 and inspect a test case. The linked guide records a misleading application badge; read the output as an event probability.
-
-The guide contains dated real screenshots, controls and output interpretation.
-If the application is unavailable, use those captures or choose the local route.
-
-### Install and run locally
-
-Use {doc}`Installation <installation>` if needed, then follow the existing
-{doc}`regression tutorial <quickstart_regression>` from the beginning. It includes data preparation, separate
-training/calibration/evaluation roles, model fitting and explanation calls.
-At “Interval and threshold predictions”, follow the threshold call and its probability output. Use the event factual and alternative calls with the same threshold; the preceding value-route explanations remain in target units.
-
-## Read your result
-
-The event definition, its probability and reported probability bounds. Factual differences concern the event probability. Do not read these bounds as an interval for a house value.
-
-Identify one feature condition, its weight and its range, then one alternative
-and its reported prediction. Use {doc}`the shared interpretation guide <../foundations/how-to/interpret_explanations>`
-to distinguish them. An alternative describes the model response, not an
-established effect of changing the real-world case.
+</details>
 
 ## Semantics for this example
 
@@ -57,10 +75,18 @@ established effect of changing the real-world case.
 - **Non-guarantees:** no individual-case certainty or unconditional protection under drift.
 - **Feature-level limits:** weight ranges are not causal or universal per-feature coverage guarantees.
 
-## Continue from the result
 
-Return to {doc}`the big picture <index>` to change your question. For the
-construction, read {doc}`How explanations are built <../foundations/concepts/how_explanations_are_built>`.
-Before adapting an example, use {doc}`Checking results on your data <../practitioner/check_results>`.
+## Continue from this result
 
-Entry-point tier: Tier 2.
+**Try another question:** return to {doc}`the big picture <index>`.
+**Understand the construction:** {doc}`How CE Works <../sections/how-ce-works>`.
+**Adapt to your data:** {doc}`Checking results <../practitioner/check_results>`.
+**Find the exact call:** {doc}`Quick API <quick_api>`.
+
+<!-- Entry-point tier: Tier 2. -->
+
+<!-- Preserve previous section links. -->
+<span id="continue-from-the-result"></span>
+<span id="read-your-result"></span>
+
+<span id="probabilistic-regression-explain-an-event-probability"></span>

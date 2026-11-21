@@ -1,88 +1,109 @@
 # CE: What & Why
 
-<!-- Preserve descriptive anchors from the previous review layout. -->
-<span id="choose-the-question-you-want-answered"></span>
-<span id="from-a-prediction-to-questions-about-it"></span>
+A prediction tells you what a model estimates. Before using it, you may also
+want to know what its reported range means, which information contributes to
+the prediction, and what the model would report under different conditions.
+**Calibrated Explanations (CE) brings these questions into one workflow.**
 
+CE is an open-source Python library. It uses a trained model and separate labelled
+calibration examples to provide calibrated prediction information and feature
+explanations with reported ranges.
 
-What can you learn about a prediction before relying on it? This route explains
-the purpose of CE without requiring code or a statistics course.
+Start here to understand the ideas. You do not need to install CE or learn its
+API first. By the end, you should be able to explain what CE adds and decide
+which question to explore in an example.
 
-## Begin with one prediction
+## Start with a familiar prediction
 
-Imagine a model estimating a district's median housing value. The number answers
-“What value does the model predict?” It does not, by itself, explain how the model
-responds to this district's features or describe a range for the target value.
+Suppose a model estimates the median housing value in an area. It uses
+**features**, such as median income and location, to estimate the **target**:
+the housing value. A model predicting a number performs **regression**. A model
+predicting a category, such as an Iris flower's species, performs **classification**.
+Both are supervised learning: training examples include features and known targets.
 
-CE helps you inspect these different questions together. For a value question,
-you can read a prediction interval in the target's units. For an event question,
-such as “Is the value at most $300,000?”, you read a probability and its reported
-bounds instead. Factual and alternative explanations then help you inspect the
-model's response. They do not determine whether buying a property is a good decision.
+The predicted number or class is useful, but leaves questions open. What range
+is reported around it? Which conditions distinguish this case? What if one of
+those conditions were different? These questions concern the prediction and
+the model's behavior; answering them does not automatically tell us what to do.
 
-**See one result first:** follow the {doc}`Quick Start <../get-started/index>`.
-**Understand the choices:** read the
-{doc}`task and mode guide <../foundations/concepts/tasks_modes_capabilities>`.
-You can return here afterward; neither route requires a statistics course.
+For the vocabulary and data roles, use the shared
+{doc}`predictive-task guide <../foundations/concepts/predictive_tasks>`.
+[Google's supervised-learning introduction](https://developers.google.com/machine-learning/intro-to-ml/supervised)
+is optional general background.
 
-## Start with the question, not the software
+## Why an explanation helps
 
-A predictive model estimates a target from a case's input features. A classifier
-might estimate a category; a regressor a numeric quantity. The shared
-{doc}`predictive-task page <../foundations/concepts/predictive_tasks>` defines
-these terms. CE combines calibration with local explanations of model responses.
+When a model's mapping from inputs to outputs is difficult to inspect directly,
+it is often described as a **black box**. Explainable AI (**XAI**) studies ways
+to make model behavior easier to inspect. An explanation can focus on one case
+rather than trying to summarize the whole model.
 
-Prediction, explanation and decision answer different questions:
+CE offers two complementary views. A **factual explanation** describes conditions
+holding for the case and their model-response contributions. An **alternative
+explanation** asks what the model would report under another feature condition.
+For housing, these can help you inspect how the model responds to income or
+location. They do not prove that changing either will cause a particular sale price.
 
-| Question | Information you need |
-| --- | --- |
-| What does the model predict? | The target, class or event definition and its output scale. |
-| What does the reported range describe? | Which quantity has a range and which method/conditions support it. |
-| Why does the model respond this way? | Feature conditions and comparison responses for this case. |
-| What should I do? | The prediction plus costs, constraints, relevant evidence and decision responsibility. |
+## Why calibration matters as well
 
-A housing-value estimate, for example, is not itself a purchase decision. An
-explanation can help you inspect a model response without establishing that a
-particular intervention will change the real outcome.
+Explaining a score does not establish that it behaves like a calibrated probability.
+Probability calibration concerns the relationship between reported probabilities
+and outcomes across cases. Accuracy and calibration therefore answer different
+questions: a model can classify many cases correctly while reporting probabilities
+that need calibration.
 
-## What CE adds
+CE uses a fitted model and **separate labelled calibration data** to construct
+prediction information appropriate to the task and question. It then explains
+that calibrated response. For a numerical target, its interval mode provides a
+prediction interval in target units; an event mode instead reports probability
+information for a question such as “Is the value at most a budget?”
 
-CE uses separate labelled calibration data with a trained model. Depending on
-the task, it returns class-probability information, numeric prediction intervals
-or probabilities for events on a numeric target. It also provides factual and
-alternative explanations where supported by the chosen interface and version.
+The {doc}`calibration background <../foundations/concepts/calibration_background>`
+explains the intuition and statistical concepts. The precise methods and their
+conditions belong in {doc}`How CE Works <how-ce-works>`, not in an assumption-free
+promise that every output becomes reliable.
 
-A factual explanation describes conditions holding for the query, with weights
-and ranges. An alternative asks what the model would report under another
-condition. These are model comparisons, not proofs of causation.
+## What CE adds to an individual result
 
-Read {doc}`tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`
-for the distinction, or {doc}`inspect a real browser result <../get-started/expert-hub>`
-without installing anything.
+Read three things together: **the prediction**, **the range for the relevant
+quantity**, and **the explanation**. A factual weight and an alternative prediction
+are different quantities. Their ranges must be interpreted separately from the
+original prediction range.
 
-## Why calibration and explanation belong together
+For example, a numerical housing-value interval is in monetary units. Bounds
+for the probability that the value is below a budget are on a probability scale.
+A similar-looking bar does not give those outputs the same meaning or guarantee.
+The {doc}`task and mode guide <../foundations/concepts/tasks_modes_capabilities>`
+connects these questions to the available output forms.
 
-Accuracy checks predictions against outcomes; probability calibration concerns
-how probability reports relate to observed frequencies. Explaining a model's
-score does not by itself calibrate that score. Conversely, prediction uncertainty
-alone does not explain feature conditions for the particular query.
+## When should you consider CE?
 
-The {doc}`statistical background <../foundations/concepts/calibration_background>`
-develops those ideas. CE's different ranges must still be read separately;
-they do not share one universal guarantee.
+Consider CE when you have a compatible fitted classifier or regressor, suitable
+labelled calibration data, and a need to inspect predictions together with
+mode-specific uncertainty information. You still need an evaluation plan and
+domain knowledge to judge whether the outputs are useful for your application.
 
-## Decide where CE fits
+If you know SHAP or LIME, use the
+{doc}`comparison page <../compare>` to compare the questions and quantities each
+method addresses. CE is not a universal replacement for every explanation method;
+choose according to your question, available data and required interpretation.
 
-You need a compatible predictive model and labelled calibration data with the
-required feature representation. Consider the task, available data, intended
-output and evaluation plan before selecting a tool. Use the
-{doc}`comparison with SHAP, LIME and other approaches <../compare>` for different
-questions and outputs, not an unsupported performance ranking.
+Calibration assumptions can fail under distribution shift. Explanations do not
+establish causation, feasible interventions or a universally correct decision.
+The {doc}`range meanings and limitations <../foundations/concepts/calibrated_interval_semantics>`
+state the method-specific conditions; prediction bounds and feature-weight ranges
+do not inherit one common guarantee.
 
-**Start with an experience:** {doc}`browser Quickstart <../get-started/index>`.
-**Learn the construction:** {doc}`How CE Works <how-ce-works>`.
-**Check exact limits:** {doc}`source-version semantics <../foundations/concepts/calibrated_interval_semantics>`.
-**Look up a term:** {doc}`Glossary <../glossary/index>`.
+## Continue the story
+
+**Next: understand the construction.** Follow {doc}`How CE Works <how-ce-works>`
+from the data split to calibration and explanation.
+
+**Prefer to see a result first?** Try the
+{doc}`classification example <../get-started/example-classification>` or the
+{doc}`housing-value example <../get-started/example-interval>`. Both let you choose
+browser or local Python; the examples explain what to notice before asking you
+to study API details.
 
 ```{toctree}
 :maxdepth: 1
@@ -91,4 +112,13 @@ questions and outputs, not an unsupported performance ranking.
 Calibrated Explanations comparisons (CE-first) <../compare>
 ```
 
-Entry-point tier: Tier 1.
+<!-- Entry-point tier: Tier 1. -->
+
+<!-- Preserve earlier section links. -->
+<span id="begin-with-one-prediction"></span>
+<span id="choose-the-question-you-want-answered"></span>
+<span id="decide-where-ce-fits"></span>
+<span id="from-a-prediction-to-questions-about-it"></span>
+<span id="start-with-the-question-not-the-software"></span>
+<span id="what-ce-adds"></span>
+<span id="why-calibration-and-explanation-belong-together"></span>

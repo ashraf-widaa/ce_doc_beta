@@ -1,42 +1,61 @@
 # CE Project, Vision & Evolution
 
-Find the research, people, development plans and resources behind CE. These
-pages support every learning route; they are not additional tutorial steps.
+This path connects the CE methods to their publications, software development
+and contribution process. Use it to understand the project, reproduce research
+or find a focused way to participate. You do not need to complete it before
+trying an explanation.
 
-## Understand the project and research
+## Understand the research behind the software
 
-Calibrated Explanations is an independent open-source project. The
-[official project overview](https://github.com/Moffran/calibrated_explanations#readme)
-introduces its purpose. This website is a separate documentation review copy.
+Begin with {doc}`Citing CE <../citing>` to identify the method and software
+references. The {doc}`Researcher Hub <../researcher/index>` connects papers,
+replication and implementation guidance. For formal background, continue to
+{doc}`Theory and literature <../researcher/advanced/theory_and_literature>`.
 
-- **Research and replication:** {doc}`Researcher Hub <../researcher/index>`.
-- **Method papers:** {doc}`Theory and literature <../researcher/advanced/theory_and_literature>`.
-- **Citation:** {doc}`Citing CE <../citing>` for software and research references.
+Keep three things distinct: a published result under stated conditions, its
+implementation in a particular software version, and an open research proposal.
+The {doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`
+records output meanings and limitations; the
+{doc}`roadmap <../ROADMAP>` describes plans rather than guaranteed availability.
+Use {doc}`release references <../appendices/changelog_links>` for released changes.
 
-## Follow development or participate
+## Understand how CE is developed
 
-The {doc}`roadmap <../ROADMAP>` describes plans, not a guarantee that a capability
-is available in your installed version. For released changes, use the
-{doc}`release references <../appendices/changelog_links>`.
+Read the {doc}`architecture overview <../foundations/concepts/architecture>`
+for component responsibilities and execution paths. The
+{doc}`Software & Integration path <software-integration>` starts with public
+interfaces and application use. Together they connect what a user calls to the
+components responsible for it.
 
-Use the {doc}`Contributor Hub <../contributor/index>` for contribution routes,
-and {doc}`governance and support <../foundations/governance/index>` for project
-policies. Implementation work belongs in the
-{doc}`Software & Integration <software-integration>` route.
+The {doc}`Contributor Hub <../contributor/index>` then introduces contribution
+options, relevant contracts and Architecture Decision Records (ADRs), setup and checks.
+An ADR explains a software design choice; it is not a replacement for a statistical
+paper or evidence that a capability has been validated for your data.
+
+## Participate or find support
+
+Start with a focused contribution: an unclear explanation, a reproducible defect,
+a testable implementation change or a research question. Follow the project's
+{doc}`governance and support pages <../foundations/governance/index>` and existing
+contribution policy. Research directions belong in the researcher route until
+they become implemented and documented capabilities.
+
+The [official repository](https://github.com/Moffran/calibrated_explanations)
+is the source for official code and issues. This site is an independent review
+copy; feedback on these documentation changes belongs with the review team and
+[review repository](https://github.com/ashraf-widaa/ce_doc_beta). These edits have
+not been adopted into official CE by appearing here.
 
 ## Shared resources
 
-- {doc}`Glossary <../glossary/index>`: short definitions linked to their full explanation.
+- {doc}`Glossary <../glossary/index>`: short definitions linked to fuller explanations.
 - {doc}`Historical terminology <../foundations/concepts/terminology>`: naming and compatibility changes.
-- [GitHub repository](https://github.com/Moffran/calibrated_explanations): official source and library issues.
-- [BSD-3-Clause License](https://github.com/Moffran/calibrated_explanations/blob/main/LICENSE): authoritative open-source reuse terms.
+- [BSD-3-Clause License](https://github.com/Moffran/calibrated_explanations/blob/main/LICENSE): open-source reuse terms.
 - {doc}`Documentation map <../appendices/rtd_tier_map>`: maintenance context.
 
-Feedback on this independent documentation work belongs with its review team
-and [review repository](https://github.com/ashraf-widaa/ce_doc_beta), not an
-assumption that these pages have been adopted upstream. Commercial services
-remain separate from the open-source library and its license; see the
-{doc}`homepage <../index>`.
+Commercial support is separate from the open-source library and its license;
+see the {doc}`homepage <../index>`. For a first hands-on result instead, start with
+{doc}`Quick Start <../get-started/index>`.
 
 ```{toctree}
 :maxdepth: 1
@@ -51,3 +70,9 @@ Contributor hub <../contributor/index>
 Governance & support <../foundations/governance/index>
 RTD tier map <../appendices/rtd_tier_map>
 ```
+
+<!-- Entry-point tier: Tier 1. -->
+
+<!-- Preserve earlier section links. -->
+<span id="follow-development-or-participate"></span>
+<span id="understand-the-project-and-research"></span>

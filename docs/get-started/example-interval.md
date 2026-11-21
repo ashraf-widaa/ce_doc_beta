@@ -1,10 +1,52 @@
-# Interval regression: explain a numerical prediction
+# Interval regression: first result
 
-**Your question:** What value is predicted, and which target-value interval is reported?
+**Goal:** read a predicted value and its interval, then inspect which feature
+conditions contribute to the model’s response. The target is a number; this example asks
+about the value itself, not the probability of an event.
 
-The browser example uses California Housing. Its target is median housing value in units of $100,000: 0.517 corresponds to $51,700. The existing local regression tutorial uses a different numeric diabetes target; retain its own units.
+## Choose where to run it
 
-## See the mode-specific workflow
+**In the browser — California Housing.** Follow the
+{ref}`Expert Hub housing exercise <expert-interval>`. Prepare and calibrate the
+model, select a test case and leave **Use Threshold** off. The guide includes
+the setup steps and current interface qualifications.
+
+**In Python — numeric diabetes target.** Follow the
+{doc}`regression tutorial <quickstart_regression>` from its prerequisites through
+“Ask for a value and its interval”. It provides code, output and interpretation.
+Its target measures disease progression; do not attach housing units to it.
+
+## Read the housing result
+
+One captured case reports **0.5170**, with interval **[0.3087, 0.7948]**.
+California Housing uses units of **$100,000**, so read this as a prediction of
+**$51,700**, with a target-value interval of **$30,870–$79,480**.
+
+This is a range for the numerical target. It does not mean “a 0.517 probability”,
+and the displayed interval is not certainty that this particular outcome lies
+inside it. Read its method-specific conditions below.
+
+Now inspect one factual condition. Its weight describes a numerical model-response
+difference in target units; its range belongs to that weight, not to the original
+housing-value prediction. An alternative instead reports a prediction under a
+different condition. Use the {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
+with your result open if those quantities are hard to distinguish.
+
+The housing numbers come from the dated {doc}`browser capture <expert-hub>`.
+The local tutorial uses different data and will produce different values.
+
+## Check your understanding
+
+Can you name the predicted quantity, its units and the class or event if applicable?
+Can you distinguish the prediction range, a factual weight and an alternative
+prediction? If not, use {doc}`Interpret calibrated explanations <../foundations/how-to/interpret_explanations>`
+with the result still open. You do not need to learn every API field to read one case.
+
+<details><summary>Go deeper: how this mode produces its outputs</summary>
+
+<span id="see-the-mode-specific-workflow"></span>
+
+**Mode-specific workflow**
 
 <figure>
 <picture>
@@ -22,31 +64,8 @@ units and keep the prediction range separate from a feature-weight range.
 For exact assumptions and limitations, use
 {doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`.
 
-## Choose where to run it
 
-### In your browser
-
-No installation is needed. Follow the {ref}`Expert Hub guide: California Housing value prediction <expert-interval>`.
-The linked section follows classification setup. Select California Housing, repeat preparation/calibration, and inspect a test case without enabling Use Threshold.
-
-The guide contains dated real screenshots, controls and output interpretation.
-If the application is unavailable, use those captures or choose the local route.
-
-### Install and run locally
-
-Use {doc}`Installation <installation>` if needed, then follow the existing
-{doc}`regression tutorial <quickstart_regression>` from the beginning. It includes data preparation, separate
-training/calibration/evaluation roles, model fitting and explanation calls.
-At “Interval and threshold predictions”, follow the value-prediction and percentile-interval calls. Leave the event question for the next example.
-
-## Read your result
-
-A numerical prediction and a prediction interval in the target’s units. Read factual differences in those same units. This is not a range for an event probability.
-
-Identify one feature condition, its weight and its range, then one alternative
-and its reported prediction. Use {doc}`the shared interpretation guide <../foundations/how-to/interpret_explanations>`
-to distinguish them. An alternative describes the model response, not an
-established effect of changing the real-world case.
+</details>
 
 ## Semantics for this example
 
@@ -57,10 +76,18 @@ established effect of changing the real-world case.
 - **Non-guarantees:** no individual-case certainty or unconditional protection under drift.
 - **Feature-level limits:** weight ranges are not causal or universal per-feature coverage guarantees.
 
-## Continue from the result
 
-Return to {doc}`the big picture <index>` to change your question. For the
-construction, read {doc}`How explanations are built <../foundations/concepts/how_explanations_are_built>`.
-Before adapting an example, use {doc}`Checking results on your data <../practitioner/check_results>`.
+## Continue from this result
 
-Entry-point tier: Tier 2.
+**Try another question:** return to {doc}`the big picture <index>`.
+**Understand the construction:** {doc}`How CE Works <../sections/how-ce-works>`.
+**Adapt to your data:** {doc}`Checking results <../practitioner/check_results>`.
+**Find the exact call:** {doc}`Quick API <quick_api>`.
+
+<!-- Entry-point tier: Tier 2. -->
+
+<!-- Preserve previous section links. -->
+<span id="continue-from-the-result"></span>
+<span id="read-your-result"></span>
+
+<span id="interval-regression-explain-a-numerical-prediction"></span>

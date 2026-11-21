@@ -16,10 +16,10 @@
 Choose what you want to understand or do. Each section offers its own starting point.
 
 <div class="ce-home-grid" role="navigation" aria-label="Documentation sections">
-<a class="ce-home-card" href="sections/what-and-why.html"><span class="ce-home-card-title">CE: What &amp; Why</span><span class="ce-home-card-description">Understand the problem CE addresses, what it adds and when to consider it.</span><span class="ce-home-card-action">Understand CE <span aria-hidden="true">→</span></span></a>
-<a class="ce-home-card" href="sections/how-ce-works.html"><span class="ce-home-card-title">How CE Works</span><span class="ce-home-card-description">Follow the workflow and explore the methods, outputs and assumptions.</span><span class="ce-home-card-action">Explore the method <span aria-hidden="true">→</span></span></a>
-<a class="ce-home-card" href="sections/in-practice.html"><span class="ce-home-card-title">CE in Practice</span><span class="ce-home-card-description">Work through examples, interpret explanations and apply CE to your model.</span><span class="ce-home-card-action">Try an example <span aria-hidden="true">→</span></span></a>
-<a class="ce-home-card" href="sections/software-integration.html"><span class="ce-home-card-title">CE Software &amp; Integration</span><span class="ce-home-card-description">Install the library, connect your model and find API and configuration guidance.</span><span class="ce-home-card-action">Use the library <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/what-and-why.html"><span class="ce-home-card-title">CE: What &amp; Why</span><span class="ce-home-card-description">Why a prediction alone can leave questions open—and what calibration and explanations add.</span><span class="ce-home-card-action">Understand CE <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/how-ce-works.html"><span class="ce-home-card-title">How CE Works</span><span class="ce-home-card-description">Follow a prediction from separate calibration data to explanations, and understand the conditions.</span><span class="ce-home-card-action">Explore the method <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/in-practice.html"><span class="ce-home-card-title">CE in Practice</span><span class="ce-home-card-description">Get a first result, read it, then adapt and check the workflow on your data.</span><span class="ce-home-card-action">Try an example <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/software-integration.html"><span class="ce-home-card-title">CE Software &amp; Integration</span><span class="ce-home-card-description">Connect CE to your application: public calls, returned results, preprocessing and operation.</span><span class="ce-home-card-action">Use the library <span aria-hidden="true">→</span></span></a>
 </div>
 
 Reported ranges have task-specific meanings and assumptions. See
@@ -30,7 +30,7 @@ Reported ranges have task-specific meanings and assumptions. See
 Find the research, terminology and open-source project.
 
 <div class="ce-home-grid ce-home-resources" role="navigation" aria-label="Project and resources">
-<a class="ce-home-card" href="sections/project-resources.html"><span class="ce-home-card-title">CE Project, Vision &amp; Evolution</span><span class="ce-home-card-description">Research, publications, development plans and ways to contribute.</span><span class="ce-home-card-action">Explore the project <span aria-hidden="true">→</span></span></a>
+<a class="ce-home-card" href="sections/project-resources.html"><span class="ce-home-card-title">CE Project, Vision &amp; Evolution</span><span class="ce-home-card-description">Connect the research, software architecture and development process; find a way to contribute.</span><span class="ce-home-card-action">Explore the project <span aria-hidden="true">→</span></span></a>
 <a class="ce-home-card" href="glossary/index.html"><span class="ce-home-card-title">Glossary</span><span class="ce-home-card-description">Shared scientific and software terms, with links for depth.</span><span class="ce-home-card-action">Find a definition <span aria-hidden="true">→</span></span></a>
 <a class="ce-home-card" href="https://github.com/Moffran/calibrated_explanations"><span class="ce-home-card-title">GitHub Repository</span><span class="ce-home-card-description">Official source code, issues and releases.</span><span class="ce-home-card-action">Visit GitHub <span aria-hidden="true">→</span></span></a>
 <a class="ce-home-card" href="https://github.com/Moffran/calibrated_explanations/blob/main/LICENSE"><span class="ce-home-card-title">BSD-3-Clause License</span><span class="ce-home-card-description">The open-source library’s license and reuse terms.</span><span class="ce-home-card-action">Read the license <span aria-hidden="true">→</span></span></a>
@@ -77,7 +77,7 @@ These services are separate from the open-source library and its license.
 
 
 
-Entry-point tier: Tier 1.
+<!-- Entry-point tier: Tier 1. -->
 
 ```{toctree}
 :maxdepth: 1

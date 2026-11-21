@@ -1,66 +1,74 @@
 # CE Software & Integration
 
-<!-- Preserve descriptive anchors from the previous review layout. -->
-<span id="install-integrate-or-look-up-a-call"></span>
-<span id="maintain-or-extend-an-integration"></span>
+Use this path to add CE to a Python application and preserve the meaning of its
+outputs as they move through your system. Start with the public interface;
+internal architecture and plugin contracts become relevant when you need to
+understand or extend the implementation.
 
+## First, run the public workflow
 
-How do you connect CE to your model, find an exact call and maintain the
-integration? This route is the technical guide; it does not require reading
-the internal architecture before using the public API.
+Follow {doc}`First explanation in Python <../get-started/first-python-explanation>`
+for installation, explained code, expected output and a plot. If you already
+have an environment, {doc}`Quick API <../get-started/quick_api>` maps your question
+to a call. Use {doc}`Installation <../get-started/installation>` for package options.
 
-## Start with the public lifecycle
+The public wrapper, `WrapCalibratedExplainer`, coordinates the lifecycle: use a
+fitted predictive model, calibrate with separate labelled data, then predict or
+explain a new case. Prediction and explanation are operations on the calibrated
+system; a separate prediction call is not required before an explanation.
 
-The tutorials use `WrapCalibratedExplainer`: fit the predictive model, calibrate
-with separate labelled data, then predict or explain. The underlying
-`CalibratedExplainer` interface is a lower-level reference, not a replacement
-for following the wrapper tutorial's data roles.
+## Connect your model and preprocessing
 
-| Your task | Guide | What to verify |
-| --- | --- | --- |
-| Install the package | {doc}`Installation <../get-started/installation>`. | Python environment and required extras. |
-| Run the lifecycle end to end | {doc}`First Python explanation <../get-started/first-python-explanation>`. | Fitting/calibration roles and a real returned result. |
-| Find a public method | {doc}`Quick API <../get-started/quick_api>` and {doc}`API reference <../api/index>`. | Inputs, output mode, shapes and version-specific returns. |
-| Integrate preprocessing | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>`. | Consistent feature representation across all data roles. |
-| Configure execution or present results | {doc}`Integration and operations guides <../foundations/how-to/index>`. | Configuration authority and selected capabilities. |
-| Resolve an error | {doc}`Troubleshooting <../get-started/troubleshooting>`. | Exact message, environment, versions and raw output. |
+Keep feature order, types and transformations consistent across fitting,
+calibration and queries. Follow
+{doc}`Integrate with pipelines <../foundations/how-to/integrate_with_pipelines>`
+for preprocessing rather than applying unrelated transformations in different
+parts of the workflow.
 
-A probability-like array does not by itself establish a statistical guarantee.
-Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
-for output meanings and {doc}`checking results <../practitioner/check_results>`
-for held-out evaluation. Keep warnings visible while integrating.
+Before integrating a method, check its inputs and return values in the
+{doc}`API reference <../api/index>`. The lower-level `CalibratedExplainer` reference
+is useful for implementation detail; it does not replace the wrapper tutorial's
+data roles or the version-specific public contract.
 
-## Choose how far into the software to go
+## Preserve the meaning of returned results
 
-**Use the public interface.** Begin with the wrapper tutorial and Quick API.
-Check the feature order and preprocessing used for fitting, calibration and
-queries. Read the returned quantity and its shape before passing it to another
-component. The {doc}`API reference <../api/index>` is where to check the exact
-contract for the installed version.
+Name the output mode, quantity and units before displaying or exporting it.
+A target-value interval must not be labelled as probability bounds; a factual
+weight must not be displayed as the case's predicted probability. Preserve the
+reported ranges and warnings rather than clipping values to fit a display.
 
-**Integrate and operate.** Use the existing pipeline and operations guides when
-connecting CE to preprocessing or an application. Preserve the output mode,
-units and reported ranges in the presentation layer; a probability bound must
-not be relabelled as a target-value interval. Keep evaluation and troubleshooting
-alongside integration rather than postponing them until deployment.
+Use {doc}`Interpret calibrated explanations <../foundations/how-to/interpret_explanations>`
+for the objects and plots. The
+{doc}`integration and operations guides <../foundations/how-to/index>` connect
+those results to export, configuration and runtime behavior. A correctly shaped
+array does not by itself establish statistical validity; evaluate using
+{doc}`Checking results <../practitioner/check_results>` and the
+{doc}`mode-specific conditions <../foundations/concepts/calibrated_interval_semantics>`.
 
-**Understand or extend the internals.** Read the technical reference and plugin
-guides when you need implementation details or extension points. They are a
-deeper route, not prerequisites for using the public wrapper. Statistical meaning
-still belongs to the shared
-{doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`.
+## Handle errors and version changes
 
-## Maintain or extend the software
+When a call fails, keep the exact message and record your environment and package
+version. {doc}`Troubleshooting <../get-started/troubleshooting>` is the first stop;
+the API contract explains accepted parameters and returns.
 
-Use {doc}`release notes <../appendices/changelog_links>`,
-{doc}`upgrade guides <../upgrade/index>` and {doc}`migration guides <../migration/index>`
-when changing versions. For plugin work or internal implementation details,
-use {doc}`plugins <../plugins>` and
-{doc}`technical reference and internals <../foundations/reference/index>`.
+Before upgrading, use the {doc}`upgrade guides <../upgrade/index>`,
+{doc}`migration guides <../migration/index>` and
+{doc}`release references <../appendices/changelog_links>`. A version change can
+affect interfaces or interpretation; do not assume an older screenshot defines
+the current contract.
 
-**Learn by task:** {doc}`CE in Practice <in-practice>`.
-**Understand construction:** {doc}`How CE Works <how-ce-works>`.
-**Find project/research context:** {doc}`Project & Resources <project-resources>`.
+## Understand or extend the implementation
+
+The {doc}`architecture overview <../foundations/concepts/architecture>` explains
+components and execution paths before internal details. For extension work,
+continue to {doc}`plugins <../plugins>`, the
+{doc}`technical reference <../foundations/reference/index>` and the
+{doc}`Contributor Hub <../contributor/index>` for contracts, relevant design
+records and checks. Architecture Decision Records explain design choices;
+scientific guarantees still need their method and assumptions.
+
+**Need the statistical construction?** Follow {doc}`How CE Works <how-ce-works>`.
+**Need another worked task?** Return to {doc}`CE in Practice <in-practice>`.
 
 ```{toctree}
 :maxdepth: 1
@@ -78,4 +86,11 @@ Plugins <../plugins>
 Technical reference and internals <../foundations/reference/index>
 ```
 
-Entry-point tier: Tier 1.
+<!-- Entry-point tier: Tier 1. -->
+
+<!-- Preserve earlier section links. -->
+<span id="choose-how-far-into-the-software-to-go"></span>
+<span id="install-integrate-or-look-up-a-call"></span>
+<span id="maintain-or-extend-an-integration"></span>
+<span id="maintain-or-extend-the-software"></span>
+<span id="start-with-the-public-lifecycle"></span>

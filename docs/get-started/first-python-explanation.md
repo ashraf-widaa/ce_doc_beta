@@ -10,7 +10,15 @@ is needed.
 
 For the no-install learning route, use {doc}`Quickstart <index>`.
 
-## What CE adds
+Start at **1. Install**, then run the cells in order. You will see a real class
+prediction and learn how to read its factual plot. If the terms or workflow are
+new, open the short background below first.
+
+<details><summary>Before you run: the CE workflow, features and target</summary>
+
+<span id="what-ce-adds"></span>
+
+**What CE adds**
 
 ```{include} ../_shared/ce-workflow.md
 ```
@@ -18,7 +26,9 @@ For the no-install learning route, use {doc}`Quickstart <index>`.
 The figure shows the additional stages, not a claim that a conventional ML
 model cannot be calibrated or used with other explanation methods.
 
-## Predictive tasks
+<span id="predictive-tasks"></span>
+
+**Predictive tasks**
 
 ```{include} ../foundations/concepts/predictive_tasks.md
 :start-after: <!-- predictive-tasks:start -->
@@ -29,6 +39,9 @@ Here, each observation is one Iris flower. Its four features are sepal length,
 sepal width, petal length and petal width, measured in centimetres. The target
 is the species: **setosa**, **versicolor** or **virginica**. This is classification.
 For optional background, see [supervised learning](https://developers.google.com/machine-learning/intro-to-ml/supervised).
+
+
+</details>
 
 ## 1. Install
 
@@ -177,4 +190,4 @@ A single example does not evaluate your model or establish deployment validity.
 | Understand the mechanisms and assumptions | {doc}`How CE Works <../sections/how-ce-works>`. |
 | Find a method or parameter | {doc}`Quick API <quick_api>` or {doc}`API reference <../api/index>`. |
 
-Entry-point tier: Tier 1.
+<!-- Entry-point tier: Tier 1. -->

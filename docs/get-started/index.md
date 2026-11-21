@@ -1,91 +1,77 @@
 # CE big picture in 60 seconds
 
-Calibrated Explanations (CE) works with **supervised machine-learning models**:
-models trained on examples with known outcomes. CE combines calibration with
-explanations of individual model predictions. Start with the overview below;
-follow the deeper links only when you need them.
+A machine-learning model predicts an outcome from a case's **features**: the
+information describing that case. The outcome is its **target**. In supervised
+learning, training examples contain both features and known targets.
 
-## What CE adds to the workflow
+**Calibrated Explanations (CE) helps you inspect an individual prediction.** It
+uses a fitted model and separate labelled calibration data to provide calibrated
+prediction information and factual or alternative explanations, with reported ranges.
+
+**Learn by doing:** start with the {doc}`Diabetes classification example <example-classification>`.
+Or read the big picture below before choosing another question.
+
+## What changes when you add CE?
 
 <picture>
 <source media="(max-width: 600px)" srcset="../_static/figures/ce-big-picture-mobile.svg">
 <img src="../_static/figures/ce-big-picture.svg" width="960" height="510" alt="White boxes show labelled training data, a fitted model and a conventional prediction for a new case. Orange boxes show separate labelled calibration data and CE, using the same fitted model and new case, to return calibrated prediction information and factual or alternative explanations with reported ranges.">
 </picture>
 
-**White boxes:** the conventional prediction workflow shown here.
-**Orange boxes:** CE's additions. Other ML workflows can also include uncertainty
-or calibration methods. [Open the full-size figure](../_static/figures/ce-big-picture.svg).
+White boxes show the conventional workflow; orange boxes show CE's additions.
+CE can use the same fitted model. Calibration uses separate labelled examples;
+you then supply a new case's features to predict or explain it. Keep evaluation
+data separate to check the resulting system. Other ML workflows can also include
+calibration or uncertainty methods.
 
-1. **Learn from labelled training data.** Each observation has input **features**
-   describing a case and a known **target**, the outcome to predict. Training
-   produces the fitted model.
-2. **Predict a new case.** The fitted model uses the new case's features to
-   estimate its target. A class, value or score alone does not describe the
-   feature conditions contributing to that response.
-3. **Calibrate with separate labelled data.** CE uses the fitted model and
-   calibration cases not used to fit it. This supports task-specific calibrated
-   prediction information; CE need not retrain the model. Keep a separate
-   evaluation set to check the resulting system.
-4. **Read prediction information and explanations.** For the new case, inspect
-   the calibrated output and its reported range. A factual explanation shows
-   feature conditions and their weights with ranges; alternatives show what the
-   model would report under different conditions. These comparisons help inspect
-   the model; they do not establish real-world causes or prescribe a decision.
+[Open the full-size figure](../_static/figures/ce-big-picture.svg).
 
-For the data roles and vocabulary, see
-{doc}`Predictive tasks <../foundations/concepts/predictive_tasks>`.
-For general background, see
-[supervised learning — Google for Developers](https://developers.google.com/machine-learning/intro-to-ml/supervised).
+## Choose the question you want to answer
 
-## Task, mode and capability: three different choices
+A **task** says what the model predicts. Classification predicts a category,
+with two classes (binary) or more than two (multiclass). Regression predicts a
+number. A **mode** is the question you ask CE about that prediction:
 
-A **task** says what the model predicts: **classification** predicts a category;
-**regression** predicts a numerical quantity. A **mode** says which question you
-ask CE about that prediction. Regression supports both value and event questions.
-A **capability** is an operation you perform, such as a factual explanation or
-exploring alternatives; it is not another predictive task.
-
-```{include} ../_shared/task-mode-map.md
-:start-after: <!-- task-mode-map:start -->
-:end-before: <!-- task-mode-map:end -->
-```
-
-In every mode, keep the prediction, factual weight and alternative prediction
-separate. Probability differences use a probability scale; numerical differences
-use the target's units. See the
-{doc}`task, mode and capability guide <../foundations/concepts/tasks_modes_capabilities>`
-for detailed distinctions and version-specific support. Conceptual modes are not
-three interchangeable constructor settings.
-
-## What can you rely on?
-
-CE's guarantees and assumptions are **mode-specific**. Probability bounds,
-target-value prediction intervals and feature-weight ranges do not share one
-universal guarantee. Read the
-{doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`
-for the precise statements and limitations; a range is not a guarantee for this
-individual case, a causal effect or protection against distribution shift.
-
-## Choose one step-by-step example
-
-Choose your question first. Each example page then offers **browser** and
-**local Python** routes; you do not need to complete both.
-
-- **Which class, and how probable?** Start the
+- **Which class, and how probable?** Follow the
   {doc}`classification example <example-classification>`.
-- **What numerical value, and within what interval?** Start the
-  {doc}`interval regression example <example-interval>`.
-- **How probable is an event on a numerical target?** Start the
+- **What value, and within what interval?** Follow the
+  {doc}`numerical prediction example <example-interval>`.
+- **How probable is an event, such as a value below a threshold?** Follow the
   {doc}`event-probability example <example-event>`.
 
-Browser and local tutorials can use different datasets and software versions.
-Compare the workflow and output meanings, not identical numerical results.
+Each example offers browser and local Python routes. Choose one; completing
+both is optional.
 
-**Go deeper:** {doc}`Why CE? <../sections/what-and-why>` ·
-{doc}`How CE works <../sections/how-ce-works>` ·
-{doc}`Read an explanation <../foundations/how-to/interpret_explanations>`.
+## What can an explanation tell you?
 
-Entry-point tier: Tier 1.
+These are explanation **capabilities**, not additional predictive tasks:
+
+- **Factual:** which feature conditions contribute to the model's response for
+  this case, with weights and reported ranges?
+- **Alternative:** what would the model report under a different feature condition?
+
+An alternative describes the model; it does not establish that changing the
+real-world case will cause that outcome.
+
+## What do the ranges mean?
+
+First name the quantity. Class and event probabilities have probability bounds;
+a numerical prediction interval is in the target's units. Feature-weight ranges
+are a separate quantity. They do not share one universal guarantee.
+
+Guarantees depend on the mode and its assumptions. Use the
+{doc}`range meanings and limitations <../foundations/concepts/calibrated_interval_semantics>`
+when interpreting a result; a range is not certainty about an individual case
+or protection against distribution shift.
+
+## Go deeper when you need it
+
+- **Why use CE?** {doc}`CE: What & Why <../sections/what-and-why>`.
+- **How is it constructed?** {doc}`How CE Works <../sections/how-ce-works>`.
+- **How do I use it in software?** {doc}`Software & Integration <../sections/software-integration>`.
+- **What do the terms mean?** {doc}`Tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`.
+
+<!-- Entry-point tier: Tier 1. -->
 
 ```{toctree}
 :hidden:
@@ -100,13 +86,14 @@ First explanation in Python <first-python-explanation>
 Choose your task <../getting_started_60s>
 ```
 
-<!-- Preserve links from earlier Quick Start candidates. -->
+<!-- Preserve previous section links. -->
 <span id="1-ce-in-60-seconds"></span>
 <span id="2-choose-your-predictive-task-and-ce-mode"></span>
 <span id="3-choose-your-browser-experience"></span>
 <span id="4-explore-one-explanation"></span>
 <span id="5-understand-what-you-see"></span>
 <span id="6-continue-learning"></span>
+<span id="choose-one-step-by-step-example"></span>
 <span id="choose-your-next-step"></span>
 <span id="get-started"></span>
 <span id="if-the-result-differs-or-no-plot-appears"></span>
@@ -117,4 +104,7 @@ Choose your task <../getting_started_60s>
 <span id="quickstart-create-and-read-your-first-explanation"></span>
 <span id="read-the-plot"></span>
 <span id="run-the-complete-example"></span>
+<span id="task-mode-and-capability-three-different-choices"></span>
+<span id="what-can-you-rely-on"></span>
 <span id="what-ce-adds"></span>
+<span id="what-ce-adds-to-the-workflow"></span>

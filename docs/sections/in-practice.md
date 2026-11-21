@@ -1,69 +1,78 @@
 # CE in Practice
 
-<!-- Preserve descriptive anchors from the previous review layout. -->
-<span id="build-on-the-ordinary-example"></span>
-<span id="choose-a-practical-route"></span>
+Use this path to obtain an explanation, understand its output and check the
+workflow before adapting it to your own data. Start with one case and one
+question; advanced filters and deployment settings can wait.
 
+## Start with one worked result
 
-What do you want to do with CE? Choose one practical route, inspect the result,
-then check whether the workflow is appropriate for your own data.
+If you are new to CE, follow the
+{doc}`classification example <../get-started/example-classification>`. It offers
+a binary Diabetes exercise in the browser and a complete multiclass Iris example
+in Python. You will identify the prediction, its reported range, a factual
+condition and an alternative prediction.
 
-## Choose your starting activity
+For a numerical target, choose the question you actually need:
 
-| Your goal | Start here | Continue with |
-| --- | --- | --- |
-| Explore without installation | {doc}`Browser Quickstart <../get-started/index>`. | {doc}`Expert Hub <../get-started/expert-hub>` or {doc}`Decision Lab <../get-started/decision-lab>`. |
-| Run a complete local example | {doc}`First explanation in Python <../get-started/first-python-explanation>`. | {doc}`Interpretation <../foundations/how-to/interpret_explanations>`. |
-| Use a classifier | {doc}`Classification tutorial <../get-started/quickstart_classification>`. | {doc}`Check results <../practitioner/check_results>`. |
-| Predict a number or an event on it | {doc}`Regression tutorial <../get-started/quickstart_regression>`. | {doc}`Regression mode meanings <../foundations/concepts/probabilistic_regression>`. |
-| Connect an existing model or preprocessing | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>`. | {doc}`Software & Integration <software-integration>`. |
+- **A predicted value and interval:** {doc}`interval regression <../get-started/example-interval>`.
+- **The probability of an event on that value:** {doc}`event-probability regression <../get-started/example-event>`.
 
-## Follow one case before changing the workflow
+Each example provides browser and local routes. Choose one; they need not use
+the same dataset or produce matching numbers. If the workflow itself is unfamiliar,
+the {doc}`Quick Start <../get-started/index>` explains the big picture first.
 
-Choose one route above and keep its dataset, selected case and output question
-unchanged for the first run. Identify the prediction, its units and its reported
-range before inspecting feature conditions. Then inspect one alternative and
-ask which model output changed. This gives you a complete first pass without
-requiring every available capability.
+## Read the result before adding features
 
-If a plot is hard to read, use the
-{doc}`interpretation guide <../foundations/how-to/interpret_explanations>` beside
-the example. When you are ready to understand how its numbers are constructed,
-follow {doc}`How CE Works <how-ce-works>`. Before adapting the example to your
-own data, use {doc}`Checking results <../practitioner/check_results>` to plan
-held-out evaluation. A successful tutorial run is the beginning of that check,
-not evidence that your deployment is reliable.
+Name the quantity and units before interpreting its range. Then read one factual
+condition: which feature does it concern, what comparison does its weight describe,
+and what range belongs to that weight? Finally inspect one alternative and compare
+its prediction with the original case. This is a model comparison, not a proven
+real-world intervention.
 
-## Know which dataset and target you are using
+The shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
+explains each element of the records and plots. Keep it beside your result when
+needed; you do not need to learn every payload field for a first reading.
 
-| Example | Target / task | Important distinction |
-| --- | --- | --- |
-| Browser Diabetes | Pima binary class | This is not Sklearn's numeric diabetes regression dataset. |
-| Browser California Housing | Numeric housing value; target units $100,000 | A threshold of 3 means $300,000 for this dataset. |
-| First Python example | Iris species / multiclass classification | It uses the reviewed library source and records its multiclass limitation. |
-| Existing Python regression tutorial | Numeric diabetes target | Numeric intervals and event probabilities answer different questions. |
+## Use your own model and data
 
-Use the example's actual labels, units, split and selected row. Do not transplant
-browser values into another dataset or assume a teaching game's backend matches
-the installed library version.
+Follow the {doc}`pipeline integration guide <../foundations/how-to/integrate_with_pipelines>`
+when adding CE to a model with preprocessing. Keep fitting, calibration and
+held-out evaluation roles separate, and use the same feature representation.
+The {doc}`Software & Integration path <software-integration>` connects this
+workflow to installation, public calls, configuration and error handling.
 
-## Interpret before extending
+A working example is not an evaluation. Before relying on your results, use
+{doc}`Checking results on your data <../practitioner/check_results>` to choose
+probability, interval or event checks appropriate to your question. Read the
+{doc}`method-specific assumptions <../foundations/concepts/calibrated_interval_semantics>`
+together with any claimed guarantee.
 
-Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
-for conditions, weights, predictions and ranges. Then move to
-{doc}`guarded explanations <../get-started/quickstart_guarded>` if filtering is
-relevant, or {doc}`practitioner playbooks <../practitioner/playbooks/index>` for
-specific decision workflows. These are optional, not prerequisites.
+## Go further for a specific reason
 
-## Check what the example does not establish
+The {doc}`Practitioner Hub <../practitioner/index>` groups existing guides by goal:
+calibration, intervals, alternatives, subgroups, rejection and evidence review.
+Use {doc}`guarded explanations <../get-started/quickstart_guarded>` when you need
+to understand support filtering, or the
+{doc}`playbooks <../practitioner/playbooks/index>` for a particular decision workflow.
+These are extensions to the basic example, not prerequisites for it.
 
-One plot is not an evaluation. Use {doc}`checking results on your data <../practitioner/check_results>`
-for task-appropriate held-out checks and limitations. Keep scientific
-{doc}`assumptions and non-guarantees <../foundations/concepts/calibrated_interval_semantics>`
-visible when adapting the workflow.
+<details><summary>Check which dataset an example uses</summary>
 
-**Understand the mechanism:** {doc}`How CE Works <how-ce-works>`.
-**Find advanced material:** {doc}`Practitioner Hub <../practitioner/index>`.
+- Browser Diabetes uses a Pima binary target; it is not scikit-learn's numeric diabetes target.
+- Browser California Housing uses $100,000 target units: a threshold of 3 means $300,000.
+- The first Python example uses Iris species and records a multiclass-bound limitation.
+- The Python regression tutorial uses the numeric diabetes target.
+
+Use each example's actual labels, units, split and query row. Do not transfer
+numbers or service guarantees between browser apps and the installed library.
+
+</details>
+
+## Continue from practice
+
+**Understand why the numbers arise:** {doc}`How CE Works <how-ce-works>`.
+**Find a particular call:** {doc}`Quick API <../get-started/quick_api>`.
+**Interpret a term:** {doc}`Glossary <../glossary/index>`.
 
 ```{toctree}
 :maxdepth: 1
@@ -76,4 +85,13 @@ Tasks and capabilities <../tasks/index>
 Practitioner hub <../practitioner/index>
 ```
 
-Entry-point tier: Tier 1.
+<!-- Entry-point tier: Tier 1. -->
+
+<!-- Preserve earlier section links. -->
+<span id="build-on-the-ordinary-example"></span>
+<span id="check-what-the-example-does-not-establish"></span>
+<span id="choose-a-practical-route"></span>
+<span id="choose-your-starting-activity"></span>
+<span id="follow-one-case-before-changing-the-workflow"></span>
+<span id="interpret-before-extending"></span>
+<span id="know-which-dataset-and-target-you-are-using"></span>
