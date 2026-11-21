@@ -22,6 +22,38 @@ units and keep the prediction range separate from a feature-weight range.
 For exact assumptions and limitations, use
 {doc}`calibrated interval semantics <../foundations/concepts/calibrated_interval_semantics>`.
 
+## Binary and multiclass: the same task, different class sets
+
+Binary classification has two target classes. Multiclass classification has
+three or more. Both belong to the classification task; they are not two
+additional CE output modes. In both cases, identify the class being explained.
+
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-classification-cases-mobile.svg">
+<img src="../_static/figures/ce-classification-cases.svg" width="900" height="300" alt="Two observed cases: binary Pima Diabetes reports positive probability 0.7448 with bounds 0.7273 to 0.7959; multiclass Iris reports versicolor probability 0.910 with bounds 0.902 to 0.992. The examples use different data and implementations.">
+</picture>
+
+[Open the full-size comparison](../_static/figures/ce-classification-cases.svg).
+
+**Binary case:** the dated {doc}`Expert Hub guide <expert-hub>` identifies the
+positive class and its reported probability. These are captured browser results,
+not expected output for the local Iris script or a clinical recommendation.
+
+**Multiclass case:** the {doc}`first Python example <first-python-explanation>`
+reports probabilities in the order setosa, versicolor, virginica. Its factual
+explanation concerns versicolor. An alternative must be interpreted relative
+to the class and output recorded by that explanation, not an assumed generic
+“positive class”.
+
+```{warning}
+The reviewed source can return multiclass bounds outside `[0, 1]` for other
+queries. The illustrated case does not resolve that limitation. Do not clip
+bounds or transfer the binary Venn–Abers interpretation unchanged to multiclass
+normalization. See the {doc}`classification tutorial <quickstart_classification>`
+and {doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`;
+exact statistical interpretation remains for author review.
+```
+
 ## Choose where to run it
 
 ### In your browser
