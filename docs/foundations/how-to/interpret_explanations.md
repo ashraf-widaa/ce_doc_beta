@@ -4,9 +4,32 @@ sidebarclass: how-to
 
 # Interpret calibrated explanations
 
-Understanding the explanation objects is the core reason to use this library. This guide shows how to read factual and alternative explanations, relate them to the calibrated predictions and uncertainty intervals they produce, and tie everything back to the plots and telemetry that document provenance.
+Read an explanation by identifying its output, units and range before comparing
+feature conditions. Start with the reading steps below; the later sections show
+how to inspect the same information in Python payloads and telemetry.
 
-For regression, the `prediction_interval` is a **conformal interval** produced by **Conformal Predictive Systems (CPS)**, and the interval percentiles are controlled by `low_high_percentiles`.
+## Read one result first
+
+1. **Name the question.** Is it a class probability, a numerical value, or the
+   probability of a defined numerical event? The
+   {doc}`task and mode guide <../concepts/tasks_modes_capabilities>` helps choose.
+2. **Read the prediction and its range.** Probability bounds use a probability
+   scale; numerical intervals use target units. The property name
+   `prediction_interval` does not turn every range into a numeric CPS interval.
+3. **Read a factual condition and weight.** Identify the condition that holds
+   for this case, the direction and size of its model-response comparison, then
+   the range reported for that weight. Do not confuse it with the prediction range.
+4. **Read one alternative.** Identify its condition and the prediction under that
+   condition. It is a model comparison, not an established intervention effect.
+
+For ordinary regression without a threshold, CPS interval percentiles are
+controlled by `low_high_percentiles`. With a threshold, read event-probability
+information instead. {doc}`Calibrated interval semantics <../concepts/calibrated_interval_semantics>`
+is the shared source for assumptions, guarantees and feature-level limitations.
+A range crossing zero does not establish a causal effect or a significance test.
+
+**Try a result:** {doc}`Quick Start <../../get-started/index>`.
+**Find the calls:** {doc}`Quick API <../../get-started/quick_api>`.
 
 ```{admonition} Terminology
 :class: tip
@@ -28,6 +51,12 @@ For regression, the `prediction_interval` is a **conformal interval** produced b
 
 ## 1. Start with the explanation collections
 
+The snippets assume a fitted, calibrated `explainer` and a held-out feature
+array `x_test`, as prepared by the {doc}`Python tutorial <../../get-started/first-python-explanation>`.
+They demonstrate a classification result. For event explanations, pass the same
+`threshold=` to both explanation calls as in the event prediction.
+
+
 Calibrated explanations return collections (`CalibratedExplanations`, `AlternativeExplanations`) that behave like sequences. The first step is to look at the summary for each item:
 
 ```python
@@ -40,20 +69,24 @@ print(f"Mode: {factual.get_mode()}  Calibrated prediction: {factual.predict:.3f}
 print(f"Mode: {alternative.get_mode()}  Calibrated prediction: {alternative.predict:.3f}")
 ```
 
-Key attributes shared by both modes:
+Useful attributes and methods shared by factual and alternative explanations:
 
 | Attribute | Description |
 | --------- | ----------- |
 | `predict` | Calibrated probability (classification) or numeric estimate (regression). |
-| `prediction_interval` | Tuple of `(low, high)` values; mirrors `uncertainty["lower_bound"]`/`["upper_bound"]`. |
-| `rules` | Ordered list of feature-level rules, highest absolute weight first. |
-| `telemetry` | Dictionary describing the interval, probability, and plot sources that produced the explanation. |
+| `prediction_interval` | Tuple of `(low, high)` values for the explained quantity; interpret it by task and threshold. |
+| `build_rules_payload()` | Structured `core` and `metadata` dictionaries; `core["feature_rules"]` lists the rule records. |
+| `to_telemetry()` | Instance-level uncertainty and rule records. Collection-level `telemetry` also records component provenance. |
 
-For regression with `threshold` values, the `predict` value expresses the probability that the outcome lies within the threshold bounds; the interval reflects percentile uncertainty around the calibrated estimate.
+For regression with a scalar `threshold=t`, `predict` concerns `P(Y <= t)`;
+an interval threshold defines an interval event. The reported range concerns
+that event probability, not percentile endpoints for the target value.
+`get_mode()` alone reports classification or regression, so inspect the threshold
+and the question as well.
 
 ## 2. Examine the rule tables in detail
 
-Rules translate the calibration result into actionable statements. Use the helper payloads to inspect them in a structured way.
+Rules express model-response comparisons as conditions and reported quantities. Use the helper payloads to inspect them in a structured way.
 
 ### 2.1 Factual explanations
 
@@ -86,7 +119,7 @@ The `build_rules_payload` result is a dictionary with two top-level keys:
 
 Read the factual core from top to bottom:
 
-1. **Weight sign** – positive weights push the calibrated prediction towards the positive outcome; negative weights pull it away. Large magnitude implies greater influence.
+1. **Weight sign** – positive weights indicate an increase in the explained quantity relative to the comparison response; negative weights indicate a decrease. Identify the class, numeric target or event first. Magnitudes use that quantity’s scale.
 2. **Condition** – confirms the feature value observed in the instance (for example, `glucose >= 140`). Use this to cross-check domain constraints.
 3. **Prediction** – available through the metadata, showing the calibrated contribution when the feature is perturbed; compare it to `predict` to understand marginal impact.
 4. **Weight interval** – the core payload keeps only the numeric bounds; consult the metadata if you need the representation (percentile vs. probabilistic) or raw percentiles used to derive them.
@@ -115,10 +148,13 @@ for extra in alternative_metadata:
     )
 ```
 
-- `core["feature_rules"]` lists the recommended feature adjustments alongside the calibrated prediction estimate and uncertainty interval for each alternative scenario.
+- `core["feature_rules"]` lists the alternative feature conditions alongside the calibrated prediction estimate and uncertainty interval for each alternative scenario.
 - `metadata["feature_rules"]` retains the richer calibration context: the difference from the factual baseline (`weight_value`), the detailed uncertainty metadata, and the alternative value used to create the scenario.
 
-Use these payloads to answer “which change makes the most difference?”—the best candidate is the scenario with the highest calibrated probability swing and acceptable feature adjustments. If explanation envelopes remain wide, treat the recommendation with caution and look for additional calibration data.
+Compare alternatives using the output quantity, its reported range and relevant
+domain constraints. The largest model-response difference is not automatically
+the best decision or a feasible action. A wide range calls for further checking;
+adding calibration data alone does not guarantee that it will become narrow.
 ## 3. Connect explanations to plots
 
 PlotSpec plots visualise the same rule rankings and uncertainty intervals:
@@ -137,16 +173,16 @@ Interpret the chart as follows:
 
 1. **Bar length** corresponds to the absolute weight shown in the rule table.
 2. **Colour** indicates direction (green for positive impact, purple for negative by default).
-3. **Shaded band** around each bar is the rule-level uncertainty interval.
+3. **Range markers** show the reported rule-level bounds; their presentation depends on the renderer.
 4. **Vertical line** over the summary panel mirrors the calibrated prediction and its `(low, high)` bounds.
 
 When reviewing alternative explanations, use `plot(style="alternative")` (or open the alternative tab in interactive renderers) to see how the suggested feature changes alter the bars and the calibrated outcome.
 
-If the plot does not match the table, regenerate the explanation—the library guarantees they use the same data.
+If the plot and table disagree, check the selected case, filters, output mode and renderer before regenerating. A matching display alone does not validate the statistical assumptions.
 
 ## 4. Tie everything back to telemetry
 
-Telemetry proves which components produced the explanation:
+Telemetry records which components produced the explanation; it does not prove statistical validity:
 
 ```python
 telemetry = getattr(factual_batch, "telemetry", {})
@@ -157,7 +193,7 @@ print(telemetry["uncertainty"])
 
 Interpretation tips:
 
-- `interval_source` / `proba_source` show the calibration algorithms in play. Namespaced identifiers such as `registry:interval.default` indicate trusted plugins; `legacy:` prefixes mean a fallback was used.
+- `interval_source` / `proba_source` show the calibration algorithms in play. Namespaced identifiers such as `registry:interval.default` identify selected plugins; `legacy:` prefixes mean a fallback was used.
 - `plot_source` surfaces the renderer (for example `plot_spec.default.factual`). Investigate if a legacy fallback appears unexpectedly.
 - The nested `uncertainty` dictionary mirrors the structure already discussed and is the authoritative source for machine-readable exports.
 - `preprocessor` provides ADR-009 provenance so you can reproduce how categorical encoders or scalers shaped the data.
@@ -170,4 +206,9 @@ After you absorb the tables and plots:
 2. Embed the interpretation checks into dashboards—surface calibrated prediction vs. interval charts and highlight scenarios with wide rule uncertainty.
 3. Share this guide with auditors and stakeholders so everyone relies on the same vocabulary when discussing factual or alternative explanations.
 
-Keeping the interpretation workflow front and centre ensures calibrated explanations drive safe, explainable decisions rather than becoming another opaque model output.
+Next, use {doc}`Checking results on your data <../../practitioner/check_results>`
+for evaluation, {doc}`How CE Works <../../sections/how-ce-works>` for construction,
+or {doc}`Software & Integration <../../sections/software-integration>` for application
+contracts. A readable explanation does not by itself establish a safe decision.
+
+Entry-point tier: Tier 3.

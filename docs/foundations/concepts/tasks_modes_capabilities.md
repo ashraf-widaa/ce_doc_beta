@@ -27,6 +27,27 @@ In the Python interface, `threshold=` selects an event question. “Mode” here
 is a learning distinction, not a claim that three different strings must be
 passed as the constructor's `mode` argument. See {doc}`probabilistic_regression`.
 
+## Follow the same housing target through two modes
+
+The California Housing browser example predicts median housing value in units of
+$100,000. Asking “What value, and within what interval?” uses interval regression.
+Asking “How probable is a value at most $300,000?” uses probabilistic regression
+with threshold 3. The predictive task remains regression. The output quantity
+changes from a value in target units to a probability on an event.
+
+Now choose a capability: inspect factual feature conditions or explore alternative
+conditions. That choice changes the explanation you request, not the target the
+model was trained to predict. See the {doc}`interval example <../../get-started/example-interval>`
+or {doc}`event example <../../get-started/example-event>` for browser and local routes.
+
+## Match the learning terms to Python
+
+`get_mode()` identifies the underlying classification or regression mode; do not
+use that string alone to distinguish numerical regression from threshold-event
+regression. Read the threshold and output quantity as well. The
+{doc}`Quick API <../../get-started/quick_api>` maps questions to calls without
+requiring a new constructor for each explanation capability.
+
 ## Capability: the operation you need
 
 | Capability | Question it helps answer | What it is not |
@@ -41,9 +62,19 @@ The last row is an advanced option after an ordinary explanation; see
 {doc}`alternatives`. Capabilities and APIs vary with version and browser route:
 Python library support does not prove that a browser app exposes the same feature.
 
+## Read guarantees at the output's level
+
+A mode determines which quantity is reported; it does not make all its ranges
+interchangeable. Start with the {doc}`semantics reading guide <calibrated_interval_semantics>`
+for the distinctions and then read the applicable assumptions. For a step-by-step
+reading of factual weights and alternative predictions, use
+{doc}`Interpret calibrated explanations <../how-to/interpret_explanations>`.
+
 ## Choose a route
 
 - **No installation:** {doc}`browser-first Quickstart <../../get-started/index>`.
 - **Run Python:** {doc}`first Python explanation <../../get-started/first-python-explanation>`.
 - **Understand construction:** {doc}`how_explanations_are_built`.
 - **Check conditions and guarantees:** {doc}`calibrated_interval_semantics`.
+
+Entry-point tier: Tier 1.

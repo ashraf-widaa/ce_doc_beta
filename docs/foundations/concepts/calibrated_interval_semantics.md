@@ -1,6 +1,37 @@
 # Calibrated interval semantics
 
-This page is the semantics source for user-facing documentation.
+This page is the semantics source for user-facing documentation. Start by naming
+the quantity that has a range, then read the corresponding mode below. Similar
+looking endpoints do not imply the same statistical statement.
+
+## Read the range before the guarantee
+
+- **Class probability:** classification reports probability information for a
+  class. Its bounds are not target-value prediction intervals or conventional
+  confidence intervals for an individual's unknown probability.
+- **Numerical target:** interval regression reports a prediction interval in the
+  target's units. Coverage concerns the specified method and sampling conditions;
+  it is not certainty about the particular case you are viewing.
+- **Event probability:** probabilistic regression asks about an event such as
+  `Y <= t`. Its probability bounds are not a range of possible target values.
+- **Feature weight:** an explanation range concerns a model-response comparison.
+  It does not automatically inherit a prediction-coverage guarantee.
+
+The sections below retain the source version's mode-specific statements.
+Exact validity wording for merged probabilities, multiclass bounds and finite-sample
+coverage remains a scientific-author review topic; this reading guide does not
+resolve it or strengthen those statements.
+
+For a concrete example, use the {doc}`Quick Start <../../get-started/index>`.
+For general background before the conditions, read
+{doc}`Calibration and statistical background <calibration_background>`.
+
+## How to use each mode section
+
+First check the calibration prerequisites. Then read its guarantee together with
+the assumptions and non-guarantees, rather than quoting the guarantee alone.
+Finally check the feature-level limits before describing an explanation range.
+Successful API calls or one correct prediction do not verify these assumptions.
 
 ## Scope
 
@@ -80,6 +111,14 @@ Do not merge these into one guarantee statement.
 - No unconditional guarantee under dataset shift, temporal drift, or adversarial change.
 - Explanation-level intervals should not be promoted as formal per-feature coverage
   guarantees unless explicitly proven for that claim.
+
+## Continue with the same result
+
+Use {doc}`Interpret calibrated explanations <../how-to/interpret_explanations>`
+to read a particular rule or plot, {doc}`Quick API <../../get-started/quick_api>`
+to find a call, or {doc}`Checking results <../../practitioner/check_results>` to
+plan held-out evaluation. The {doc}`How CE Works route <../../sections/how-ce-works>`
+connects construction and calibration without requiring the software internals.
 
 ## Related standards and ADRs
 
