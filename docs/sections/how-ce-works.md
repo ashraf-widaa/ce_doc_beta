@@ -14,9 +14,9 @@ statistical conditions. You can stop at the depth needed for your question.
 <figure>
 <picture>
 <source media="(max-width: 600px)" srcset="../_static/figures/ce-how-workflow-mobile.svg">
-<img src="../_static/figures/ce-how-workflow.svg" width="960" height="355" alt="Orange boxes show model fitting on training data, calibration with separate labelled data, then prediction information and explanations as two operations on the calibrated system using new-case features.">
+<img src="../_static/figures/ce-how-workflow.svg" width="960" height="590" alt="Orange boxes show model fitting on training data, calibration with separate labelled data, then prediction information and explanations as two operations on the calibrated system using new-case features.">
 </picture>
-<figcaption>CE's conceptual lifecycle. Orange boxes identify the stages; the figure background is transparent. After calibration, prediction and explanation are separate operations, not a compulsory sequence of calls.</figcaption>
+<figcaption>Orange boxes show the workflow stages; the dashed box shows what you provide when querying it. Both branches use the same calibrated system. You can request a prediction, an explanation, or both; a separate prediction call is not required before an explanation. The background is transparent.</figcaption>
 </figure>
 
 [Open the full-size workflow](../_static/figures/ce-how-workflow.svg).
