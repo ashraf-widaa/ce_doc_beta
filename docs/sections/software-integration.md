@@ -1,5 +1,7 @@
 # CE Software & Integration
 
+<span class="ce-choice-page" hidden></span>
+
 Use this path to add CE to a Python application and preserve the meaning of its
 outputs as they move through your system. Start with the public interface;
 internal architecture and plugin contracts become relevant when you need to
@@ -16,6 +18,18 @@ The public wrapper, `WrapCalibratedExplainer`, coordinates the lifecycle: use a
 fitted predictive model, calibrate with separate labelled data, then predict or
 explain a new case. Prediction and explanation are operations on the calibrated
 system; a separate prediction call is not required before an explanation.
+
+## Follow the software guide alongside the concepts
+
+The practical sequence is {doc}`the complete Python example <../get-started/first-python-explanation>` →
+{doc}`Quick API <../get-started/quick_api>` →
+{doc}`pipeline integration <../foundations/how-to/integrate_with_pipelines>` →
+{doc}`runtime configuration <../foundations/how-to/configure_runtime>` and
+{doc}`troubleshooting <../get-started/troubleshooting>` as needed. Each destination
+has a different job: obtain a result, find a call, connect preprocessing, then
+operate the configured system. Use the shared
+{doc}`calibration chapter <../foundations/concepts/calibration_background>` when you
+need the mechanism; implementation documentation should not redefine its theory.
 
 ## Connect your model and preprocessing
 

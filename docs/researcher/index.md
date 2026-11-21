@@ -1,10 +1,22 @@
 # Researcher hub
 
+<span class="ce-choice-page" hidden></span>
+
 Use this hub for replication and method-focused analysis.
 
 Begin with a concrete result in {doc}`Quick Start <../get-started/index>` if CE
 is new to you. The {doc}`How CE Works path <../sections/how-ce-works>` connects
 outputs to construction; this hub then guides replication and research.
+
+## Move from a question to a reproducible study
+
+First identify the question and reported quantity. Use the
+{doc}`shared calibration chapter <../foundations/concepts/calibration_background>`
+and {doc}`explanation construction <../foundations/concepts/how_explanations_are_built>`
+for the conceptual and runnable background. Then select the relevant paper from
+{doc}`the maintained citation list <../citing>`, check its method and assumptions,
+and follow the study-specific replication instructions. This keeps tutorial
+intuition, formal results and an implementation experiment distinct.
 
 ## Core path
 

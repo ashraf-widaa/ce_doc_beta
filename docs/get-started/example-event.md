@@ -1,5 +1,7 @@
 # Event probabilities: first result
 
+<span class="ce-choice-page" hidden></span>
+
 **Goal:** define an event on a numerical target, then read its probability and
 bounds. This is probabilistic regression. The question has changed from “What value?”
 to “How probable is this event?”

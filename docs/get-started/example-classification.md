@@ -1,5 +1,7 @@
 # Classification: read a prediction
 
+<span class="ce-choice-page" hidden></span>
+
 A classifier predicts a category. The Diabetes example has two classes
 (**binary**); the Iris example has three species (**multiclass**).
 

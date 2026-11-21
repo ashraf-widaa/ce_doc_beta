@@ -4,6 +4,8 @@ sidebarclass: how-to
 
 # Interpret calibrated explanations
 
+<span class="ce-course-step" hidden></span>
+
 Read an explanation by identifying its output, units and range before comparing
 feature conditions. Start with the reading steps below; the later sections show
 how to inspect the same information in Python payloads and telemetry.
@@ -53,16 +55,17 @@ A range crossing zero does not establish a causal effect or a significance test.
 
 The snippets assume a fitted, calibrated `explainer` and a held-out feature
 array `x_test`, as prepared by the {doc}`Python tutorial <../../get-started/first-python-explanation>`.
-They demonstrate a classification result. For event explanations, pass the same
+They demonstrate a classification result; the selected row matches the shared Iris lab. For event explanations, pass the same
 `threshold=` to both explanation calls as in the event prediction.
 
 
 Calibrated explanations return collections (`CalibratedExplanations`, `AlternativeExplanations`) that behave like sequences. The first step is to look at the summary for each item:
 
 ```python
-factual_batch = explainer.explain_factual(x_test[:1])
+query = x_test[1:2]  # Same selected Iris row as the shared lab.
+factual_batch = explainer.explain_factual(query)
 factual = factual_batch[0]
-alternative_batch = explainer.explore_alternatives(x_test[:1])
+alternative_batch = explainer.explore_alternatives(query)
 alternative = alternative_batch[0]
 
 print(f"Mode: {factual.get_mode()}  Calibrated prediction: {factual.predict:.3f}")
@@ -84,11 +87,70 @@ that event probability, not percentile endpoints for the target value.
 `get_mode()` alone reports classification or regression, so inspect the threshold
 and the question as well.
 
-## 2. Examine the rule tables in detail
+<span id="3-connect-explanations-to-plots"></span>
+
+## 2. Read the plot
+
+A factual plot visualises prediction information, conditions and reported ranges.
+Plotting needs the optional visualization dependencies in the same environment:
+
+```bash
+python -m pip install "calibrated-explanations[viz]"
+```
+
+The following cell uses the factual object created above. The figure is its
+output; the reading instructions below explain how its shapes represent the values.
+
+```python
+factual.plot(uncertainty=True, filter_top=4)
+```
+
+The same selected Iris case appears in the verified example plot below. The
+figure is an output to interpret, not evidence that the method's assumptions hold.
+Other datasets or renderers need not produce this exact figure.
+
+```{figure} ../../get-started/assets/learning-lab-factual.png
+:alt: Verified factual plot for the same Iris versicolor case, showing prediction information above feature conditions, weights and ranges.
+:width: 100%
+
+Read prediction information first, then a condition, its weight and its own range.
+```
+
+Interpret the chart as follows:
+
+1. **Prediction panel:** in this Iris plot, `y=1` means versicolor and `y!=1`
+   means either other species. Read the class probability and its bounds there.
+2. **Point weight:** use the printed rule value. For sepal length, it is +0.388
+   with reported bounds [0.240, 0.433]; it is not the original class probability.
+3. **Solid and translucent portions:** with uncertainty enabled, a positive
+   range entirely above zero has a solid portion from zero to its lower bound;
+   a negative range entirely below zero has one from its upper bound to zero.
+   The overlay shows the reported range. The solid length therefore need not
+   equal the point weight. This is a rendering convention, not a new guarantee.
+4. **Ranges crossing zero:** the solid portion can be suppressed while the range
+   remains visible on both sides. Read the point and endpoints together; this is
+   not a significance test or universal per-feature coverage statement.
+5. **Colour and labels:** colours depend on the renderer and style. Use signs,
+   conditions and numeric records rather than interpreting colour alone.
+
+For an alternative plot, read the alternative prediction and its range on the
+same class/event scale as the original case. It is not a factual-weight bar.
+The {doc}`alternative guide <../concepts/alternatives>` describes available views.
+
+If the plot and table disagree, check the selected case, filters, output mode and renderer before regenerating. A matching display alone does not validate the statistical assumptions.
+
+
+<details><summary>Software guide: inspect structured rule payloads</summary>
+
+<span id="2-examine-the-rule-tables-in-detail"></span>
+
+**2. Examine the rule tables in detail**
 
 Rules express model-response comparisons as conditions and reported quantities. Use the helper payloads to inspect them in a structured way.
 
-### 2.1 Factual explanations
+<span id="21-factual-explanations"></span>
+
+**2.1 Factual explanations**
 
 ```python
 factual_payload = factual.build_rules_payload()
@@ -124,7 +186,9 @@ Read the factual core from top to bottom:
 3. **Prediction** – available through the metadata, showing the calibrated contribution when the feature is perturbed; compare it to `predict` to understand marginal impact.
 4. **Weight interval** – the core payload keeps only the numeric bounds; consult the metadata if you need the representation (percentile vs. probabilistic) or raw percentiles used to derive them.
 
-### 2.2 Alternative explanations
+<span id="22-alternative-explanations"></span>
+
+**2.2 Alternative explanations**
 
 Alternative explanations add scenario guidance on top of feature contributions. The payload uses the same helper:
 
@@ -143,44 +207,30 @@ for rule in alternative_core["feature_rules"]:
 alternative_metadata = alternative_payload["metadata"]["feature_rules"]
 for extra in alternative_metadata:
     print(
-        f"  Δ prediction={extra['weight_value']:+.3f} "
+        f"  Stored comparison weight={extra['weight_value']:+.3f} "
         f"(repr={extra['weight_uncertainty']['representation']})"
     )
 ```
 
 - `core["feature_rules"]` lists the alternative feature conditions alongside the calibrated prediction estimate and uncertainty interval for each alternative scenario.
-- `metadata["feature_rules"]` retains the richer calibration context: the difference from the factual baseline (`weight_value`), the detailed uncertainty metadata, and the alternative value used to create the scenario.
+- `metadata["feature_rules"]` retains the richer calibration context: the stored comparison weight (`weight_value`), detailed uncertainty metadata, and the alternative value used to create the scenario. Do not label the stored weight as alternative-minus-original without checking its convention.
+
+For an explicit prediction change, subtract the original prediction from the
+alternative prediction on the same scale. In the shared case, 0.522 minus 0.910
+is about -0.388; do not reverse that sign by reusing a differently defined weight.
 
 Compare alternatives using the output quantity, its reported range and relevant
 domain constraints. The largest model-response difference is not automatically
 the best decision or a feasible action. A wide range calls for further checking;
 adding calibration data alone does not guarantee that it will become narrow.
-## 3. Connect explanations to plots
 
-PlotSpec plots visualise the same rule rankings and uncertainty intervals:
+</details>
 
-```python
-fig = factual.plot(uncertainty=True, filter_top=6)
-try:
-    from matplotlib import pyplot as plt
+<details><summary>Software guide: inspect telemetry and provenance</summary>
 
-    plt.close(fig)
-except Exception:
-    pass
-```
+<span id="4-tie-everything-back-to-telemetry"></span>
 
-Interpret the chart as follows:
-
-1. **Bar length** corresponds to the absolute weight shown in the rule table.
-2. **Colour** indicates direction (green for positive impact, purple for negative by default).
-3. **Range markers** show the reported rule-level bounds; their presentation depends on the renderer.
-4. **Vertical line** over the summary panel mirrors the calibrated prediction and its `(low, high)` bounds.
-
-When reviewing alternative explanations, use `plot(style="alternative")` (or open the alternative tab in interactive renderers) to see how the suggested feature changes alter the bars and the calibrated outcome.
-
-If the plot and table disagree, check the selected case, filters, output mode and renderer before regenerating. A matching display alone does not validate the statistical assumptions.
-
-## 4. Tie everything back to telemetry
+**4. Tie everything back to telemetry**
 
 Telemetry records which components produced the explanation; it does not prove statistical validity:
 
@@ -198,7 +248,12 @@ Interpretation tips:
 - The nested `uncertainty` dictionary mirrors the structure already discussed and is the authoritative source for machine-readable exports.
 - `preprocessor` provides ADR-009 provenance so you can reproduce how categorical encoders or scalers shaped the data.
 
-## 5. Validate in notebooks and downstream systems
+
+</details>
+
+<span id="5-validate-in-notebooks-and-downstream-systems"></span>
+
+## 3. Use the reading in your application
 
 After you absorb the tables and plots:
 
@@ -206,9 +261,15 @@ After you absorb the tables and plots:
 2. Embed the interpretation checks into dashboards—surface calibrated prediction vs. interval charts and highlight scenarios with wide rule uncertainty.
 3. Share this guide with auditors and stakeholders so everyone relies on the same vocabulary when discussing factual or alternative explanations.
 
-Next, use {doc}`Checking results on your data <../../practitioner/check_results>`
-for evaluation, {doc}`How CE Works <../../sections/how-ce-works>` for construction,
-or {doc}`Software & Integration <../../sections/software-integration>` for application
-contracts. A readable explanation does not by itself establish a safe decision.
+A readable explanation does not by itself establish a safe decision. The next
+chapter evaluates held-out results; use {doc}`Software & Integration <../../sections/software-integration>`
+when you need an application contract instead.
 
 Entry-point tier: Tier 3.
+
+
+## Continue the guided introduction
+
+**Previous chapter:** {doc}`../concepts/how_explanations_are_built`.
+
+**Next chapter:** {doc}`Evaluate held-out results <../../practitioner/check_results>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.

@@ -1,5 +1,7 @@
 # CE big picture in 60 seconds
 
+<span class="ce-choice-page" hidden></span>
+
 A machine-learning model predicts an outcome from a case's **features**: the
 information describing that case. The outcome is its **target**. In supervised
 learning, training examples contain both features and known targets.

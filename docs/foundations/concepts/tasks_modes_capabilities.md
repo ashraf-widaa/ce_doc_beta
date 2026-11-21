@@ -1,5 +1,7 @@
 # Tasks, modes and capabilities
 
+<span class="ce-course-step" hidden></span>
+
 What is your model predicting, what question do you ask about it, and what do
 you want to inspect? These are three separate choices.
 
@@ -10,6 +12,39 @@ The shared {doc}`predictive-task definitions <predictive_tasks>` explain feature
 observations, targets and data roles. Classification and regression are the two
 predictive tasks used in these guides; do not count factual explanations as a
 third task.
+
+## Check what the target codes mean
+
+This cell continues the Iris session from
+{doc}`Predictive tasks and data roles <predictive_tasks>`. If you arrived here
+directly, run that setup first or use the
+{download}`complete shared lab <../../_examples/learning_lab.py>`.
+
+```{literalinclude} ../../_examples/learning_lab.py
+:language: python
+:start-after: modes:start
+:end-before: modes:end
+```
+
+Verified output from the review environment:
+
+```{literalinclude} ../../_examples/learning_lab_output.txt
+:language: text
+:start-after: MODES_START
+:end-before: MODES_END
+```
+
+The `for` loop uses `enumerate` to pair each position with its species name.
+Although the target codes are numbers, they name species. Their numeric order
+does not define an amount: species 2 is not “twice species 1”. The task is therefore
+multiclass classification, not regression. Binary classification has two target
+categories; multiclass classification has three or more.
+
+We will ask about one flower's class-probability information, then request factual
+and alternative explanations of that response. Those are different operations
+on the same task. For regression, the output question can instead ask about a
+value or an event on that value, as the mode cards below show.
+
 
 ## Mode: the question you ask
 
@@ -70,11 +105,12 @@ for the distinctions and then read the applicable assumptions. For a step-by-ste
 reading of factual weights and alternative predictions, use
 {doc}`Interpret calibrated explanations <../how-to/interpret_explanations>`.
 
-## Choose a route
+<span id="choose-a-route"></span>
 
-- **No installation:** {doc}`browser-first Quickstart <../../get-started/index>`.
-- **Run Python:** {doc}`first Python explanation <../../get-started/first-python-explanation>`.
-- **Understand construction:** {doc}`how_explanations_are_built`.
-- **Check conditions and guarantees:** {doc}`calibrated_interval_semantics`.
+## Continue the guided introduction
 
-Entry-point tier: Tier 1.
+**Previous chapter:** {doc}`predictive_tasks`.
+
+**Next chapter:** {doc}`Calibration and its methods <calibration_background>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+
+<!-- Entry-point tier: Tier 3. -->

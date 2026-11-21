@@ -1,8 +1,17 @@
 # How a prediction becomes an explanation
 
+<span class="ce-course-step" hidden></span>
+
 What connects a feature condition to the numbers in an explanation? Begin with
 the quantity being explained, then distinguish a factual weight from an
 alternative prediction.
+
+## Keep the running case in view
+
+The preceding chapter reports 0.910 for the selected flower's versicolor
+probability. We now ask which feature conditions contribute to that response
+and what the model reports under different conditions. Keep the same flower and
+class so that a changed quantity does not get mistaken for a changed case.
 
 ## Start with the output quantity
 
@@ -59,14 +68,57 @@ patient, district or production process. Alternatives need not be actionable,
 minimal or feasible. A browser game can add costs and constraints, but that
 does not turn every library alternative into a causal recommendation.
 
-## Continue with a concrete result
+## Inspect a weight and an alternative in Python
 
-- {doc}`Interpretation guide <../how-to/interpret_explanations>` connects the
-  returned records to plots.
-- {doc}`Expert Hub guide <../../get-started/expert-hub>` inspects actual browser
-  factual and alternative outputs.
-- {doc}`First Python explanation <../../get-started/first-python-explanation>`
-  produces a checked local result.
-- {doc}`Alternatives and filters <alternatives>` develops optional operations.
-- {doc}`Canonical semantics <calibrated_interval_semantics>` records the
-  qualifications that these introductory comparisons do not replace.
+Continue the fitted and calibrated Iris session from
+{doc}`calibration_background`, or run the
+{download}`complete shared lab <../../_examples/learning_lab.py>` first.
+`build_rules_payload()` returns structured rule records; `core` contains the
+explanation quantities, while metadata retains additional construction details.
+Here we inspect one rule to connect the terminology to an actual result.
+`factual[0]` selects the first queried case. Dictionary keys such as `["core"]`
+and `["feature_rules"]` select named records inside that case’s payload; the
+second `[0]` selects its first rule.
+
+```{literalinclude} ../../_examples/learning_lab.py
+:language: python
+:start-after: explanation:start
+:end-before: explanation:end
+```
+
+Verified output from the review environment:
+
+```{literalinclude} ../../_examples/learning_lab_output.txt
+:language: text
+:start-after: EXPLANATION_START
+:end-before: EXPLANATION_END
+```
+
+The factual condition `sepal length (cm) > 5.55` holds for the selected flower.
+Its reported weight is +0.388 with bounds [0.240, 0.433]. Read this as a comparison
+on the explained class-probability scale, not a second prediction probability
+or a causal effect of changing a sepal.
+
+The alternative collection has one item for this queried flower; that item
+contains eight rules in the captured run. Its first alternative condition reports
+a prediction of 0.522. A rule count is not the collection length, and an alternative
+prediction is not a factual weight. The output is version-specific; a different
+case can produce different rules, ranges or no usable alternatives.
+
+To see the same Iris case as a plot, follow
+{doc}`First explanation in Python <../../get-started/first-python-explanation>`.
+The shared {doc}`interpretation guide <../how-to/interpret_explanations>` then
+explains how to read records and figures without assuming they prove causation.
+
+
+<span id="continue-with-a-concrete-result"></span>
+
+## Continue the guided introduction
+
+**Previous chapter:** {doc}`calibration_background`.
+
+**Next chapter:** {doc}`Read the results and figures <../how-to/interpret_explanations>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+
+For the method-specific conditions behind the ranges, use {doc}`calibrated_interval_semantics`.
+
+<!-- Entry-point tier: Tier 3. -->

@@ -1,5 +1,7 @@
 # Explore the Expert Hub
 
+<span class="ce-choice-page" hidden></span>
+
 Use this route to inspect CE's technical workflow without installing Python.
 The instructions below were tested with built-in examples on 19 November 2026.
 This application is under active development; these are captured observations,

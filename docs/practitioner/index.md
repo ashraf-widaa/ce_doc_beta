@@ -1,5 +1,7 @@
 # Practitioner hub
 
+<span class="ce-choice-page" hidden></span>
+
 Choose a practical task, interpret its result and check it before adapting
 advanced workflows. Browser and Python routes are both available from
 {doc}`CE in Practice <../sections/in-practice>`.

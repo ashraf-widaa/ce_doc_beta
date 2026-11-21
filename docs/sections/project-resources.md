@@ -1,5 +1,7 @@
 # CE Project, Vision & Evolution
 
+<span class="ce-choice-page" hidden></span>
+
 This path connects the CE methods to their publications, software development
 and contribution process. Use it to understand the project, reproduce research
 or find a focused way to participate. You do not need to complete it before
@@ -45,6 +47,30 @@ is the source for official code and issues. This site is an independent review
 copy; feedback on these documentation changes belongs with the review team and
 [review repository](https://github.com/ashraf-widaa/ce_doc_beta). These edits have
 not been adopted into official CE by appearing here.
+
+## Which hub should you open next?
+
+The hubs organize material by goal. They are not five separate definitions of CE
+or additional courses that everyone must complete.
+
+| Your next goal | Start with | What to do there |
+| --- | --- | --- |
+| Inspect the workflow in a browser | {doc}`Expert Hub guide <../get-started/expert-hub>` | Follow preparation/calibration, then read one factual and alternative result. |
+| Practise interpreting advice before a decision | {doc}`Decision Lab guide <../get-started/decision-lab>` | Read probabilities, costs and explanations; decide, then reflect on feedback. |
+| Apply or extend a practical workflow | {doc}`Practitioner Hub <../practitioner/index>` | Choose a goal-specific tutorial/playbook after understanding one result. |
+| Understand or reproduce research | {doc}`Researcher Hub <../researcher/index>` | Select the method/paper, inspect assumptions and follow its replication environment. |
+| Change documentation or software | {doc}`Contributor Hub <../contributor/index>` | Locate the responsible component/policy, make a scoped change and run its checks. |
+
+Use the documentation guide before opening an external app or repository: it
+explains what to look for and where to continue. The official CE GitHub repository
+holds source, issues and policies; the separate studies repository holds paper-specific
+reproduction material. Follow a study's own README and version requirements,
+not an invented universal reproduction command. The researcher route links it.
+The review repository holds these independent documentation candidates.
+
+For a continuous first introduction, begin with {doc}`What & Why <what-and-why>`
+and follow its shared chapters. For a specific software task, enter the relevant
+hub directly; each guide states the context and prerequisites you need.
 
 ## Shared resources
 

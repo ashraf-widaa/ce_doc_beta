@@ -1,5 +1,7 @@
 # Contributor hub
 
+<span class="ce-choice-page" hidden></span>
+
 Use this hub to change code or docs without breaking CE semantics.
 
 The authoritative public source, issue tracker, tags, releases, changelog, and

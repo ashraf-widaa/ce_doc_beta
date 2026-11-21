@@ -1,7 +1,9 @@
 # Predictive tasks and data roles
 
-What is a model predicting, and which data can be used at each stage?
-These definitions support Quickstart, conceptual introductions and practical guides.
+<span class="ce-course-step" hidden></span>
+
+This chapter introduces features, targets and data roles, then prepares one small
+example that continues through calibration, explanation and evaluation.
 
 ## Predictive tasks
 
@@ -27,6 +29,9 @@ numeric target; threshold queries ask a different question about that target.
 
 ## Data roles in CE
 
+Here, **proper training** means the model-fitting subset, kept separate from
+calibration. The code names it `x_proper, y_proper`.
+
 <!-- data-roles:start -->
 | Data | Role in this example |
 | --- | --- |
@@ -45,8 +50,77 @@ background, see [dividing datasets](https://developers.google.com/machine-learni
 CE's additional calibration set must remain explicit. Method-specific sampling
 assumptions and non-guarantees are in {doc}`calibrated_interval_semantics`.
 
-## Choose the next activity
 
-- **Run the example:** {doc}`Quickstart <../../get-started/index>`.
-- **Follow the whole workflow:** {doc}`How CE Works <../../sections/how-ce-works>`.
-- **Interpret results:** {doc}`../how-to/interpret_explanations`.
+## Work with one dataset before choosing a method
+
+We will use **Iris** throughout the guided introduction: each flower is an
+observation, its measurements are features, and its species is the target. This
+keeps the context fixed as we move from data to calibration and explanation.
+The separate regression tutorials demonstrate numerical targets afterward.
+
+In Python, `x` is a **feature matrix**: rows are observations and columns are
+features. `y` is a target array with one entry per row. The letters are conventional
+names, not special CE API keywords. Iris measurements are in centimetres; the
+species names are categories.
+
+### Prepare a session and inspect the data
+
+Use Python 3.10 or later and the environment described in
+{doc}`Installation <../../get-started/installation>`. This lab does not plot, so
+it needs the base package and scikit-learn:
+
+```bash
+python -m pip install calibrated-explanations scikit-learn
+```
+
+Run the installation command in a terminal. Run the Python cell below in a script
+or notebook using that environment. Continue using the same session in later chapters so its
+arrays remain available. You can also
+{download}`download the complete shared lab <../../_examples/learning_lab.py>`
+and run it as a script. The source is reused by the later chapters; no custom
+wrapper or unintroduced dataset is required.
+
+```{literalinclude} ../../_examples/learning_lab.py
+:language: python
+:start-after: data:start
+:end-before: data:end
+```
+
+Verified output from the review environment:
+
+```{literalinclude} ../../_examples/learning_lab_output.txt
+:language: text
+:start-after: DATA_START
+:end-before: DATA_END
+```
+
+Read `(150, 4)` as 150 flowers described by four measurements. The three species
+are the target categories. The row counts describe separate data roles, not
+three different predictive tasks. The first split reserves 30 evaluation rows. The second takes 30 calibration
+rows from the remaining 120, leaving 90 for fitting. `random_state=0` makes the
+random partition repeatable; `stratify` approximately preserves species proportions.
+Neither establishes the statistical assumptions needed for CE.
+
+### Why hold data aside?
+
+Fitting learns the predictive model from the proper training set. Calibration
+uses other labelled cases to construct prediction information. Evaluation uses
+held-out outcomes to assess the resulting system. A query may be an evaluation
+row, but its target is not passed into its prediction or explanation.
+
+Using evaluation information to choose the model or settings can make the final
+check optimistic; this is **data leakage**. Learned preprocessing must also
+respect the data roles. We use a simple split here to make those roles visible,
+not to claim that one fixed proportion suits every dataset.
+
+
+
+<span id="choose-the-next-activity"></span>
+
+## Continue the guided introduction
+
+**Previous chapter:** {doc}`../../sections/what-and-why`.
+
+**Next chapter:** {doc}`Tasks, modes and capabilities <tasks_modes_capabilities>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+
+<!-- Entry-point tier: Tier 3. -->

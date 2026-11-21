@@ -1,5 +1,7 @@
 # How CE Works
 
+<span class="ce-choice-page" hidden></span>
+
 <!-- Preserve descriptive anchors from the previous review layout. -->
 <span id="choose-an-output-to-understand"></span>
 <span id="follow-the-workflow"></span>
@@ -8,6 +10,17 @@
 How does CE turn a trained model and calibration data into prediction information
 and an explanation? This route moves from the workflow to mechanisms and their
 statistical conditions. You can stop at the depth needed for your question.
+
+## Read this path as a tutorial
+
+The shared chapters provide the detailed teaching, code and output. Start with
+{doc}`data roles <../foundations/concepts/predictive_tasks>` if features, targets
+or calibration sets are new. Then work through
+{doc}`calibration and its methods <../foundations/concepts/calibration_background>` →
+{doc}`explanation construction <../foundations/concepts/how_explanations_are_built>` →
+{doc}`interpretation <../foundations/how-to/interpret_explanations>`.
+The same Iris session continues across those chapters. The overview below helps
+you see how they connect; it is not a second copy of their detailed explanations.
 
 ## Follow the same model through the workflow
 

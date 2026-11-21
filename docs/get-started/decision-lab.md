@@ -1,5 +1,7 @@
 # Learn through a decision
 
+<span class="ce-choice-page" hidden></span>
+
 Use this route to ask what a prediction contributes to a decision with costs
 and consequences. Decision Lab and Expert Hub have different learning goals;
 you do not need to complete both.

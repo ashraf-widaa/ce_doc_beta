@@ -16,13 +16,13 @@ mode-specific assumptions and limits. For papers and replication, use the
 | [Calibration and statistical background](calibration_background.md) | Understand accuracy, calibration, quantiles and assumptions. |
 | [How explanations are built](how_explanations_are_built.md) | Connect conditions, comparison responses and reported quantities. |
 | [Predictive tasks and data roles](predictive_tasks.md) | Shared definitions of features, targets, observations and separate data roles. |
-| [Interpret explanations](../how-to/interpret_explanations.md) | Reuses notebook screenshots and walks through dual uncertainty plus the triangular plot. |
-| [Probabilistic & interval regression](probabilistic_regression.md) | Shows how calibrated probabilities and interval regression stay in lockstep across quickstarts and notebooks. |
+| [Interpret explanations](../how-to/interpret_explanations.md) | Connects prediction information, factual weights and alternative predictions to records and figures. |
+| [Probabilistic & interval regression](probabilistic_regression.md) | Distinguishes target-value intervals from event probabilities and their API calls. |
 | [Alternatives & triangular plots](alternatives.md) | Explains how the triangular view pairs with rule tables for calibrated alternatives. |
 | [Architecture overview](architecture.md) | Connects runtime components, caching, and plugin guardrails. |
 | [Error handling](error_handling.md) | Summarises runtime safeguards and expected exceptions. |
 | [Explanation structures](explanation_structures.md) | Documents the internal data structures used by CalibratedExplanation classes. |
-| [Guarded explanations](guarded_explanations.md) | In-distribution filtering via conformal anomaly detection for trustworthy rules. |
+| [Guarded explanations](guarded_explanations.md) | Explains support-filtered candidates, prerequisites and limitations. |
 | [Calibrated interval semantics](calibrated_interval_semantics.md) | Canonical semantics, assumptions, and non-guarantees for all three modes. |
 | [Terminology standardization](terminology.md) | Summarises the shift to probabilistic regression terminology and compatibility guarantees. |
 | [Terminology: thresholded vs probabilistic regression](terminology_thresholded_vs_probabilistic_regression.md) | Clarifies language used across ADR-021 and user-facing regression docs. |

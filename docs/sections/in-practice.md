@@ -1,5 +1,7 @@
 # CE in Practice
 
+<span class="ce-choice-page" hidden></span>
+
 Use this path to obtain an explanation, understand its output and check the
 workflow before adapting it to your own data. Start with one case and one
 question; advanced filters and deployment settings can wait.
@@ -32,6 +34,21 @@ real-world intervention.
 The shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
 explains each element of the records and plots. Keep it beside your result when
 needed; you do not need to learn every payload field for a first reading.
+
+## Choose a browser learning environment for a purpose
+
+Use the {doc}`Expert Hub guide <../get-started/expert-hub>` when you want to follow
+dataset preparation, calibration and explanation without writing code. It guides
+the controls and interprets dated real outputs. Use the
+{doc}`Decision Lab guide <../get-started/decision-lab>` when you want to inspect a
+prediction alongside decision costs and then reflect on feedback. Its teaching
+games identify their own service and do not establish library guarantees.
+
+You can follow either guide directly; you do not need to complete both. After
+an exercise, return to interpretation and evaluation rather than treating a
+successful game outcome as a calibration check. If you want the underlying
+construction, the {doc}`shared guided introduction <what-and-why>` provides concept,
+code and output chapters instead of a separate set of definitions.
 
 ## Use your own model and data
 

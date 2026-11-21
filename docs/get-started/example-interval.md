@@ -1,5 +1,7 @@
 # Interval regression: first result
 
+<span class="ce-choice-page" hidden></span>
+
 **Goal:** read a predicted value and its interval, then inspect which feature
 conditions contribute to the model’s response. The target is a number; this example asks
 about the value itself, not the probability of an event.

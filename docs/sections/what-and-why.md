@@ -1,5 +1,7 @@
 # CE: What & Why
 
+<span class="ce-course-step" hidden></span>
+
 A prediction tells you what a model estimates. Before using it, you may also
 want to know what its reported range means, which information contributes to
 the prediction, and what the model would report under different conditions.
@@ -94,16 +96,43 @@ The {doc}`range meanings and limitations <../foundations/concepts/calibrated_int
 state the method-specific conditions; prediction bounds and feature-weight ranges
 do not inherit one common guarantee.
 
-## Continue the story
+## Connect the motivation to the research
 
-**Next: understand the construction.** Follow {doc}`How CE Works <how-ce-works>`
-from the data split to calibration and explanation.
+The research question is how to present explanations of individual model
+predictions together with calibrated uncertainty information. The
+[classification paper](https://doi.org/10.1016/j.eswa.2024.123154) develops CE with
+uncertainty information and counterfactuals; the
+[regression paper](https://doi.org/10.1007/s10994-024-06642-8) extends the programme
+to numerical targets. The maintained {doc}`citation list <../citing>` also includes
+multiclass and conditional developments.
 
-**Prefer to see a result first?** Try the
-{doc}`classification example <../get-started/example-classification>` or the
-{doc}`housing-value example <../get-started/example-interval>`. Both let you choose
-browser or local Python; the examples explain what to notice before asking you
-to study API details.
+The teaching examples below make those ideas concrete. The papers and their
+assumptions govern the formal results; an intuitive explanation or successful
+code cell does not add a guarantee. We use “alternative” for model-condition
+comparisons without assuming real-world causal or actionable counterfactuals.
+
+## Continue as a guided tutorial
+
+The chapters below develop one Iris example, reusing the same data and Python
+session. Read the concept, inspect the code and output, then explain what changed
+before moving on. You can choose browser exercises or a numerical-target tutorial
+after the common foundation; the chapters are not extra compulsory homepage steps.
+
+1. {doc}`Features, targets and separate data roles <../foundations/concepts/predictive_tasks>`.
+2. {doc}`Choose a task, output question and operation <../foundations/concepts/tasks_modes_capabilities>`.
+3. {doc}`Understand calibration and run it <../foundations/concepts/calibration_background>`.
+4. {doc}`Construct and inspect an explanation <../foundations/concepts/how_explanations_are_built>`.
+5. {doc}`Read the resulting rules and plots <../foundations/how-to/interpret_explanations>`.
+6. {doc}`Evaluate held-out results <../practitioner/check_results>`.
+
+The {doc}`complete plotted Python example <../get-started/first-python-explanation>`
+is an alternative hands-on entry using the same Iris case. You do not need to
+repeat it after executing the shared chapter cells.
+
+For the scientific origins, use {doc}`the method papers and citations <../citing>`:
+they connect CE's uncertainty-information and alternative-explanation research to
+classification, multiclass and regression developments. Do not interpret the
+teaching narrative as an additional historical or statistical claim.
 
 ```{toctree}
 :maxdepth: 1
@@ -122,3 +151,8 @@ Calibrated Explanations comparisons (CE-first) <../compare>
 <span id="start-with-the-question-not-the-software"></span>
 <span id="what-ce-adds"></span>
 <span id="why-calibration-and-explanation-belong-together"></span>
+
+
+## Continue the guided introduction
+
+**Next chapter:** {doc}`Predictive tasks and data roles <../foundations/concepts/predictive_tasks>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.

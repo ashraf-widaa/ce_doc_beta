@@ -1,5 +1,7 @@
 # First explanation in Python
 
+<span class="ce-course-step" hidden></span>
+
 <span id="get-started"></span>
 <span id="quickstart"></span>
 
@@ -180,7 +182,16 @@ A single example does not evaluate your model or establish deployment validity.
   maintainer review; do not clip it. See the
   {doc}`documented review limitation <quickstart_classification>`.
 
-## Choose your next step
+## Continue the guided introduction
+
+**Understand the plot:** {doc}`../foundations/how-to/interpret_explanations`.
+
+**Next chapter:** {doc}`Check results on held-out data <../practitioner/check_results>`. This complete plotted example is an alternative to running the shared chapter cells. You do not need to repeat both.
+
+
+<span id="choose-your-next-step"></span>
+
+## Other directions after the example
 
 | Your goal | Continue with |
 | --- | --- |

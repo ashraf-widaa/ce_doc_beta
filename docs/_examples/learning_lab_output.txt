@@ -1,0 +1,31 @@
+DATA_START
+Observations and features: (150, 4)
+Species: setosa, versicolor, virginica
+Fit / calibration / evaluation rows: 90 30 30
+DATA_END
+MODES_START
+Target codes: [0, 1, 2]
+0 means setosa
+1 means versicolor
+2 means virginica
+MODES_END
+CALIBRATION_START
+Raw model probabilities: 0.000, 1.000, 0.000
+CE probabilities: 0.045, 0.910, 0.045
+Selected class: versicolor
+Reported bounds: [0.902, 0.992]
+CALIBRATION_END
+EXPLANATION_START
+Factual condition: sepal length (cm) > 5.55
+Weight: +0.388
+Weight bounds: [0.240, 0.433]
+Alternative rules for this case: 8
+Alternative condition: sepal length (cm) < 5.55
+Alternative prediction: 0.522
+EXPLANATION_END
+CHECKING_START
+Evaluation rows: 30
+Accuracy: 0.933
+Log loss: 0.212
+Out-of-range class-bound entries: 1
+CHECKING_END
