@@ -1,22 +1,11 @@
-# Quick Start: the CE big picture
-
-<span class="ce-choice-page" hidden></span>
-
-A machine-learning model predicts an outcome from a case's **features**: the
-information describing that case. The outcome is its **target**. In supervised
-learning, training examples contain both features and known targets.
+# CE big picture in 60 seconds
 
 **Calibrated Explanations (CE) helps you inspect an individual prediction.** It
-uses a fitted model and separate labelled calibration data to provide calibrated
-prediction information and factual or alternative explanations, with reported ranges.
+uses a {term}`fitted model <Fitted model>` and separate labelled
+{term}`calibration data <Calibration data>` to provide calibrated prediction
+information and feature explanations with reported ranges.
 
-Read the workflow below, choose a prediction question, then inspect or run one
-example. You do not need to install CE to begin.
-
-**Prefer to see a result first?** {ref}`Read one Iris prediction without running code <classification-one-case>`,
-or {doc}`run the same case in Python <first-python-explanation>`.
-
-## What changes when you add CE?
+## From a conventional prediction to CE
 
 <figure>
 <picture>
@@ -28,76 +17,60 @@ or {doc}`run the same case in Python <first-python-explanation>`.
 
 [Open the full-size figure](../_static/figures/ce-big-picture.svg).
 
-Read the figure from the inputs to the outputs:
+**Conventional prediction:** a trained model uses a new case's
+{term}`features <Feature>` to return a class, value or score.
 
-1. **Fit the predictive model.** Training examples have features and known targets.
-   The fitted model can predict a class, numerical value or score for a new case.
-2. **Add separate calibration data.** CE uses labelled examples that were not used
-   to fit the model. Calibrating does not retrain that predictive model. Keep
-   evaluation data separate to check the resulting system.
-3. **Supply the new case's features.** Its unknown target is not an input. CE uses
-   the fitted model and calibration to produce information for your chosen question.
-4. **Read the different outputs separately.** Identify the prediction and its range,
-   then inspect a factual condition and an alternative. Their quantities are
-   explained below. Other ML workflows can also include calibration and uncertainty methods.
+**With CE:** keep that same model, add separate calibration data, then inspect
+prediction information with task-specific ranges and factual or alternative
+explanations. Calibration does not retrain the predictive model. Other ML
+workflows can also include calibration and uncertainty methods.
 
-## Choose the question you want to answer
+**Go deeper:** {doc}`follow the complete CE workflow <../sections/how-ce-works>`.
 
-A **task** says what the model predicts. Classification predicts a category,
-with two classes (binary) or more than two (multiclass). Regression predicts a
-number. A **mode** is the question you ask CE about that prediction:
+## Tasks and modes: what question are you asking?
 
-- **Which class, and how probable?** Follow the
-  {doc}`classification example <example-classification>`.
-- **What value, and within what interval?** Follow the
-  {doc}`numerical prediction example <example-interval>`.
-- **How probable is an event, such as a value below a threshold?** Follow the
-  {doc}`event-probability example <example-event>`.
+CE supports {term}`supervised learning <Supervised learning>`: models learn from
+features and known {term}`targets <Target>`. A {term}`task <Predictive task>`
+describes the target: **classification** predicts categories (two classes for
+binary, three or more for multiclass); **regression** predicts a number.
 
-Each example explains its output and offers two ways to run it: **in the browser**
-without installation, or **locally in Python**. Choose one; completing both is optional.
-Installation belongs to the Python route, not a separate step for every reader.
+A {term}`CE mode <CE mode>` describes the output question:
 
-## What can an explanation tell you?
+- **Class probability:** which class, and how probable? {doc}`See classification <example-classification>`.
+- **Value and interval:** what numerical value and target-value interval? {doc}`See interval regression <example-interval>`.
+- **Event probability:** how probable is an event such as a value at most a budget? {doc}`See probabilistic regression <example-event>`.
 
-These are explanation **capabilities**, not additional predictive tasks:
+**Go deeper:** {doc}`tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`.
 
-- **Factual:** which feature conditions contribute to the model's response for
-  this case, with weights and reported ranges?
-- **Alternative:** what would the model report under a different feature condition?
+## Capabilities: what can CE show you?
 
-An alternative describes the model; it does not establish that changing the
-real-world case will cause that outcome.
+- **Calibrated prediction information:** the quantity for your question, with its reported range.
+- **Factual explanations:** conditions holding for the case, with comparison weights and their ranges.
+- **Alternative explanations:** predictions and ranges under different feature conditions.
 
-## What do the ranges mean?
+These are model-response explanations, not causal interventions. Range meanings
+and guarantees depend on the quantity, method and assumptions.
 
-First name the quantity. Class and event probabilities have probability bounds;
-a numerical prediction interval is in the target's units. Feature-weight ranges
-are a separate quantity. They do not share one universal guarantee.
+**Go deeper:** {doc}`how explanations are built <../foundations/concepts/how_explanations_are_built>`
+and {doc}`what CE ranges mean <../foundations/concepts/calibrated_interval_semantics>`.
 
-Guarantees depend on the mode and its assumptions. Use the
-{doc}`range meanings and limitations <../foundations/concepts/calibrated_interval_semantics>`
-when interpreting a result; a range is not certainty about an individual case
-or protection against distribution shift.
+## Choose how to try CE
 
-## After your first result
+<div class="ce-route-grid" role="navigation" aria-label="Try CE in a browser or locally">
+<a class="ce-route-card" href="expert-hub.html"><strong>Try CE in your browser</strong><span>Use built-in examples without installing Python. Prepare, calibrate and inspect one result.</span><span>Open the browser guide →</span></a>
+<a class="ce-route-card" href="first-python-explanation.html"><strong>Install and run locally</strong><span>Install CE, run the Iris example and interpret its output and plot.</span><span>Open the Python guide →</span></a>
+</div>
 
-Before adding more features or methods, check that you can answer:
+For local numerical targets, follow the {doc}`regression tutorial <quickstart_regression>`.
+For package and environment options, use {doc}`installation <installation>`.
+You can also {ref}`read one Iris result without running code <classification-one-case>`.
 
-- What quantity was predicted, and for which class or event if applicable?
-- Which range belongs to the prediction, and what does it mean in this mode?
-- What does one factual weight compare, and how does an alternative prediction differ?
+## Continue learning
 
-Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
-with the result open if needed. The next step depends on your goal:
-
-- **Apply CE to your own data:** follow {doc}`the practical sequence <../sections/in-practice>`
-  to adapt the workflow and check held-out results.
-- **Understand why CE exists:** read {doc}`CE: What & Why <../sections/what-and-why>`.
-- **Understand the construction:** follow {doc}`How CE Works <../sections/how-ce-works>`.
-- **Connect it to an application:** use {doc}`Software & Integration <../sections/software-integration>`.
-
-<span id="go-deeper-when-you-need-it"></span>
+- **Why was CE developed?** {doc}`CE: What & Why <../sections/what-and-why>`.
+- **How do I read my result?** {doc}`Interpret explanations <../foundations/how-to/interpret_explanations>`.
+- **How do I use my own data?** {doc}`CE in Practice <../sections/in-practice>`.
+- **How do I integrate the library?** {doc}`Software & Integration <../sections/software-integration>`.
 
 <!-- Entry-point tier: Tier 1. -->
 
@@ -136,4 +109,13 @@ Decision practice: Decision Lab <decision-lab>
 <span id="what-ce-adds"></span>
 <span id="what-ce-adds-to-the-workflow"></span>
 
-<span id="ce-big-picture-in-60-seconds"></span>
+
+
+<!-- Preserve headings from the preceding review candidate. -->
+<span id="quick-start-the-ce-big-picture"></span>
+<span id="what-changes-when-you-add-ce"></span>
+<span id="choose-the-question-you-want-to-answer"></span>
+<span id="what-can-an-explanation-tell-you"></span>
+<span id="what-do-the-ranges-mean"></span>
+<span id="after-your-first-result"></span>
+<span id="go-deeper-when-you-need-it"></span>

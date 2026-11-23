@@ -71,3 +71,10 @@ body:has(article .ce-choice-page) .related-pages { display: none; }
 .ce-nav-start { font-weight: 700; }
 .ce-reference-links { border-top: 1px solid var(--color-background-border); margin-top: .8rem; }
 .ce-reference-links p { font-weight: 650; margin: .4rem; }
+
+/* Make glossary names easy to scan; aliases still share one definition. */
+body:has(article .ce-glossary-page) article dl.glossary > dt {
+  font-weight: 650;
+  overflow-wrap: anywhere;
+}
+body:has(article .ce-glossary-page) article dl.glossary > dd { margin-bottom: 1.25rem; }
