@@ -10,7 +10,8 @@ contribute, and compare what the model would report under other conditions.
 uses your {term}`fitted model <Fitted model>` and separate labelled
 {term}`calibration data <Calibration data>` to provide calibrated prediction
 information, factual explanations and alternative explanations with reported ranges.
-Read the overview first; open an optional question below when you want more depth.
+Read the overview first; the optional walkthrough below connects further needs
+to the same workflow.
 
 ## From a conventional prediction to CE
 
@@ -82,95 +83,116 @@ and {doc}`what CE ranges mean <../foundations/concepts/calibrated_interval_seman
 
 ## When you need more than the basic workflow
 
-After understanding one result, choose an extension for a specific need.
-**Calibration constructs prediction information; explanation filters select
-rules; rejection handles cases.** They have different jobs. Availability,
-criteria and statistical conditions depend on the task, mode and configuration;
-check the linked guide for your software version and browser or Python route.
+[Return to the workflow figure](#from-a-conventional-prediction-to-ce).
+Follow one housing case through it: a fitted model estimates an area’s median
+housing value; CE uses separate labelled calibration cases and can explain the
+result. You may ask either for a **value and interval** or for the **probability
+of a value at most a budget**. Keep that question fixed when reading an explanation.
 
-<details><summary>Do defined groups need separate calibration treatment? — Mondrian calibration</summary>
+The options below address different needs within this same flow. They are not
+extra predictive tasks or four settings everyone must enable.
 
-Suppose your housing application defines regional groups. A single collection
-of calibration cases may mix those groups, while your question concerns one of
-them. {term}`Mondrian calibration <Mondrian calibration>`, also called conditional
-calibration, uses group labels in the applicable calibration construction.
-The query uses its group information when obtaining prediction information.
+### At calibration: should regions be treated separately?
 
-This option belongs at the **calibration stage**. Use the group-label procedure
-consistently for calibration and queries. The selected method’s conditions and
-available group data matter; small groups can limit usefulness. Grouping alone
-does not establish fairness or guarantee improved predictions.
+In the figure, find **Calibration data** entering CE. The calibration procedure
+uses these cases’ known outcomes to construct prediction information.
 
-Continue with {doc}`conditional calibration <../foundations/how-to/conditional_calibration>`
-for setup, supported label channels and limitations. Read its conditions for your
-selected task and mode rather than transferring one guarantee to every group.
+Suppose your application defines Region A and Region B. With
+{term}`Mondrian calibration <Mondrian calibration>`, also called conditional
+calibration, you supply or derive a group label for each calibration case and
+query. For a new area assigned to Region A, the selected construction uses Region A’s
+calibration cases rather than treating all regions as one calibration group. You still use the fitted predictive model and the same housing target;
+the group-specific calibration can change the reported prediction information
+and its range.
 
-</details>
+Use this option when the grouping is relevant to your application and the
+method’s conditions are appropriate. The available calibration cases within each
+group matter; defining regions alone does not establish fairness or guarantee improved results.
 
-<details><summary>Which alternatives should I inspect? — Alternative filtering</summary>
+**Learn next:** {doc}`supply group labels and check the conditional setup <../foundations/how-to/conditional_calibration>`.
+For a numerical target, keep the selected {doc}`value or event question <../foundations/concepts/probabilistic_regression>`.
 
-One case can have several alternatives. {term}`Alternative filtering <Alternative filtering>`
-selects existing alternative rules according to a stated criterion, after they
-have been generated. For example, you may want to inspect prediction-changing
-alternatives or compare their reported interval widths.
+### While building explanations: are candidate conditions supported?
 
-The selection criterion needs its mode. Probability-based filters and numerical
-regression filters use different comparisons. An **ensured** filter retains
-alternatives with intervals no wider than the baseline interval on the same
-output scale. That is a width comparison, not a guarantee of a beneficial
-intervention or improved predictive accuracy.
+Now find the **factual and alternative explanation outputs** in the figure.
+To construct them, CE considers feature conditions. A **candidate** is a condition
+being considered for a rule, before it appears in the returned explanation.
 
-Continue with {doc}`alternative explanations and filters <../foundations/concepts/alternatives>`
-to understand the criteria before choosing a method. Filtering rules does not
-retrain the predictive model or, by itself, reject the queried case.
+For the housing case, changing an income condition while leaving the other
+features fixed might create a combination poorly represented in the calibration
+data. {term}`Guarded explanations <Guarded explanation>` check selected test
+copies of the case, with feature values replaced by representatives of candidate
+conditions. The configured guard rule decides which candidates to retain.
 
-</details>
+Read the returned rules alongside the **audit**, which reports counts of tested
+and removed candidates. Passing checks at representatives does not certify every
+value in a numerical interval, or automatically check whether the original
+area’s full feature combination is supported by the calibration data. Guarding is a check during explanation construction, not a general
+certificate for the prediction.
 
-<details><summary>Are the candidate conditions supported by the data? — Guarded explanations</summary>
+**Learn next:** {doc}`understand the guard, supported configuration and audit <../foundations/concepts/guarded_explanations>`.
 
-Changing one feature while keeping the others can produce an unusual combination
-of values. {term}`Guarded explanations <Guarded explanation>` check representative
-hypothetical inputs using calibration-data support information and filter
-candidate conditions before emitting rules.
+### After generating alternatives: which ones should I inspect?
 
-This check belongs to **explanation construction**. It examines selected
-representatives, not every point in a numerical interval. It also does not
-automatically certify that the original query is in distribution. Inspect the
-audit alongside the returned rules, especially if few or none remain.
+Look at the **Alternative explanation** output. One case can have several rules,
+each reporting a prediction under a different condition. You can inspect them
+all or select a subset for a stated purpose, whether or not you used a guard.
 
-Continue with {doc}`guarded explanations <../foundations/concepts/guarded_explanations>`
-for the rule, standard-explainer prerequisites, options and audit. Read the
-applicable limitations for your task and configuration; support filtering is
-not a new universal prediction guarantee.
+{term}`Alternative filtering <Alternative filtering>` selects from those existing
+rules. For example, an **ensured** filter keeps alternatives whose reported
+prediction interval is no wider than the original prediction interval. Width
+here means the difference between the reported upper and lower values. For a
+value question, compare target-value interval widths; for an event question,
+compare probability-bound widths. Keep the quantity and scale the same.
 
-</details>
+Other criteria also need their mode: crossing a probability comparison boundary
+is a different question from obtaining a lower numerical house-value prediction.
+Filtering helps organize what you inspect. It does not prove that changing an
+area’s income would cause the alternative outcome, or that a narrower reported
+range improves predictive accuracy.
 
-<details><summary>Should the application handle some cases differently? — Rejection</summary>
+**Learn next:** {doc}`choose an alternative filter and read its mode-specific criterion <../foundations/concepts/alternatives>`.
 
-An application may need to flag or set aside a case under a defined rejection
-procedure, even when a model prediction is available. {term}`Rejection <Rejection>`
-identifies cases under that procedure. A **reject policy** controls their tagging,
-selection or return handling; the application decides what to do next.
+### When using the prediction: should some cases be flagged or set aside?
 
-This concerns **cases**, rather than selecting explanation rules. The procedure
-is task-specific. In the reviewed source version, **regression rejection requires
-an event threshold**: a numerical prediction interval alone is not its rejection
-procedure. Classification has its own construction. In the reviewed multiclass procedure,
-a two-label representation concerns whether the model’s top prediction is correct;
-those labels are not the original flower species. Read its metadata using the
-procedure’s definitions.
+Return to the **prediction information** in the figure. Your application may
+need to treat some cases differently rather than use every result in the same way.
+{term}`Rejection <Rejection>` identifies cases under a supported, task-specific
+rejection procedure. A **reject policy** controls how that status affects handling—for example,
+tagging cases or selecting cases for explanation. Your application decides the
+follow-up action.
 
-Continue with the {doc}`reject-policy guide <../practitioner/advanced/reject-policy>`
-for supported configurations, return handling and the regression event contract.
-Do not infer rejection behavior from a displayed probability or interval width alone.
+For the housing example, the reviewed regression rejection procedure requires
+a defined event threshold, such as the budget used for the event-probability
+question. A wide house-value interval alone is not that procedure. Classification
+has its own construction and interpretation; do not transfer the regression setup
+or its assumptions unchanged to another task.
 
-</details>
+The distinction is the item being handled: alternative filters select explanation
+rules; rejection concerns queried cases. A case can have a model prediction while
+also receiving a rejection status under the configured procedure.
+
+**Learn next:** {doc}`configure rejection for your task and interpret the returned status <../practitioner/advanced/reject-policy>`.
+
+Choose only the options your problem needs. Their supported combinations and
+statistical conditions depend on the task, mode, configuration and software
+version. The browser guide and Python guides identify their own available controls.
+For the meaning of each range, keep the shared
+{doc}`range guide <../foundations/concepts/calibrated_interval_semantics>` nearby.
 
 ## Choose how to try CE
 
 <div class="ce-route-grid" role="navigation" aria-label="Try CE in a browser or locally">
-<a class="ce-route-card" href="expert-hub.html"><strong>Try CE in your browser</strong><span>Use built-in examples without installing Python. Prepare, calibrate and inspect one result.</span><span>Open the browser guide →</span></a>
-<a class="ce-route-card" href="first-python-explanation.html"><strong>Install and run locally</strong><span>Install CE, run the Iris example and interpret its output and plot.</span><span>Open the Python guide →</span></a>
+<a class="ce-route-card" href="expert-hub.html">
+<div><strong>Try CE in your browser</strong></div>
+<div>Use built-in examples without installing Python. Prepare, calibrate and inspect one result.</div>
+<span>Open the browser guide →</span>
+</a>
+<a class="ce-route-card" href="first-python-explanation.html">
+<div><strong>Install and run locally</strong></div>
+<div>Install CE, run the Iris example and interpret its output and plot.</div>
+<span>Open the Python guide →</span>
+</a>
 </div>
 
 For local numerical targets, follow the {doc}`regression tutorial <quickstart_regression>`.
