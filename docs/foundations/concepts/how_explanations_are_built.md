@@ -15,7 +15,8 @@ class so that a changed quantity does not get mistaken for a changed case.
 
 ## Start with the output quantity
 
-Call that quantity {math}`q(x)` for the query {math}`x`. It may be a class probability,
+The **baseline** is the prediction information for the original case, before
+considering another feature condition. It may be a class probability,
 a numeric target prediction or a threshold-event probability. Its units follow
 that choice. The {doc}`task and mode map <tasks_modes_capabilities>` helps you
 identify it before reading any weights.
@@ -27,6 +28,14 @@ identify it before reading any weights.
 <div class="ce-workflow-lane"><p class="ce-workflow-heading">Alternative explanation</p><ol><li>Keep the same baseline and task.</li><li>Consider a different feature condition.</li><li>Obtain the prediction information under that condition.</li><li>Compare the alternative prediction and its range with the baseline.</li></ol></div>
 </div>
 
+A **comparison response** is what the calibrated model reports under the
+feature scenarios used by the explanation method. A factual weight compares
+the original response with those comparison responses. An alternative reports
+the response under a different condition. Conditions describe the model query,
+not an experiment that has changed the real-world case.
+
+<details><summary>Go deeper: schematic notation for a factual weight</summary>
+
 For the ordinary factual comparison, a schematic description of a feature
 weight is
 
@@ -34,7 +43,7 @@ weight is
 w_j(x)=q(x)-r_j(x),
 ```
 
-where {math}`r_j(x)` summarizes the responses used for feature {math}`j`'s comparison.
+Here {math}`q(x)` is the original output for query {math}`x`; {math}`r_j(x)` summarizes the responses used for feature {math}`j`'s comparison.
 The actual substitutions and aggregation depend on the method, feature type
 and options; this notation is not an alternative implementation specification.
 The source's ordinary factual construction uses prediction-minus-comparison
@@ -44,6 +53,8 @@ also expose its difference from baseline.
 As illustrative arithmetic only, 0.70 minus 0.50 gives a factual weight of 0.20
 on a probability scale. It does not say that changing that feature in the real
 world increases an outcome probability by 0.20.
+
+</details>
 
 ## Read signs, units and ranges together
 

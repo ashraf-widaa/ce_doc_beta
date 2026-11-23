@@ -27,6 +27,8 @@ frequencies. A hypothetical group of predictions near 0.8 illustrates the idea:
 we would compare the positive-outcome frequency in that group with 0.8. This is
 an explanatory example, not a measurement from CE or a browser application.
 
+<details><summary>Go deeper: the ideal calibration equation and its limits</summary>
+
 An ideal population definition for a binary outcome is
 
 ```{math}
@@ -39,6 +41,8 @@ observed frequencies have sampling variation. This ideal definition is **not**
 a theorem that every CE merged probability satisfies this equality on every
 dataset. See [scikit-learn's probability calibration guide](https://scikit-learn.org/stable/modules/calibration.html)
 for general background and the CE semantics reference for method-specific claims.
+
+</details>
 
 ## Why separate calibration data matters
 
@@ -71,6 +75,10 @@ records a reviewed multiclass output limitation. Its presence is not permission
 to clip values or silently reinterpret them.
 
 ## How the binary Venn–Abers construction works
+
+Start with two objects: the fitted classifier supplies scores; the calibrator
+uses scores and known outcomes from separate calibration cases. Fitting a
+calibration mapping does not retrain the predictive classifier.
 
 A classifier produces a **score** for a class. Calibration relates scores to
 known outcomes from the calibration cases. Venn–Abers uses **isotonic regression**:
@@ -135,14 +143,24 @@ exchangeability, distribution shift or the validity of a statistical claim.
 
 A conformal predictive system (CPS) uses calibration information to construct
 predictive information for a numeric target. A useful background concept is a
-predictive cumulative distribution function, {math}`F_x(y)`: it describes cumulative
-probability up to target value {math}`y` for a query with features {math}`x`.
+**cumulative distribution function (CDF)**: it accumulates probability up to a
+chosen target value. A query supplies the features; moving along the target
+scale changes the cumulative probability.
 
-For a CDF, a quantile can be defined as
+A **quantile** is a location on that distribution at a specified cumulative
+probability. Percentiles express those locations out of 100. The 5th and 95th
+percentiles therefore mark two target values, rather than two class probabilities.
+
+<details><summary>Go deeper: quantile notation</summary>
+
+Write the predictive CDF as {math}`F_x(y)` for query features {math}`x` and target
+value {math}`y`. For a CDF, a quantile can be defined as
 
 ```{math}
 Q_\gamma(x)=\inf\{y:F_x(y)\ge\gamma\}.
 ```
+
+</details>
 
 A lower and upper percentile describe a target-value interval. For example,
 5th/95th percentile settings describe a nominal central 90% interval. This

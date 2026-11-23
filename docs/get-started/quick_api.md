@@ -47,6 +47,8 @@ alternatives = explainer.explore_alternatives(X_query)
 
 ## Reject-aware prediction note
 
+<details><summary>Advanced: return types when a reject policy is enabled</summary>
+
 When `predict(...)` or `predict_proba(...)` is called with a non-`NONE`
 `reject_policy`, the return value is a `RejectResult` envelope. For
 `ONLY_ACCEPTED` and `ONLY_REJECTED`, `result.prediction` remains full-batch;
@@ -55,6 +57,8 @@ to identify the matched subset. Reject-enabled `explain_factual(...)` and
 `explore_alternatives(...)` return reject-aware collections
 (`RejectCalibratedExplanations` / `RejectAlternativeExplanations`), not a
 `RejectResult` envelope.
+
+</details>
 
 ## Classification
 
@@ -102,32 +106,26 @@ p, (plo, phi) = explainer.predict_proba(X_sample, uq_interval=True, threshold=12
 
 ## Mode-specific semantics notes
 
+The same `low` and `high` variable names do not make the returned quantities
+interchangeable. Use the shared {doc}`range guide <../foundations/concepts/calibrated_interval_semantics>`
+for the detailed statements and assumptions rather than treating an API snippet
+as a guarantee.
+
 ### Classification
 
-- **Calibration prerequisites**: fit on proper split and calibrate on held-out calibration split.
-- **Mode-specific guarantees**: Venn-Abers calibrated class probabilities with intervals.
-- **Assumptions**: exchangeability or calibration-deployment distribution match.
-- **Explicit non-guarantees**: no guarantee under drift or regime shift.
-- **Explanation-envelope limits**: feature-level intervals are model-response summaries, not causal claims.
-- **Formal semantics**: {doc}`../foundations/concepts/calibrated_interval_semantics`.
+Select the class before reading its probability and bounds. Check binary versus
+multiclass return shapes and the documented multiclass limitation.
 
 ### Percentile or interval regression
 
-- **Calibration prerequisites**: fit regression model and calibrate CPS on held-out calibration split.
-- **Mode-specific guarantees**: CPS percentile intervals for requested `low_high_percentiles`.
-- **Assumptions**: exchangeability or calibration-deployment distribution match.
-- **Explicit non-guarantees**: no guarantee under drift or fixed interval width across subpopulations.
-- **Explanation-envelope limits**: interval effects on explanations summarize model behavior under perturbation.
-- **Formal semantics**: {doc}`../foundations/concepts/calibrated_interval_semantics`.
+Read the point prediction and endpoints in the target's units. Percentiles
+specify the requested interval; they do not fix its numerical width or guarantee
+that this individual outcome is inside it.
 
 ### Probabilistic or thresholded regression
 
-- **Calibration prerequisites**: fit regression model and calibrate before threshold queries.
-- **Mode-specific guarantees**: threshold events use CPS with Venn-Abers calibrated probabilities.
-- **Assumptions**: exchangeability or calibration-deployment distribution match.
-- **Explicit non-guarantees**: no guarantee under drift and no causal guarantee from threshold probabilities.
-- **Explanation-envelope limits**: feature-level probability shifts are model-response summaries.
-- **Formal semantics**: {doc}`../foundations/concepts/calibrated_interval_semantics`.
+Name the event first. Its probability and bounds have a different meaning from
+target-value endpoints. Use the same threshold for its explanation calls.
 
 ## Continue from a call
 
