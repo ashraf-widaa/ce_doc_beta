@@ -8,17 +8,21 @@ to “How probable is this event?”
 
 ## Choose where to run it
 
-**In the browser — a housing threshold.** Follow the
-{ref}`Expert Hub threshold exercise <expert-event>`. Prepare California Housing,
-enable **Use Threshold** and enter **3**. In this dataset's units, that means
-**$300,000**, not $3. The guide records a misleading interval badge; keep the
-event definition and raw probability values in view.
+Choose one environment. The browser and Python examples use different datasets;
+follow the selected guide's labels, units and setup. You can also read the captured
+results below without running either route.
 
-**In Python — a disease-progression threshold.** Follow the
-{doc}`regression tutorial <quickstart_regression>` from setup through “Ask for an
-event probability”. Its event is `Y <= 150` on a different target. Pass the same
-threshold to its factual and alternative calls; do not reuse target-value weights
-as event-probability weights.
+<div class="ce-route-grid" role="navigation" aria-label="Ways to run this example">
+<a class="ce-route-card" href="expert-hub.html#expert-event"><strong>Browser: housing event</strong><span>Define the housing threshold, then inspect its probability.</span><span>Open the browser guide →</span></a>
+<a class="ce-route-card" href="quickstart_regression.html"><strong>Python: disease-progression event</strong><span>Run the tutorial from setup through the event-probability section.</span><span>Open the Python example →</span></a>
+</div>
+
+**Before running:** for the housing event, enable **Use Threshold** and enter **3**
+for $300,000, not 300000. The browser guide flags a misleading interval badge;
+read the event definition and raw probability values. In Python, run from setup
+through “Ask for an event probability”. Its event is `Y <= 150` on a different
+target. Pass the same threshold to factual and alternative calls; target-value
+weights must not be reused as event-probability weights.
 
 ## Read the housing event result
 

@@ -1,4 +1,4 @@
-# CE big picture in 60 seconds
+# Quick Start: the CE big picture
 
 <span class="ce-choice-page" hidden></span>
 
@@ -10,23 +10,36 @@ learning, training examples contain both features and known targets.
 uses a fitted model and separate labelled calibration data to provide calibrated
 prediction information and factual or alternative explanations, with reported ranges.
 
-**Learn by doing:** start with the {doc}`Diabetes classification example <example-classification>`.
-Or read the big picture below before choosing another question.
+Read the workflow below, choose a prediction question, then inspect or run one
+example. You do not need to install CE to begin.
+
+**Prefer to see a result first?** {ref}`Read one Iris prediction without running code <classification-one-case>`,
+or {doc}`run the same case in Python <first-python-explanation>`.
 
 ## What changes when you add CE?
 
+<figure>
 <picture>
 <source media="(max-width: 600px)" srcset="../_static/figures/ce-big-picture-mobile.svg">
-<img src="../_static/figures/ce-big-picture.svg" width="960" height="510" alt="White boxes show labelled training data, a fitted model and a conventional prediction for a new case. Orange boxes show separate labelled calibration data and CE, using the same fitted model and new case, to return calibrated prediction information and factual or alternative explanations with reported ranges.">
+<img src="../_static/figures/ce-big-picture.svg" width="1100" height="680" alt="White boxes show training data, the fitted model and a new case leading to a conventional prediction. Orange boxes add separate labelled calibration data and CE using the same fitted model and new-case features. Four output boxes distinguish prediction, its task-specific range, factual conditions with weights and ranges, and alternative conditions with predictions and ranges.">
 </picture>
-
-White boxes show the conventional workflow; orange boxes show CE's additions.
-CE can use the same fitted model. Calibration uses separate labelled examples;
-you then supply a new case's features to predict or explain it. Keep evaluation
-data separate to check the resulting system. Other ML workflows can also include
-calibration or uncertainty methods.
+<figcaption>CE uses the same fitted model. The orange outputs distinguish quantities; they are not four required API calls.</figcaption>
+</figure>
 
 [Open the full-size figure](../_static/figures/ce-big-picture.svg).
+
+Read the figure from the inputs to the outputs:
+
+1. **Fit the predictive model.** Training examples have features and known targets.
+   The fitted model can predict a class, numerical value or score for a new case.
+2. **Add separate calibration data.** CE uses labelled examples that were not used
+   to fit the model. Calibrating does not retrain that predictive model. Keep
+   evaluation data separate to check the resulting system.
+3. **Supply the new case's features.** Its unknown target is not an input. CE uses
+   the fitted model and calibration to produce information for your chosen question.
+4. **Read the different outputs separately.** Identify the prediction and its range,
+   then inspect a factual condition and an alternative. Their quantities are
+   explained below. Other ML workflows can also include calibration and uncertainty methods.
 
 ## Choose the question you want to answer
 
@@ -41,8 +54,9 @@ number. A **mode** is the question you ask CE about that prediction:
 - **How probable is an event, such as a value below a threshold?** Follow the
   {doc}`event-probability example <example-event>`.
 
-Each example offers browser and local Python routes. Choose one; completing
-both is optional.
+Each example explains its output and offers two ways to run it: **in the browser**
+without installation, or **locally in Python**. Choose one; completing both is optional.
+Installation belongs to the Python route, not a separate step for every reader.
 
 ## What can an explanation tell you?
 
@@ -66,12 +80,24 @@ Guarantees depend on the mode and its assumptions. Use the
 when interpreting a result; a range is not certainty about an individual case
 or protection against distribution shift.
 
-## Go deeper when you need it
+## After your first result
 
-- **Why use CE?** {doc}`CE: What & Why <../sections/what-and-why>`.
-- **How is it constructed?** {doc}`How CE Works <../sections/how-ce-works>`.
-- **How do I use it in software?** {doc}`Software & Integration <../sections/software-integration>`.
-- **What do the terms mean?** {doc}`Tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`.
+Before adding more features or methods, check that you can answer:
+
+- What quantity was predicted, and for which class or event if applicable?
+- Which range belongs to the prediction, and what does it mean in this mode?
+- What does one factual weight compare, and how does an alternative prediction differ?
+
+Use the shared {doc}`interpretation guide <../foundations/how-to/interpret_explanations>`
+with the result open if needed. The next step depends on your goal:
+
+- **Apply CE to your own data:** follow {doc}`the practical sequence <../sections/in-practice>`
+  to adapt the workflow and check held-out results.
+- **Understand why CE exists:** read {doc}`CE: What & Why <../sections/what-and-why>`.
+- **Understand the construction:** follow {doc}`How CE Works <../sections/how-ce-works>`.
+- **Connect it to an application:** use {doc}`Software & Integration <../sections/software-integration>`.
+
+<span id="go-deeper-when-you-need-it"></span>
 
 <!-- Entry-point tier: Tier 1. -->
 
@@ -109,3 +135,5 @@ Decision practice: Decision Lab <decision-lab>
 <span id="what-can-you-rely-on"></span>
 <span id="what-ce-adds"></span>
 <span id="what-ce-adds-to-the-workflow"></span>
+
+<span id="ce-big-picture-in-60-seconds"></span>

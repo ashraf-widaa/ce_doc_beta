@@ -37,6 +37,17 @@ needed; you do not need to learn every payload field for a first reading.
 
 ## 3. Adapt and check the workflow
 
+Keep the example's sequence and replace one part at a time: your task and
+labels/units, your feature representation, the model-fitting and calibration data,
+then a held-out query. Use the relevant guide below rather than repeating the introduction.
+
+| What you are changing | Existing guide | Check before continuing |
+| --- | --- | --- |
+| Model and preprocessing | {doc}`Pipeline integration <../foundations/how-to/integrate_with_pipelines>` | Feature order and transformations match across data roles. |
+| Task or output question | {doc}`Tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>` | Target units, class mapping or event definition are explicit. |
+| Evaluation data | {doc}`Check results <../practitioner/check_results>` | Checks match the returned quantity; no fitting or calibration uses evaluation outcomes. |
+| Displayed or saved results | {doc}`Export explanations <../foundations/how-to/export_explanations>` | Prediction quantities, weight ranges and warnings retain their meaning. |
+
 Follow the {doc}`pipeline integration guide <../foundations/how-to/integrate_with_pipelines>`
 when adding CE to a model with preprocessing. Keep fitting, calibration and
 held-out evaluation roles separate, and use the same feature representation.

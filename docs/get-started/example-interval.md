@@ -8,15 +8,18 @@ about the value itself, not the probability of an event.
 
 ## Choose where to run it
 
-**In the browser — California Housing.** Follow the
-{ref}`Expert Hub housing exercise <expert-interval>`. Prepare and calibrate the
-model, select a test case and leave **Use Threshold** off. The guide includes
-the setup steps and current interface qualifications.
+Choose one environment. The browser and Python examples use different datasets;
+follow the selected guide's labels, units and setup. You can also read the captured
+results below without running either route.
 
-**In Python — numeric diabetes target.** Follow the
-{doc}`regression tutorial <quickstart_regression>` from its prerequisites through
-“Ask for a value and its interval”. It provides code, output and interpretation.
-Its target measures disease progression; do not attach housing units to it.
+<div class="ce-route-grid" role="navigation" aria-label="Ways to run this example">
+<a class="ce-route-card" href="expert-hub.html#expert-interval"><strong>Browser: California Housing</strong><span>Prepare and calibrate, then read a value and target-value interval.</span><span>Open the browser guide →</span></a>
+<a class="ce-route-card" href="quickstart_regression.html"><strong>Python: numerical diabetes target</strong><span>Run setup, then the value-and-interval part of the regression tutorial.</span><span>Open the Python example →</span></a>
+</div>
+
+**Before running:** leave **Use Threshold** off for the browser housing exercise.
+In Python, run the prerequisites through “Ask for a value and its interval”.
+That tutorial's target is disease progression; do not attach housing units to it.
 
 ## Read the housing result
 
