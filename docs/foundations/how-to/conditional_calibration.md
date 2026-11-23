@@ -4,6 +4,24 @@ Conditional, or Mondrian, calibration partitions calibration data by category
 label and fits separate calibrators per category. Use it when uncertainty must be
 reported by subgroup or segment.
 
+## Before choosing a group-label channel
+
+Start with the {doc}`ordinary Python workflow <../../get-started/first-python-explanation>`
+and separate model-fitting, calibration and evaluation data. Below, `x_proper,
+y_proper` are the model-fitting subset, `x_cal, y_cal` are separate calibration
+cases, and `x_test` contains query features. `model` is a compatible classifier.
+The two code examples below therefore request
+class probabilities. Each channel is an alternative setup; choose one. For
+regression, use the corresponding value or event call from the
+{doc}`regression guide <../concepts/probabilistic_regression>`; do not use a
+threshold-free regression `predict_proba` call as a class-probability query.
+
+In Channel A, `group_idx` identifies a feature column that already encodes the
+intended groups as integer categories. Replace that label construction with your
+application’s defined groups when appropriate; integer conversion alone does not
+establish a scientifically meaningful grouping. Check that calibration and query
+labels use the same definition and vocabulary.
+
 ## Channel A: Inline Labels
 
 Use `bins=` when labels are already available for every calibration and inference
@@ -13,7 +31,7 @@ instance.
 from calibrated_explanations import WrapCalibratedExplainer
 
 explainer = WrapCalibratedExplainer(model)
-explainer.fit(x_train, y_train)
+explainer.fit(x_proper, y_proper)
 
 group_cal = x_cal[:, group_idx].astype(int)
 group_test = x_test[:, group_idx].astype(int)
@@ -39,7 +57,7 @@ from crepes.extras import MondrianCategorizer
 from calibrated_explanations import WrapCalibratedExplainer
 
 explainer = WrapCalibratedExplainer(model)
-explainer.fit(x_train, y_train)
+explainer.fit(x_proper, y_proper)
 
 mc = MondrianCategorizer()
 mc.fit(x_cal, f=lambda X: model.predict_proba(X)[:, 1], no_bins=5)

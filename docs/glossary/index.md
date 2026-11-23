@@ -23,6 +23,29 @@ related concepts such as local and global explanations have separate definitions
 ```{glossary}
 :sorted:
 
+Alternative filtering
+Alternative filter
+    Selecting existing alternative rules by a stated criterion, such as their prediction relationship or reported interval width. The criteria depend on the output mode; the filter does not establish a real-world intervention effect.
+
+    Learn more: {doc}`Understand alternative filters <../foundations/concepts/alternatives>`.
+
+Filtering
+    Selecting items according to a criterion. In CE, identify whether the items are alternative rules, candidate conditions or cases: alternative filters, guarded checks and reject policies perform different jobs.
+
+    Learn more: {doc}`Place each option in the workflow <../get-started/index>`.
+
+Mondrian calibration
+Conditional calibration
+    Calibration using defined category or group labels in the applicable construction. Group information is used consistently for calibration and queries; the task, method conditions and available group data still matter.
+
+    Learn more: {doc}`Configure conditional calibration <../foundations/how-to/conditional_calibration>`.
+
+Rejection
+Reject option
+    Identifying cases under a task-specific rejection procedure. A reject policy controls their handling. The reviewed regression procedure requires an event threshold; selecting explanation rules is a different operation.
+
+    Learn more: {doc}`Understand reject procedures and policies <../practitioner/advanced/reject-policy>`.
+
 Alternative explanation
     Prediction information under a different feature condition. Compare it with the original prediction on the same scale; it is not a causal intervention.
 
