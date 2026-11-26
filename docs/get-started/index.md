@@ -15,8 +15,57 @@ to the same workflow.
 
 ## From a conventional prediction to CE
 
-The workflow separates **development and evaluation** from **inference**: using
-an already prepared system to predict or explain a new case.
+Start with what you already know: a basic machine-learning workflow. The figure
+compares it, lane by lane, with the same workflow when CE is added.
+
+<figure>
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-adds-comparison-mobile.svg">
+<img src="../_static/figures/ce-adds-comparison.svg" width="1100" height="1350" alt="Two lanes. Conventional ML: training data fit a predictive model; new-case features go to that model, which returns a class, numerical value or score. With CE: the same fitted model, not retrained, and separate labelled calibration data configure a CE system; the same new-case features go to that system, which returns prediction information with a mode-specific range and factual or alternative explanations with ranges. Held-out evaluation: test features obtain outputs; test targets are used only to check them and never enter prediction or explanation.">
+</picture>
+<figcaption>White boxes are the conventional workflow. Orange boxes are what CE adds. The fitted model and the new-case features are the same in both lanes.</figcaption>
+</figure>
+
+[Download the comparison figure (SVG)](../_static/figures/ce-adds-comparison.svg).
+
+**Read the figure in three parts.**
+
+- **Preparation (done once).** In the conventional lane, training data (features
+  plus known {term}`targets <Target>`) are used to fit a predictive model. With
+  CE, you keep that same {term}`fitted model <Fitted model>` and add one step:
+  separate labelled {term}`calibration data <Calibration data>`, cases the model
+  was not trained on, configure a CE system around it. Calibration does not
+  retrain the model.
+- **Inference (for each new case).** Both lanes receive the same new-case
+  features; the case's target is not needed. The conventional model returns a
+  class, a numerical value or a score. The CE system returns prediction
+  information with a range whose meaning depends on the
+  {term}`mode <CE mode>`: probability bounds for a class or a numerical event,
+  or an interval in the target's units for a numerical value. It can also give
+  *factual* explanations (feature weights with ranges, for this case's own
+  feature values) and *alternative* explanations (what the model would report,
+  with ranges, under other feature conditions).
+- **Held-out evaluation (before relying on either lane).** Test features go to
+  the fitted model or the CE system to obtain outputs. The test targets are
+  kept aside and used only to check those outputs. They never enter a
+  prediction or explanation call.
+
+In code, the same split appears as `fit(X_train, y_train)` for training,
+`calibrate(X_cal, y_cal)` for CE preparation, and `predict(X)`,
+`explain_factual(X)` or `explore_alternatives(X)` at inference. The inference
+calls take features only.
+
+The comparison is with a *basic* model-only workflow. Real conventional
+systems can also include their own calibration or explanation (XAI) tools; CE
+brings calibrated prediction information and both kinds of explanation into one
+workflow around one model. The ranges are only as trustworthy as the
+calibration data are representative of the cases you query.
+
+### The full lifecycle
+
+The next figure shows the CE lane in more detail. It separates
+**development and evaluation** from **inference**: using an already prepared
+system to predict or explain a new case.
 
 <figure>
 <picture>
@@ -39,9 +88,8 @@ an already prepared system to predict or explain a new case.
    configured CE system. The case's target is not required. Read the prediction
    information, then inspect factual or alternative explanations as needed.
 
-In a model-only route, the fitted model returns a class, numerical value or
-score. CE adds calibrated prediction information and explanations around that
-same model. Other tools can also provide calibration or explanations.
+Without CE, the same fitted model returns a class, numerical value or score, as
+in the comparison above.
 The figure shows data roles, not a complete deployment architecture or a proof
 that future data satisfy the method's assumptions. If the model changes, its
 existing CE calibration must not simply be assumed valid.

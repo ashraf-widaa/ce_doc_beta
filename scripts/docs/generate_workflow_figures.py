@@ -23,9 +23,12 @@ class Diagram:
 
     def text(self, x, y, t, size=19, bold=False, anchor="middle", color="#334155"):
         if not self.inbox:
+            # White pill keeps free-standing labels legible on transparent canvases
+            # in both light and dark themes.
             bw = min(1080, len(t) * size * 0.57 + 18)
+            left = x - 9 if anchor == "start" else x - bw / 2
             self.parts.append(
-                f'<rect x="{x - bw / 2}" y="{y - size}" width="{bw}" height="{size + 9}" rx="5" fill="#ffffff"/>'
+                f'<rect x="{left}" y="{y - size}" width="{bw}" height="{size + 9}" rx="5" fill="#ffffff"/>'
             )
         self.parts.append(
             f'<text x="{x}" y="{y}" text-anchor="{anchor}" font-family="sans-serif" font-size="{size}" font-weight="{700 if bold else 400}" fill="{color}">{html.escape(t)}</text>'
@@ -54,7 +57,9 @@ class Diagram:
         self.box(12, y, w - 24, 48, t)
 
     def save(self, name):
-        (DEST / name).write_text("\n".join(self.parts) + "\n</svg>\n")
+        (DEST / name).write_text(
+            "\n".join(self.parts) + "\n</svg>\n", encoding="utf-8", newline="\n"
+        )
 
 
 MODES = {
@@ -257,7 +262,7 @@ def workflow(stem, m=False, slug=None):
             980,
             685,
             90,
-            "Model-only route",
+            "Without CE (conventional route)",
             ["The same fitted model returns a class, value or score."],
         )
         d.text(
@@ -518,3 +523,144 @@ def options_map(m=False):
 for m in (False, True):
     task_map(m)
     options_map(m)
+
+
+def comparison(m=False):
+    """Compare a basic conventional ML workflow with the same workflow plus CE.
+
+    Verified against the implementation: ``fit`` trains only the learner;
+    ``calibrate`` requires that fitted learner and does not refit it; ``predict``
+    and ``explain_*`` take features only; without calibration ``predict``
+    returns ``learner.predict``.
+    """
+    w = 360 if m else 1100
+    h = 2440 if m else 1350
+    d = Diagram(
+        w,
+        h,
+        "What CE adds to a basic conventional ML workflow",
+        "Two lanes share the same fitted predictive model. Conventional ML: training data fit the model; at inference, new-case features go to that model, which returns a class, numerical value or score. With CE: the same fitted model, not retrained, plus separate labelled calibration data configure a CE system; at inference, the same new-case features go to that system, which returns prediction information with a mode-specific range, and factual or alternative explanations with ranges. Held-out evaluation is separate: test features obtain outputs from the model or CE system; test targets are used only to check those outputs and never enter prediction or explanation. White marks conventional parts, orange marks CE additions. Conventional systems can also use other calibration or explanation tools; this compares CE with a basic model-only workflow. Arrows show information flow, not API calls.",
+    )
+    ce_outputs = ("Prediction information", ["Probability or numerical value", "with a mode-specific range"])
+    if m:
+        x, bw = 22, 316
+        d.box(12, 12, w - 24, 48, "Conventional ML")
+        d.text(180, 95, "Preparation · once", 17, True)
+        for p in ["M180 185V210", "M180 420V445", "M180 525V550"]:
+            d.arrow(p)
+        d.box(x, 105, bw, 80, "Training data", ["Features + known targets"])
+        d.box(x, 210, bw, 80, "Fitted predictive model", ["Learns from training data"])
+        d.text(180, 325, "Inference · each new case", 17, True)
+        d.box(x, 340, bw, 80, "New-case features", ["Target not needed"])
+        d.box(x, 445, bw, 80, "Same fitted model", ["From preparation"])
+        d.box(x, 550, bw, 90, "Model output", ["Class, numerical value", "or score"])
+        d.text(180, 672, "Other tools can add calibration", 15)
+        d.text(180, 697, "or explanations to this lane.", 15)
+
+        d.box(12, 730, w - 24, 48, "With CE", ce=True)
+        d.text(180, 812, "Preparation · once", 17, True)
+        for p in ["M180 1020V1050", "M180 1275V1300", "M180 1380V1405"]:
+            d.arrow(p)
+        d.arrow("M22 865H10V1095H22")
+        d.arrow("M338 1340H350V1585H338")
+        d.box(x, 825, bw, 80, "Same fitted model", ["Reused, not retrained"])
+        d.box(x, 930, bw, 90, "Calibration data", ["Separate labelled cases:", "features + targets"], True)
+        d.box(x, 1050, bw, 90, "Configured CE system", ["Model + calibration state"], True)
+        d.text(180, 1180, "Inference · each new case", 17, True)
+        d.box(x, 1195, bw, 80, "Same new-case features", ["Target not needed"])
+        d.box(x, 1300, bw, 80, "Same CE system", ["Model + calibration state"], True)
+        d.box(x, 1405, bw, 90, *ce_outputs, True)
+        d.box(
+            x,
+            1525,
+            bw,
+            120,
+            "Explanations",
+            ["Factual: weights + ranges", "Alternatives: predictions", "for other conditions + ranges"],
+            True,
+        )
+
+        d.box(12, 1690, w - 24, 48, "Held-out evaluation")
+        for p in ["M180 1840V1865", "M180 1955V1980", "M180 2060V2085"]:
+            d.arrow(p)
+        d.arrow("M180 2195V2165")
+        d.box(x, 1760, bw, 80, "Test features", ["Query inputs only"])
+        d.box(x, 1865, bw, 90, "Same model or CE system", ["Predict or explain"])
+        d.box(x, 1980, bw, 80, "Test outputs", ["Kept for checking"])
+        d.box(x, 2085, bw, 80, "Check results", ["Compare outputs with targets"])
+        d.box(x, 2195, bw, 90, "Test targets", ["Known outcomes, kept aside", "Used only in the check"])
+        d.text(180, 2320, "Test targets never enter", 16, True)
+        d.text(180, 2345, "prediction or explanation.", 16, True)
+        d.text(180, 2385, "White: conventional ML", 15)
+        d.text(180, 2410, "Orange: what CE adds", 15)
+    else:
+        ax, bx, lw, half = 25, 575, 500, 240
+        d.box(ax, 12, lw, 52, "Conventional ML")
+        d.box(bx, 12, lw, 52, "With CE", ce=True)
+
+        # Preparation band
+        d.parts.append('<path d="M25 82H1075" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 6"/>')
+        d.text(550, 100, "PREPARATION · done once, before use", 18, True)
+        for p in ["M275 205V235", "M695 325V355", "M955 325V355"]:
+            d.arrow(p)
+        d.arrow("M525 280H575", dashed=True)
+        d.box(ax, 115, lw, 90, "Training data", ["Features + known targets"])
+        d.box(ax, 235, lw, 90, "Fitted predictive model", ["Learns from the training data"])
+        d.text(825, 150, "CE starts from the model you already have,", 17)
+        d.text(825, 178, "plus separate labelled calibration data.", 17)
+        d.box(bx, 235, half, 90, "Same fitted model", ["Reused, not retrained"])
+        d.box(835, 235, half, 90, "Calibration data", ["Separate labelled cases:", "features + targets"], True)
+        d.box(bx, 355, lw, 90, "Configured CE system", ["Same model + calibration state"], True)
+
+        # Inference band
+        d.parts.append('<path d="M25 482H1075" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 6"/>')
+        d.text(550, 500, "INFERENCE · repeated for each new case", 18, True)
+        for p in ["M275 600V630", "M275 720V750", "M825 600V630", "M825 720V750"]:
+            d.arrow(p)
+        # Explanations come from the CE system, not from the prediction box.
+        d.arrow("M575 690H555V927H575")
+        # Reuse connectors: preparation results are the same objects used at inference.
+        d.arrow("M25 280H12V675H25", dashed=True)
+        d.arrow("M1075 400H1088V675H1075", dashed=True)
+        d.box(ax, 520, lw, 80, "New-case features", ["The case's target is not needed"])
+        d.box(bx, 520, lw, 80, "Same new-case features", ["The case's target is not needed"])
+        d.box(ax, 630, lw, 90, "Same fitted model", ["Unchanged from preparation"])
+        d.box(bx, 630, lw, 90, "Same configured CE system", ["Model + calibration state, reused"], True)
+        d.box(ax, 750, lw, 90, "Model output", ["Class, numerical value or score"])
+        d.box(bx, 750, lw, 90, *ce_outputs, True)
+        d.box(
+            bx,
+            870,
+            lw,
+            115,
+            "Explanations",
+            ["Factual: feature weights with ranges", "Alternatives: predictions with ranges", "under other feature conditions"],
+            True,
+        )
+        d.text(275, 905, "A basic model reports no range or explanation", 16)
+        d.text(275, 931, "by itself; other tools can add them.", 16)
+
+        # Evaluation band
+        d.parts.append('<path d="M25 1018H1075" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 6"/>')
+        d.text(550, 1036, "HELD-OUT EVALUATION · before relying on either lane", 18, True)
+        for p in ["M245 1100H285", "M555 1100H595", "M815 1100H855"]:
+            d.arrow(p)
+        d.arrow("M965 1190V1145")
+        d.box(25, 1055, 220, 90, "Test features", ["Query inputs only"])
+        d.box(285, 1055, 270, 90, "Same fitted model", ["or same CE system"])
+        d.box(595, 1055, 220, 90, "Test outputs", ["Predictions or", "explanations"])
+        d.box(855, 1055, 220, 90, "Check results", ["Compare outputs", "with test targets"])
+        d.box(855, 1190, 220, 90, "Test targets", ["Known outcomes,", "kept aside"])
+        d.text(430, 1225, "Test targets go only to the check.", 18, True)
+        d.text(430, 1253, "They never enter prediction or explanation.", 18, True)
+        d.text(
+            550,
+            1318,
+            "White: conventional ML and data · Orange: what CE adds · Arrows: information flow, not API calls",
+            16,
+        )
+    d.save("ce-adds-comparison" + ("-mobile" if m else "") + ".svg")
+
+
+for m in (False, True):
+    comparison(m)

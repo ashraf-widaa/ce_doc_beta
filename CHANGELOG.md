@@ -6,6 +6,7 @@
 ### Documentation
 
 - Clarify development, held-out evaluation and inference in the Beta workflow figures; distinguish data roles, task/mode choices and optional CE capabilities.
+- Add a conventional-ML-versus-CE comparison figure to the get-started overview, separating preparation, inference and held-out evaluation; align the lifecycle figures' conventional-route label.
 
 [Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.2...main)
 
