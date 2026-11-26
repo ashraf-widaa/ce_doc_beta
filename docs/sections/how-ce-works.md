@@ -20,29 +20,31 @@ read code and output from one Iris session, and distinguish the quantities it re
 
 ## Follow the same model through the workflow
 
+First separate preparing the system from querying it. The same fitted model
+and CE calibration state serve both held-out evaluation and later new cases.
+
 <figure>
 <picture>
 <source media="(max-width: 600px)" srcset="../_static/figures/ce-reference-workflow-mobile.svg">
-<img src="../_static/figures/ce-reference-workflow.svg" width="1000" height="860" alt="Blue conventional model training, prediction and evaluation steps; orange CE calibration and explanation steps using a separate calibration set and new-case features.">
+<img src="../_static/figures/ce-reference-workflow.svg" width="1100" height="1110" alt="Prepare: training data fit the model; separate labelled calibration data configure CE. Evaluate: test features query the same system; test targets are used only to check outputs. Use: new-case features query the same fitted model and CE state without its target or refitting the predictive model.">
 </picture>
+<figcaption>Test targets enter evaluation only. New-case targets are not inputs to prediction or explanation.</figcaption>
 </figure>
 
 [Open the full-size figure](../_static/figures/ce-reference-workflow.svg).
 
-The blue route shows a conventional predictive workflow; the orange route shows
-CE's additions around the same fitted model. Other ML workflows can also include
-calibration and uncertainty methods. The labelled dataset is separated into
-training, calibration and evaluation roles. A new query needs features, not its
-unknown target. Interpret one result directly; evaluate performance on separate
-labelled cases. These are different activities.
+White boxes describe conventional ML inputs and activities; orange boxes identify
+CE additions. Training, calibration and test data have separate roles. The
+three-way split is a teaching workflow, not a universal split ratio or a claim
+that every deployment uses the same data-management design.
 
 1. **Fit the predictive model.** Training examples contain features and known
    targets. Fitting learns the predictive model. If your model is already fitted,
    CE can use it without requiring you to train it again.
 2. **Calibrate with separate labelled data.** CE uses that fitted model and
-   calibration examples not used to fit it. Calibration supports the prediction
-   information appropriate to your task and mode; it is not another model-fitting
-   step. Keep evaluation data separate to check the resulting system.
+   calibration examples not used to fit it. Calibration constructs method-specific
+   state, including fitted calibrators where applicable, while keeping the
+   predictive model fixed. Keep evaluation data separate to check the resulting system.
 3. **Read prediction information for a new case.** Supply its features and choose
    the question: a class probability, a numerical value with an interval, or the
    probability of an event on a numerical target. Identify the quantity and units
@@ -68,6 +70,37 @@ Python routes. Read the figure together with its assumptions note.
 - {doc}`Classification: class-probability information <../get-started/example-classification>`.
 - {doc}`Interval regression: value and target-value interval <../get-started/example-interval>`.
 - {doc}`Probabilistic regression: event probability and bounds <../get-started/example-event>`.
+
+## Place optional features by their job
+
+Once the core workflow is familiar, attach each option to the activity it changes.
+The arrows below identify that relationship; they do not make the options a
+sequence that every application must run.
+
+<figure>
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-optional-features-mobile.svg">
+<img src="../_static/figures/ce-optional-features.svg" width="1100" height="770" alt="Mondrian belongs to calibration and group-aware queries. Guarding checks candidates during explanation construction. Conjunctions combine conditions. Alternative filters select generated rules. Rejection handles cases under a configured rule.">
+</picture>
+<figcaption>Guarding candidates and rejecting cases are separate operations. Support and conditions depend on task, mode and configuration.</figcaption>
+</figure>
+
+[Open the full-size figure](../_static/figures/ce-optional-features.svg).
+
+- **Mondrian calibration:** supply consistent group information at calibration
+  and query time; see {doc}`conditional calibration <../foundations/how-to/conditional_calibration>`.
+- **Guarding:** check selected representatives of candidate conditions while
+  building explanations; see {doc}`guarded explanations <../foundations/concepts/guarded_explanations>`.
+- **Conjunctions:** combine feature conditions in rules; see
+  {doc}`interpreting explanations <../foundations/how-to/interpret_explanations>`.
+- **Alternative filtering:** select already generated alternative rules by a
+  stated criterion; see {doc}`alternatives <../foundations/concepts/alternatives>`.
+- **Rejection:** flag cases for separate handling under the configured rule;
+  follow the {doc}`rejection guide <../practitioner/advanced/reject-policy>`. Setup and support must be checked before use.
+
+These operations do not establish real-world causal effects or a universal
+prediction guarantee. The shared {doc}`task and mode guide <../foundations/concepts/tasks_modes_capabilities>`
+keeps the output quantities distinct.
 
 ## From calibration to a prediction
 

@@ -15,23 +15,36 @@ to the same workflow.
 
 ## From a conventional prediction to CE
 
+The workflow separates **development and evaluation** from **inference**: using
+an already prepared system to predict or explain a new case.
+
 <figure>
 <picture>
 <source media="(max-width: 600px)" srcset="../_static/figures/ce-big-picture-mobile.svg">
-<img src="../_static/figures/ce-big-picture.svg" width="1100" height="680" alt="White boxes show training data, the fitted model and a new case leading to a conventional prediction. Orange boxes add separate labelled calibration data and CE using the same fitted model and new-case features. Four output boxes distinguish prediction, its task-specific range, factual conditions with weights and ranges, and alternative conditions with predictions and ranges.">
+<img src="../_static/figures/ce-big-picture.svg" width="1100" height="1110" alt="Prepare: training data fit the model; separate labelled calibration data configure CE. Evaluate: test features query the same system; test targets are used only to check outputs. Use: new-case features query the same fitted model and CE state without its target or refitting the predictive model.">
 </picture>
-<figcaption>CE uses the same fitted model. The orange outputs distinguish quantities; they are not four required API calls.</figcaption>
+<figcaption>One fitted predictive model is reused. CE adds calibration state and explanations; it does not retrain that model for each case.</figcaption>
 </figure>
 
 [Open the full-size figure](../_static/figures/ce-big-picture.svg).
 
-The white route shows a conventional prediction: the fitted model uses a new
-case’s {term}`features <Feature>` to return a class, value or score. The orange
-route adds calibration using separate cases with known outcomes, then explains
-the calibrated response for the new case. Its unknown target is not an input.
-CE does not retrain that predictive model; keep evaluation data separate to check
-results. Other tools also offer calibration or explanations—CE combines them
-around the calibrated response.
+1. **Prepare the system.** Training features and known targets fit the predictive
+   model. Separate labelled calibration cases configure CE around that model.
+   Calibration can fit internal calibrators and retain reference data; it does
+   not refit the underlying predictive model.
+2. **Evaluate before relying on results.** Supply held-out test features to the
+   prepared system, then compare its outputs with the known test targets. Those
+   targets belong to evaluation, not to the prediction or explanation call.
+3. **Use it with a new case.** Supply features to the same fitted model and
+   configured CE system. The case's target is not required. Read the prediction
+   information, then inspect factual or alternative explanations as needed.
+
+In a model-only route, the fitted model returns a class, numerical value or
+score. CE adds calibrated prediction information and explanations around that
+same model. Other tools can also provide calibration or explanations.
+The figure shows data roles, not a complete deployment architecture or a proof
+that future data satisfy the method's assumptions. If the model changes, its
+existing CE calibration must not simply be assumed valid.
 
 **Go deeper:** {doc}`why CE was developed <../sections/what-and-why>` and
 {doc}`how the workflow is constructed <../sections/how-ce-works>`.
@@ -56,6 +69,16 @@ A {term}`CE mode <CE mode>` describes the question you ask about that prediction
 
 The two housing questions can use the same fitted regressor. Changing the
 question changes the reported quantity and range meaning, not the target it learned.
+
+<figure>
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-tasks-capabilities-mobile.svg">
+<img src="../_static/figures/ce-tasks-capabilities.svg" width="1100" height="1030" alt="Classification includes binary and multiclass targets. Regression supports value-and-interval or event-probability questions. Factual and alternative explanations refer to the selected output scale.">
+</picture>
+<figcaption>Task describes the target; mode describes the output question; capability describes what you ask CE to do.</figcaption>
+</figure>
+
+[Open the full-size figure](../_static/figures/ce-tasks-capabilities.svg).
 
 **Go deeper:** {doc}`tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`.
 

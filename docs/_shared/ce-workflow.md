@@ -1,7 +1,7 @@
-<figure class="ce-workflow" aria-label="Conventional prediction workflow and the additional CE steps">
+<figure class="ce-workflow" aria-label="Preparing a CE system and using it with a new case">
 <div class="ce-workflow-grid">
-<div class="ce-workflow-lane"><p class="ce-workflow-heading">Conventional prediction workflow</p><ol><li>Features of a new case</li><li>A trained model</li><li>A prediction: a class, value or score</li></ol></div>
-<div class="ce-workflow-lane"><p class="ce-workflow-heading">With Calibrated Explanations</p><ol><li>The trained model and separate labelled calibration data</li><li>CE applied to the features of a new case</li><li>Calibrated prediction information and feature explanations with reported ranges</li></ol></div>
+<div class="ce-workflow-lane"><p class="ce-workflow-heading">Prepare and evaluate</p><ol><li>Fit the predictive model using training features and known targets.</li><li>Configure CE with that fitted model and separate labelled calibration data.</li><li>Query held-out test features; use their targets only to check the outputs.</li></ol></div>
+<div class="ce-workflow-lane"><p class="ce-workflow-heading">Use with a new case (inference)</p><ol><li>Supply the new case’s features; its target is not required.</li><li>Reuse the same fitted model and CE calibration state, without refitting.</li><li>Read prediction information and factual or alternative explanations with their mode-specific ranges.</li></ol></div>
 </div>
-<figcaption>CE adds calibration and explanation steps around the trained model. The meaning of the reported ranges depends on the task and method. Other ML workflows can also include calibration or uncertainty methods.</figcaption>
+<figcaption>Model-only use returns a class, value or score. CE adds calibration state and explanations around the same fitted model. Calibration may fit calibrators; it does not refit that predictive model. Range meanings and conditions depend on the selected method.</figcaption>
 </figure>

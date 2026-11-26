@@ -1,0 +1,49 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1100 770" role="img" aria-labelledby="title desc"><title id="title">Optional CE features have different jobs</title><desc id="desc">Mondrian calibration uses group information at calibration and query time. Guarding checks selected candidate representatives during explanation construction. Conjunctions combine feature conditions. Alternative filters select generated alternative rules. Rejection handles queried cases under a configured criterion, with setup requirements. These features are not five required stages; verify support and conditions for the task, mode and software version. Guarding is not universal query out-of-distribution detection or case rejection.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#64748b"/></marker></defs>
+<g class="node"><rect x="12" y="12" width="1076" height="48" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="550.0" y="45.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Optional CE features</text>
+</g>
+<g class="node"><rect x="25" y="95" width="435" height="93" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="242.5" y="150.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">At calibration</text>
+</g>
+<path d="M460 141H510" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<g class="node"><rect x="510" y="95" width="565" height="93" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="792.5" y="138.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Mondrian calibration</text>
+<text x="792.5" y="162.5" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Use defined calibration groups.</text>
+</g>
+<g class="node"><rect x="25" y="214" width="435" height="93" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="242.5" y="269.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">During explanation building</text>
+</g>
+<path d="M460 260H510" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<g class="node"><rect x="510" y="214" width="565" height="93" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="792.5" y="257.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Guarding</text>
+<text x="792.5" y="281.5" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Check candidate representatives.</text>
+</g>
+<g class="node"><rect x="25" y="333" width="435" height="93" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="242.5" y="388.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">When combining conditions</text>
+</g>
+<path d="M460 379H510" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<g class="node"><rect x="510" y="333" width="565" height="93" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="792.5" y="376.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Conjunctions</text>
+<text x="792.5" y="400.5" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Combine feature conditions in rules.</text>
+</g>
+<g class="node"><rect x="25" y="452" width="435" height="93" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="242.5" y="507.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">After alternative generation</text>
+</g>
+<path d="M460 498H510" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<g class="node"><rect x="510" y="452" width="565" height="93" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="792.5" y="495.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Alternative filtering</text>
+<text x="792.5" y="519.5" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Select rules by a stated criterion.</text>
+</g>
+<g class="node"><rect x="25" y="571" width="435" height="93" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="242.5" y="626.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">For case handling</text>
+</g>
+<path d="M460 617H510" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round" stroke-dasharray="7 5" marker-end="url(#arrow)"/>
+<g class="node"><rect x="510" y="571" width="565" height="93" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="792.5" y="614.5" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Rejection / defer handling</text>
+<text x="792.5" y="638.5" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Flag cases under a configured rule.</text>
+</g>
+<rect x="347.20000000000005" y="688" width="405.59999999999997" height="26" rx="5" fill="#ffffff"/>
+<text x="550.0" y="705" text-anchor="middle" font-family="sans-serif" font-size="17" font-weight="700" fill="#334155">These are options, not mandatory stages.</text>
+<rect x="327.82000000000005" y="717" width="444.35999999999996" height="26" rx="5" fill="#ffffff"/>
+<text x="550.0" y="734" text-anchor="middle" font-family="sans-serif" font-size="17" font-weight="400" fill="#334155">Check support, prerequisites and conditions.</text>
+</svg>

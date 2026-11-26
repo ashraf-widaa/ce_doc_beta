@@ -11,6 +11,16 @@ species is classification, asking for species probabilities selects that output,
 and inspecting factual conditions requests an explanation. Changing the operation
 does not change the target the model learned.
 
+<figure>
+<picture>
+<source media="(max-width: 600px)" srcset="../../_static/figures/ce-tasks-capabilities-mobile.svg">
+<img src="../../_static/figures/ce-tasks-capabilities.svg" width="1100" height="1030" alt="Categorical targets give binary or multiclass classification; numerical targets give regression with value or event questions. Factual and alternative explanations use the selected output scale.">
+</picture>
+<figcaption>Choose the target type, then the output question, then the operation. These are conceptual choices, not three constructor mode strings.</figcaption>
+</figure>
+
+[Open the full-size figure](../../_static/figures/ce-tasks-capabilities.svg).
+
 ## Task: the target your model predicts
 
 A classification target is a category. A regression target is a numeric quantity.
@@ -65,7 +75,7 @@ requiring a new constructor for each explanation capability.
 | Alternative explanation | What would the model report under another feature condition? | A guaranteed feasible, minimal or effective real-world intervention. |
 | Guarded filtering | Which explanation candidates meet the configured support filter? | A guarantee that the whole query or deployment is valid. |
 
-The last row is an advanced option after an ordinary explanation; see
+The last row is an option during explanation construction, not a later rejection of the case; see
 {doc}`guarded_explanations`. Alternative filtering and plotting are described in
 {doc}`alternatives`. Capabilities and APIs vary with version and browser route:
 Python library support does not prove that a browser app exposes the same feature.

@@ -53,16 +53,21 @@ with the result still open. You do not need to learn every API field to read one
 
 **Mode-specific workflow**
 
+Follow the three activities: prepare the model and CE calibration, evaluate
+with held-out test data, then reuse the same system with new-case features.
+Only the last activity needs the new case; its target is not required.
+
 <figure>
 <picture>
 <source media="(max-width: 600px)" srcset="../_static/figures/ce-mode-interval-mobile.svg">
-<img src="../_static/figures/ce-mode-interval.svg" width="1000" height="570" alt="Interval regression: fitted model and separate labelled calibration data, method-specific calibration, new-case features, prediction information and factual or alternative explanations.">
+<img src="../_static/figures/ce-mode-interval.svg" width="1100" height="1110" alt="Prepare: training data fit the model; separate labelled calibration data configure CE. Evaluate: test features query the same system; test targets are used only to check outputs. Use: new-case features query the same fitted model and CE state without its target or refitting the predictive model.">
 </picture>
 </figure>
 
 [Open the full-size figure](../_static/figures/ce-mode-interval.svg).
 
-The arrows show information flow, not a required sequence of API calls.
+The test targets are used to assess outputs, not to obtain them. The arrows
+show information flow, not a required sequence of API calls.
 Prediction and explanation operate on the same calibrated system; the
 explanation call can obtain its own prediction. Read the result in this mode's
 units and keep the prediction range separate from a feature-weight range.

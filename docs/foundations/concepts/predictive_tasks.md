@@ -51,6 +51,30 @@ CE's additional calibration set must remain explicit. Method-specific sampling
 assumptions and non-guarantees are in {doc}`calibrated_interval_semantics`.
 
 
+## Development, evaluation and inference
+
+**Development** includes fitting the predictive model and preparing CE with
+separate labelled calibration data. Calibration may fit internal calibrators;
+it leaves the fitted predictive model fixed. The configured CE system includes
+that model, calibration state and reference information needed by its methods.
+
+**Held-out evaluation** uses test features to obtain outputs, then test targets
+to assess those outputs. The labels are known to the evaluator but withheld
+from the prediction and explanation calls. Keep a final test set separate from
+choices about the model or settings; additional validation or cross-validation
+may be needed during development.
+
+**Inference** means using the prepared system with query features. In production,
+these may describe a new case whose target is not yet known. A tutorial can
+simulate that use with one test row: its features are the query; its known target
+is available only for the subsequent check. Test data do not become training or
+calibration data merely because you ask for an explanation.
+
+The {doc}`workflow figure <../../sections/how-ce-works>` traces these connections.
+It depicts one fixed-model cycle. Retraining, recalibration and deployment
+monitoring require their own procedures; a successful call does not establish
+validity under changes in the data distribution.
+
 ## Work with one dataset before choosing a method
 
 We will use **Iris** throughout the guided introduction: each flower is an

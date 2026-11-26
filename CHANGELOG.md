@@ -3,6 +3,10 @@
 
 ## [Unreleased]
 
+### Documentation
+
+- Clarify development, held-out evaluation and inference in the Beta workflow figures; distinguish data roles, task/mode choices and optional CE capabilities.
+
 [Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.2...main)
 
 ## [v1.0.2](https://github.com/Moffran/calibrated_explanations/releases/tag/v1.0.2) - 2026-10-20
