@@ -4,18 +4,19 @@
 Start with one ordinary result from {doc}`Quick Start </get-started/index>`,
 then use the {ref}`numbered wrapper workflow <ce-wrapper-workflow-map>` to place each option.
 Follow one housing case through it: a fitted model estimates an area’s median
-housing value; CE uses separate labelled calibration cases and can explain the
+housing value; Calibrated Explanations (CE) uses separate labelled calibration cases and can explain the
 result. You may ask either for a **value and interval** or for the **probability
 of a value at most a budget**. Keep that question fixed when reading an explanation.
 
 The options below address different needs within this same flow. They are not
 extra predictive tasks or settings everyone must enable.
 
-```{include} ../../_shared/optional-figure.md
+```{include} ../../_shared/capability-stage-map.md
 ```
 
-The step labels refer to the {ref}`shared wrapper figure <ce-wrapper-workflow-map>`. Each row introduces a
-concept and its software entry point. **Rejection** concerns cases;
+The stages correspond to the {ref}`shared wrapper figure <ce-wrapper-workflow-map>`
+(calibration at step 3, prediction at step 4, explanations at steps 5a/5b). Each
+column introduces an operation and its software entry point. **Rejection** concerns cases;
 **alternative filtering** selects rules; **guarded explanations** check
 candidates during explanation construction. They are different operations.
 
@@ -30,7 +31,7 @@ alternative selection and rejection through one housing example.
 
 ## At calibration: should regions be treated separately?
 
-In step 3 of the core workflow, find **Calibration data** entering **Prepare CE calibration**. The calibration procedure
+In step 3 of the core workflow, find **Calibration data** entering **Prepare calibration**. The calibration procedure
 uses these cases’ known outcomes to construct prediction information.
 
 Suppose your application defines Region A and Region B. With

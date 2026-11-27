@@ -2,8 +2,8 @@
 
 <span class="ce-course-step" hidden></span>
 
-What is your model predicting, what question do you ask about it, and what do
-you want to inspect? These are three separate choices.
+In Calibrated Explanations (CE), what your model predicts, the question you ask
+about it, and the operation you request are three separate choices.
 
 A **task** describes the target; a **mode** describes the output question; a
 **capability** describes the operation you request. For example, predicting flower
@@ -11,15 +11,12 @@ species is classification, asking for species probabilities selects that output,
 and inspecting factual conditions requests an explanation. Changing the operation
 does not change the target the model learned.
 
-<figure>
-<picture>
-<source media="(max-width: 600px)" srcset="../../_static/figures/ce-tasks-capabilities-mobile.svg">
-<img src="../../_static/figures/ce-tasks-capabilities.svg" width="1100" height="1030" alt="Categorical targets give binary or multiclass classification; numerical targets give regression with value or event questions. Factual and alternative explanations use the selected output scale.">
-</picture>
-<figcaption>Choose the target type, then the output question, then the operation. These are conceptual choices, not three constructor mode strings.</figcaption>
-</figure>
+```{include} ../../_shared/task-mode-definitions.md
+```
 
-[Open the full-size figure](../../_static/figures/ce-tasks-capabilities.svg).
+**Read in this order:** identify your target, choose the output question, then
+choose an operation. You can stop at the worked example for your question and
+return for the software details later.
 
 ## Task: the target your model predicts
 
@@ -31,10 +28,12 @@ third task.
 
 ## Mode: the question you ask
 
-```{include} ../../_shared/task-mode-map.md
-:start-after: <!-- task-mode-map:start -->
-:end-before: <!-- task-mode-map:end -->
+```{include} ../../_shared/task-output-choice.md
 ```
+
+The classification branch covers **binary** targets (two categories) and
+**multiclass** targets (three or more). Integer-encoded species remain categories;
+numeric codes alone do not make a task regression.
 
 A regression model can support both value and event questions. For example,
 asking for a housing value interval and asking for the probability that value
@@ -58,15 +57,13 @@ conditions. That choice changes the explanation you request, not the target the
 model was trained to predict. See the {doc}`interval example <../../get-started/example-interval>`
 or {doc}`event example <../../get-started/example-event>` for browser and local routes.
 
-## Match the learning terms to Python
-
-`get_mode()` identifies the underlying classification or regression mode; do not
-use that string alone to distinguish numerical regression from threshold-event
-regression. Read the threshold and output quantity as well. The
-{doc}`Quick API <../../get-started/quick_api>` maps questions to calls without
-requiring a new constructor for each explanation capability.
-
 ## Capability: the operation you need
+
+After choosing the output, ask whether you need its prediction information,
+a factual explanation, or alternatives. A factual explanation describes conditions
+holding for this case; an alternative reports what the model would return under
+another condition. Neither establishes a causal effect.
+
 
 | Capability | Question it helps answer | What it is not |
 | --- | --- | --- |
@@ -75,10 +72,24 @@ requiring a new constructor for each explanation capability.
 | Alternative explanation | What would the model report under another feature condition? | A guaranteed feasible, minimal or effective real-world intervention. |
 | Guarded explanations | Which explanation candidates meet the configured support filter? | A guarantee that the whole query or deployment is valid. |
 
+To locate calibration, prediction, explanation and the optional operations, use
+{doc}`the capability map and walkthrough <optional_capabilities>`. It explains
+Mondrian calibration, rejection, guarding, conjunctions and alternative filtering
+in their workflow positions; the {ref}`shared Quick API map <optional-capability-api-map>`
+provides the corresponding software entry points.
+
 The last row is an option during explanation construction, not a later rejection of the case; see
 {doc}`guarded_explanations`. Alternative filtering and plotting are described in
 {doc}`alternatives`. Capabilities and APIs vary with version and browser route:
 Python library support does not prove that a browser app exposes the same feature.
+
+## Match the learning terms to Python
+
+`get_mode()` identifies the underlying classification or regression mode; do not
+use that string alone to distinguish numerical regression from threshold-event
+regression. Read the threshold and output quantity as well. The
+{doc}`Quick API <../../get-started/quick_api>` maps questions to calls without
+requiring a new constructor for each explanation capability.
 
 ## Check the distinctions in the Iris example
 

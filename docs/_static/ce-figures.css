@@ -93,3 +93,28 @@ body[data-theme="dark"] .ce-native-figure { --ce-ml-fill: #142f4b; --ce-ml-ink: 
 /* Explicit vertical transitions keep the resource flow visible between stages. */
 .ce-stage-connector { display: flex; flex-direction: column; align-items: center; gap: .15rem; margin: .65rem 0 .25rem; text-align: center; font-size: .9375rem; color: var(--color-foreground-primary); }
 .ce-stage-connector .ce-vertical-arrow { font-family: sans-serif; font-size: 2.3rem; line-height: 1; }
+
+/* Task/output choices and capability maps share the site's typography. */
+.ce-definition-row { display: grid; grid-template-columns: 8rem minmax(0,1fr); gap: 1rem; align-items: start; margin: .8rem 0; }
+.ce-concept-label { padding: .8rem; border: 1px solid var(--ce-ml-line); border-radius: .5rem; background: var(--ce-ml-fill); color: var(--ce-ml-ink); text-align: center; }
+.ce-definition-row p { margin: .35rem 0 0; }
+.ce-choice-root { max-width: 28rem; margin-inline: auto; }
+.ce-choice-branches { display: grid; grid-template-columns: minmax(0,1fr) minmax(0,2fr); gap: .8rem; }
+.ce-choice-path { min-width: 0; display: flex; flex-direction: column; }
+.ce-down-arrow { display: block; text-align: center; font-size: 1.6rem; line-height: 1.4; }
+.ce-numeric-questions { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: .8rem; }
+.ce-task-choice a { display: block; margin-top: .6rem; }
+.ce-capability-stages { display: grid; grid-template-columns: repeat(2,minmax(0,1fr)); gap: 1rem; }
+.ce-capability-stage { min-width: 0; }
+.ce-capability-stage h3 { font-size: 1.05rem; margin: .5rem 0; }
+.ce-capability-stage .ce-flow-node { margin-bottom: .6rem; }
+.ce-optional-node { border-style: dashed; }
+.ce-dashed-key::before { content: ''; width: 1.15rem; height: .85rem; border: 1px dashed var(--ce-ce-line); border-radius: .15rem; }
+@container ce-figure (max-width: 620px) {
+.ce-choice-branches,.ce-numeric-questions,.ce-capability-stages { grid-template-columns: minmax(0,1fr); }
+.ce-definition-row { grid-template-columns: minmax(0,1fr); gap: .5rem; }
+}
+@media (max-width: 650px) {
+.ce-choice-branches,.ce-numeric-questions,.ce-capability-stages { grid-template-columns: minmax(0,1fr); }
+.ce-definition-row { grid-template-columns: minmax(0,1fr); gap: .5rem; }
+}
