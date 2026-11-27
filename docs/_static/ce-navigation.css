@@ -58,8 +58,6 @@
 body:has(article .ce-course-step) .related-pages,
 body:has(article .ce-choice-page) .related-pages { display: none; }
 
-/* Show the page's primary path, not seven competing expanded trees. */
-.ce-local-tree > ul > li:not(.current) { display: none; }
 .ce-route-switcher, .ce-reference-links { padding: .6rem 1rem; }
 .ce-route-switcher a, .ce-reference-links a {
   box-sizing: border-box; min-height: 44px;
@@ -79,3 +77,11 @@ body:has(article .ce-glossary-page) article dl.glossary > dt {
   overflow-wrap: anywhere;
 }
 body:has(article .ce-glossary-page) article dl.glossary > dd { margin-bottom: 1.25rem; }
+
+/* Visible, compact section links replace the repeated full navigation tree. */
+.ce-section-links { padding: .25rem 1rem; border-top: 1px solid var(--color-background-border); }
+.ce-section-links ul { list-style: none; margin: .25rem 0; padding: 0; }
+.ce-section-links a { display: block; padding: .45rem .4rem; min-height: 36px; box-sizing: border-box; line-height: 1.35; overflow-wrap: anywhere; }
+.ce-section-links a:focus-visible { outline: 2px solid var(--color-brand-primary); outline-offset: 1px; }
+.ce-route-switcher a[aria-current="page"], .ce-section-links a[aria-current="page"], .ce-reference-links a[aria-current="page"] { font-weight: 700; color: var(--color-brand-primary); }
+@media (max-width: 50em) { .ce-section-links a { min-height: 44px; padding-block: .6rem; } }

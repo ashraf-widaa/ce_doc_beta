@@ -1,28 +1,25 @@
-{# Keep Sphinx's single-owner tree and Furo's accessible branch controls. #}
+{# Global destinations stay visible; section links do not repeat the whole tree. #}
 <nav class="ce-route-switcher" aria-label="Documentation routes">
-  <a class="ce-nav-home" href="{{ pathto('index') }}"{% if pagename == 'index' %} aria-current="page"{% endif %}>Home</a>
-  <a href="{{ pathto('get-started/index') }}">Get Started</a>
-  <a class="ce-nav-start" href="{{ pathto('get-started/quickstart') }}"{% if pagename == 'get-started/quickstart' %} aria-current="page"{% endif %}>Quick Start</a>
-  <p class="ce-nav-heading">Learn and use</p>
   <ul>
-    <li><a href="{{ pathto('sections/understand-ce') }}">Learn Calibrated Explanations</a></li>
-    <li><a href="{{ pathto('sections/what-and-why') }}">What &amp; Why</a></li>
-    <li><a href="{{ pathto('sections/how-ce-works') }}">How Calibrated Explanations works</a></li>
-    <li><a href="{{ pathto('sections/in-practice') }}">Use Calibrated Explanations</a></li>
-    <li><a href="{{ pathto('sections/software-integration') }}">Software Architecture &amp; Integration</a></li>
-    <li><a href="{{ pathto('sections/project-resources') }}">Project &amp; Resources</a></li>
+  {% for label, target in ce_main_navigation %}
+    <li><a href="{{ pathto(target) }}"{% if pagename == target %} aria-current="page"{% endif %}>{{ label }}</a></li>
+  {% endfor %}
   </ul>
 </nav>
-{% if pagename != 'index' and (parents or pagename == 'get-started/index' or pagename.startswith('sections/')) %}
-<nav class="sidebar-tree ce-local-tree" aria-label="Current path chapters">
-  {{ furo_navigation_tree }}
+{% if ce_section_navigation %}
+<nav class="ce-section-links" aria-label="Current section">
+  <p class="ce-nav-heading">{{ ce_section_heading }}</p>
+  <ul>
+  {% for label, target in ce_section_navigation %}
+    <li><a href="{{ pathto(target) }}"{% if pagename == target %} aria-current="page"{% endif %}>{{ label }}</a></li>
+  {% endfor %}
+  </ul>
 </nav>
 {% endif %}
 <nav class="ce-reference-links" aria-label="Reference shortcuts">
-  <p>Look up</p>
+  <p>Reference</p>
   <ul>
-    <li><a href="{{ pathto('api/index') }}">API reference</a></li>
-    <li><a href="{{ pathto('glossary/index') }}">Glossary</a></li>
-    <li><a href="{{ pathto('foundations/concepts/calibrated_interval_semantics') }}">Range meanings and assumptions</a></li>
+    <li><a href="{{ pathto('api/index') }}"{% if pagename == 'api/index' %} aria-current="page"{% endif %}>API reference</a></li>
+    <li><a href="{{ pathto('glossary/index') }}"{% if pagename == 'glossary/index' %} aria-current="page"{% endif %}>Glossary</a></li>
   </ul>
 </nav>

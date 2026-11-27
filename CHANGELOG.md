@@ -5,6 +5,8 @@
 
 ### Documentation
 
+- Shorten left navigation to visible main routes and current-section links; expand Calibrated Explanations in right-hand contents without altering heading anchors or API identifiers.
+
 - Restore the requested two-path Get Started overview, retain Quick Start as its child page and label the transparent workflow input Instance (Test Data / New use case).
 
 - Label the introductory workflow input as Instance (test data/new case), remove its outer background and adapt free-standing labels to the selected documentation theme.

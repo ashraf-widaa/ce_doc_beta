@@ -12,6 +12,11 @@ import shutil
 import sys
 import warnings
 from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from docutils.nodes import document
+    from sphinx.application import Sphinx
 
 _DOCS_DIR = Path(__file__).resolve().parent
 _REPO_ROOT = _DOCS_DIR.parent
@@ -252,3 +257,100 @@ _builder_name = _sphinx_builder_name_from_argv(sys.argv)
 # Executing notebooks makes linkcheck flaky and can fail on time ceilings.
 nbsphinx_execute = "never" if (_builder_name == "linkcheck" or _ON_READTHEDOCS) else "always"
 nbsphinx_timeout = 60  # seconds per cell (enforce time ceilings)
+
+
+# Concise sidebar routes use the existing single-owner Sphinx document tree.
+def _configure_reading_navigation(
+    app: "Sphinx",
+    pagename: str,
+    templatename: str,
+    context: dict[str, object],
+    doctree: "document | None",
+) -> None:
+    """Populate section links and expand names only in visible local contents."""
+    import re
+
+    from markupsafe import Markup
+
+    main = [
+        ("Home", "index"),
+        ("Get Started", "get-started/index"),
+        ("Quick Start", "get-started/quickstart"),
+        ("Learn", "sections/understand-ce"),
+        ("Use", "sections/in-practice"),
+        ("Software & Integration", "sections/software-integration"),
+        ("Project & Resources", "sections/project-resources"),
+    ]
+    sections = {
+        "get-started/index": ("Getting started", [
+            ("Classification example", "get-started/example-classification"),
+            ("Value & interval example", "get-started/example-interval"),
+            ("Event-probability example", "get-started/example-event"),
+            ("Run in Python", "get-started/first-python-explanation"),
+            ("Browser guide", "get-started/expert-hub"),
+            ("Decision Lab", "get-started/decision-lab"),
+        ]),
+        "sections/understand-ce": ("Learn the concepts", [
+            ("What & Why", "sections/what-and-why"),
+            ("Workflow & capabilities", "sections/how-ce-works"),
+            ("Tasks & modes", "foundations/concepts/tasks_modes_capabilities"),
+            ("Calibration", "foundations/concepts/calibration_background"),
+            ("Explanation construction", "foundations/concepts/how_explanations_are_built"),
+            ("Read a result", "foundations/how-to/interpret_explanations"),
+            ("Guarantees & limits", "foundations/concepts/calibrated_interval_semantics"),
+            ("All shared topics", "foundations/index"),
+        ]),
+        "sections/in-practice": ("Use the results", [
+            ("Practitioner Hub", "practitioner/index"),
+            ("Check your results", "practitioner/check_results"),
+            ("Tasks & capabilities", "tasks/index"),
+            ("Practical playbooks", "practitioner/playbooks/index"),
+        ]),
+        "sections/software-integration": ("Software guide", [
+            ("Installation", "get-started/installation"),
+            ("Quick API", "get-started/quick_api"),
+            ("Pipeline integration", "foundations/how-to/integrate_with_pipelines"),
+            ("Configuration", "foundations/how-to/configure_runtime"),
+            ("Troubleshooting", "get-started/troubleshooting"),
+            ("Architecture", "foundations/concepts/architecture"),
+        ]),
+        "sections/project-resources": ("Project guide", [
+            ("Researcher Hub", "researcher/index"),
+            ("Contributor Hub", "contributor/index"),
+            ("Cite the research", "citing"),
+            ("Governance & support", "foundations/governance/index"),
+        ]),
+    }
+    parents = {
+        child: parent
+        for parent, children in app.env.toctree_includes.items()
+        for child in children
+    }
+    # A shared technical page can be owned by foundations but belong to the
+    # software reading context. Prefer its explicit section destination.
+    current = next(
+        (root for root, (_, items) in sections.items() if any(target == pagename for _, target in items)),
+        pagename,
+    )
+    visited = set()
+    while current not in sections and current in parents and current not in visited:
+        visited.add(current)
+        current = parents[current]
+    heading, links = sections.get(current, ("", []))
+    # Keep repeated global/reference destinations out of the contextual list.
+    global_targets = {target for _, target in main} | {"api/index", "glossary/index"}
+    context["ce_main_navigation"] = main
+    context["ce_section_heading"] = heading
+    context["ce_section_navigation"] = [item for item in links if item[1] not in global_targets]
+
+    # Expand only visible TOC text, preserving href fragments and markup verbatim.
+    toc = str(context.get("toc") or "")
+    parts = re.split(r"(<[^>]+>)", toc)
+    for index in range(0, len(parts), 2):
+        text = re.sub(r"Calibrated Explanations\s*\(CE\)", "Calibrated Explanations", parts[index])
+        parts[index] = re.sub(r"\bCE\b", "Calibrated Explanations", text)
+    context["toc"] = Markup("".join(parts))
+
+
+def setup(app: "Sphinx") -> None:
+    app.connect("html-page-context", _configure_reading_navigation)
