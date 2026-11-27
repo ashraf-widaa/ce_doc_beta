@@ -8,7 +8,7 @@ codebase?*
 This section has two routes. Choose the one that matches your task; the two
 are linked wherever a procedure or contract applies to both. Readers who have
 not used CE yet can start with the
-{doc}`Quick Start <../get-started/try-in-browser>`, which needs no
+{doc}`Quick Start <../get-started/index>`, which needs no
 installation.
 
 <span id="software-foundations"></span><span id="development-integration"></span><span id="configuration-operations"></span>

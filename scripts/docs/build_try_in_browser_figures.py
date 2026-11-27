@@ -1,6 +1,6 @@
 """Build the annotated figures of ``docs/get-started/first-explanation-python.md``.
 
-The page was formerly part of the browser Quick Start (``try-in-browser.md``); the
+The page was formerly part of the browser Quick Start (``get-started/index.md``); the
 images keep their ``try_assets/`` names so existing links stay valid.
 
 The script executes the page's own ``python`` blocks in order (reading the data

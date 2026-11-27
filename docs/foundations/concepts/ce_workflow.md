@@ -4,7 +4,7 @@
 
 <span id="the-ce-workflow"></span>
 
-*New to the workflow? The {doc}`Quick Start <../../get-started/try-in-browser>`
+*New to the workflow? The {doc}`Quick Start <../../get-started/index>`
 walks through it with two worked cases before this page develops it.*
 
 Calibrated Explanations connects a predictive model with calibration data,

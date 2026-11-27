@@ -2,7 +2,7 @@
 
 <span id="your-first-ce-explanation-in-python"></span>
 
-This is **Path B** of the {doc}`Quick Start <try-in-browser>`: install the open-source
+This is **Path B** of the {doc}`Quick Start <index>`: install the open-source
 CE library and run a complete example on your own computer. You follow one patient
 (classification) and one housing district (regression) from raw data to a calibrated
 prediction, a factual explanation and alternative explanations, and then ask a
@@ -553,4 +553,4 @@ the ranges to behave differently for defined groups, see
 - {doc}`Tasks, modes and capabilities <ce-tasks-and-modes>` and
   {doc}`Understand CE <../sections/understand-ce>`.
 
-Back to the {doc}`Quick Start <try-in-browser>`.
+Back to the {doc}`Quick Start <index>`.

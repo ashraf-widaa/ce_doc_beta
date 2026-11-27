@@ -2,7 +2,7 @@
 
 <span id="why-ce-from-a-conventional-to-a-ce-workflow"></span>
 
-*The {doc}`Quick Start <try-in-browser>` introduces this workflow in one minute,
+*The {doc}`Quick Start <index>` introduces this workflow in one minute,
 cases, starting from {ref}`one figure <qs-workflow>`.*
 
 A conventional workflow trains and evaluates a predictive model. CE adds

@@ -23,5 +23,5 @@ there. Its pages are unchanged:
 4. {doc}`Factual and alternative explanations <../foundations/concepts/alternatives>`.
 5. {doc}`ML and statistical foundations <../get-started/ml-foundations>`.
 
-The {doc}`Quick Start <../get-started/try-in-browser>` shows each idea in use
+The {doc}`Quick Start <../get-started/index>` shows each idea in use
 with two worked cases.

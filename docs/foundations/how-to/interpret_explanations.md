@@ -11,11 +11,11 @@ read {doc}`../concepts/ce_workflow`; the mode-specific range meanings are in
 {doc}`../concepts/calibrated_interval_semantics`.
 
 ```{raw} html
-<nav class="ce-journey" aria-label="Get started, step 4 of 5"><ol><li><a href="../../what-is-ce.html"><span class="ce-journey-n">1</span>What CE is</a></li><li><a href="../../get-started/try-in-browser.html"><span class="ce-journey-n">2</span>Quick Start</a></li><li><a href="../../get-started/installation.html"><span class="ce-journey-n">3</span>Install</a></li><li aria-current="step"><a href="interpret_explanations.html"><span class="ce-journey-n">4</span>Read it</a></li><li><a href="../../get-started/apply-to-your-data.html"><span class="ce-journey-n">5</span>Your data</a></li></ol></nav>
+<nav class="ce-journey" aria-label="Get started, step 4 of 5"><ol><li><a href="../../what-is-ce.html"><span class="ce-journey-n">1</span>What CE is</a></li><li><a href="../../get-started/index.html"><span class="ce-journey-n">2</span>Quick Start</a></li><li><a href="../../get-started/installation.html"><span class="ce-journey-n">3</span>Install</a></li><li aria-current="step"><a href="interpret_explanations.html"><span class="ce-journey-n">4</span>Read it</a></li><li><a href="../../get-started/apply-to-your-data.html"><span class="ce-journey-n">5</span>Your data</a></li></ol></nav>
 ```
 
 **Get started, step 4 of 5 · about 15 minutes.** Coming from the
-{doc}`Quick Start <../../get-started/try-in-browser>`,
+{doc}`Quick Start <../../get-started/index>`,
 {doc}`Your First CE Explanation in Python <../../get-started/first-explanation-python>`, the
 {doc}`Python quickstart <../../get-started/quickstart>` or the in-depth
 {doc}`Python walkthrough <../../get-started/quickstart_walkthrough>`, use this

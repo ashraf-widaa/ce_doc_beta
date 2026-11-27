@@ -3,7 +3,7 @@
 <span id="what-ce-is-and-what-it-adds"></span>
 
 ```{raw} html
-<nav class="ce-journey" aria-label="Get started, step 1 of 5"><ol><li aria-current="step"><a href="what-is-ce.html"><span class="ce-journey-n">1</span>What CE is</a></li><li><a href="get-started/try-in-browser.html"><span class="ce-journey-n">2</span>Quick Start</a></li><li><a href="get-started/installation.html"><span class="ce-journey-n">3</span>Install</a></li><li><a href="foundations/how-to/interpret_explanations.html"><span class="ce-journey-n">4</span>Read it</a></li><li><a href="get-started/apply-to-your-data.html"><span class="ce-journey-n">5</span>Your data</a></li></ol></nav>
+<nav class="ce-journey" aria-label="Get started, step 1 of 5"><ol><li aria-current="step"><a href="what-is-ce.html"><span class="ce-journey-n">1</span>What CE is</a></li><li><a href="get-started/index.html"><span class="ce-journey-n">2</span>Quick Start</a></li><li><a href="get-started/installation.html"><span class="ce-journey-n">3</span>Install</a></li><li><a href="foundations/how-to/interpret_explanations.html"><span class="ce-journey-n">4</span>Read it</a></li><li><a href="get-started/apply-to-your-data.html"><span class="ce-journey-n">5</span>Your data</a></li></ol></nav>
 ```
 
 **Calibrated Explanations (CE)** is an open-source Python library that adds two
@@ -15,7 +15,7 @@ scikit-learn-style classification or regression interface.
 **Get started, step 1 of 5 · about 5 minutes.** Use this overview to
 understand CE's purpose, outputs and fit for your task. To see these
 outputs on two worked cases, continue with the
-{doc}`Quick Start <get-started/try-in-browser>` (step 2, no installation).
+{doc}`Quick Start <get-started/index>` (step 2, no installation).
 For the steps CE adds to a model workflow, read {doc}`get-started/why-ce`;
 for a concrete output, read {doc}`get-started/ce-by-example`. No mathematics
 is needed here; the links below lead to mechanisms and formal qualifications.
@@ -207,7 +207,7 @@ explains the returned quantities, while
 construction behind them.
 
 **Next in Get started (step 2 of 5):** the
-{doc}`Quick Start <get-started/try-in-browser>`: learn the CE workflow and
+{doc}`Quick Start <get-started/index>`: learn the CE workflow and
 read your first explanation.
 
 ## References

@@ -1,6 +1,6 @@
 # Tasks, modes and capabilities
 
-*The {doc}`Quick Start <try-in-browser>` introduces tasks, modes and
+*The {doc}`Quick Start <index>` introduces tasks, modes and
 capabilities in plain language ({ref}`section 2 <qs-task-mode-capability>`);
 this page is the full account.*
 

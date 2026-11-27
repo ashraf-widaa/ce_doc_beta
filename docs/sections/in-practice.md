@@ -20,7 +20,7 @@ Mode-specific guarantees and their assumptions are stated in
 :gutter: 3
 
 :::{grid-item-card} 1. Quick Start
-:link: ../get-started/try-in-browser
+:link: ../get-started/index
 :link-type: doc
 
 Understand what CE adds, choose your task and create your first explanation:

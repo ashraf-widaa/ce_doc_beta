@@ -6,7 +6,7 @@ This section explains the methods, assumptions and guarantees behind
 Calibrated Explanations: what problem CE addresses and when it is useful,
 then how its workflow produces calibrated outputs and explanations and which
 assumptions those outputs rest on. New to the vocabulary? Take the
-{doc}`Quick Start <../get-started/try-in-browser>` first; it introduces every
+{doc}`Quick Start <../get-started/index>` first; it introduces every
 term used here with two worked cases.
 
 Each concept has one main page in this section. Other pages summarize it and

@@ -1,6 +1,6 @@
 """Capture the Expert Hub screenshots used by the browser Quick Start (manual tool).
 
-The Quick Start (``docs/get-started/try-in-browser.md``) shows real, dated screenshots of
+The Quick Start (``docs/get-started/index.md``) shows real, dated screenshots of
 the online CE demo. This script re-creates the five Expert Hub screenshots by driving the
 live application with Playwright, so they can be refreshed when the application changes.
 
@@ -32,7 +32,7 @@ Precision Works recipe gives different numbers. Capture them by hand:
    crop the Process Advisor panel (``dl-pw-forecast.png``). Repeat with the LIMIT order
    ("Will it reach the minimum?") for ``dl-pw-limit.png``.
 3. Use a 1366 x 900 desktop window, update the capture date in the Quick Start captions,
-   and recheck the callout positions in ``try-in-browser.md``.
+   and recheck the callout positions in ``get-started/index.md``.
 """
 
 from __future__ import annotations

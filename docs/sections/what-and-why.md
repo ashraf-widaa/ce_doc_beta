@@ -23,4 +23,4 @@ This part of the documentation is now the first half of
 4. {doc}`Comparison with other methods <../compare>`.
 
 To see CE's outputs without installing anything, take the
-{doc}`Quick Start <../get-started/try-in-browser>`.
+{doc}`Quick Start <../get-started/index>`.

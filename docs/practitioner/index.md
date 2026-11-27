@@ -1,7 +1,7 @@
 # Practitioner Hub
 
 Install CE, run worked Python examples and apply the CE workflow on your own
-machine. New to CE? Read the {doc}`Quick Start <../get-started/try-in-browser>`
+machine. New to CE? Read the {doc}`Quick Start <../get-started/index>`
 first; it explains every output used below and offers a browser route with no
 installation.
 

@@ -9,7 +9,7 @@ the receiving side.
 
 **You need.** CE installed ({doc}`../get-started/installation`) and a
 calibrated `WrapCalibratedExplainer`. The meaning of every value read below is
-introduced in the {doc}`Quick Start <../get-started/try-in-browser>`.
+introduced in the {doc}`Quick Start <../get-started/index>`.
 
 ## 1. Produce: explain and serialize
 

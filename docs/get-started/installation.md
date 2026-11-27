@@ -1,11 +1,11 @@
 # Installation
 
 ```{raw} html
-<nav class="ce-journey" aria-label="Get started, step 3 of 5"><ol><li><a href="../what-is-ce.html"><span class="ce-journey-n">1</span>What CE is</a></li><li><a href="try-in-browser.html"><span class="ce-journey-n">2</span>Quick Start</a></li><li aria-current="step"><a href="installation.html"><span class="ce-journey-n">3</span>Install</a></li><li><a href="../foundations/how-to/interpret_explanations.html"><span class="ce-journey-n">4</span>Read it</a></li><li><a href="apply-to-your-data.html"><span class="ce-journey-n">5</span>Your data</a></li></ol></nav>
+<nav class="ce-journey" aria-label="Get started, step 3 of 5"><ol><li><a href="../what-is-ce.html"><span class="ce-journey-n">1</span>What CE is</a></li><li><a href="index.html"><span class="ce-journey-n">2</span>Quick Start</a></li><li aria-current="step"><a href="installation.html"><span class="ce-journey-n">3</span>Install</a></li><li><a href="../foundations/how-to/interpret_explanations.html"><span class="ce-journey-n">4</span>Read it</a></li><li><a href="apply-to-your-data.html"><span class="ce-journey-n">5</span>Your data</a></li></ol></nav>
 ```
 
 **Get started, step 3 of 5 · about 2 minutes.** Install CE and check that
-it imports. The {doc}`Quick Start <try-in-browser>` (step 2) needs no
+it imports. The {doc}`Quick Start <index>` (step 2) needs no
 installation; install CE when you want to run it yourself.
 
 Calibrated Explanations is published on PyPI and conda-forge. Install the base

@@ -56,7 +56,7 @@ use `sphinx -b linkcheck` for those.
 ## `capture_browser_quickstart.py`
 
 Re-creates the five Expert Hub screenshots of the browser Quick Start
-(`docs/get-started/try-in-browser.md`) by driving the live application with
+(`docs/get-started/index.md`) by driving the live application with
 Playwright. It is a **manual** tool: it is not run by the Sphinx build, CI or the
 documentation tests.
 

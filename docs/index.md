@@ -12,7 +12,7 @@ machine-learning models.
 
 :::{container} ce-hero-actions
 
-```{button-ref} get-started/try-in-browser
+```{button-ref} get-started/index
 :ref-type: doc
 :color: primary
 
