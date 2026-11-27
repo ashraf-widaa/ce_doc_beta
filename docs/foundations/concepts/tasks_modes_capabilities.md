@@ -73,7 +73,7 @@ requiring a new constructor for each explanation capability.
 | Calibrated prediction | What prediction information is reported for this query? | Proof that the case will have that outcome. |
 | Factual explanation | Which conditions holding for this case are associated with the model response? | A causal explanation of the world. |
 | Alternative explanation | What would the model report under another feature condition? | A guaranteed feasible, minimal or effective real-world intervention. |
-| Guarded filtering | Which explanation candidates meet the configured support filter? | A guarantee that the whole query or deployment is valid. |
+| Guarded explanations | Which explanation candidates meet the configured support filter? | A guarantee that the whole query or deployment is valid. |
 
 The last row is an option during explanation construction, not a later rejection of the case; see
 {doc}`guarded_explanations`. Alternative filtering and plotting are described in

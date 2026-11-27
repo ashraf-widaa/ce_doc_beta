@@ -10,43 +10,36 @@ contribute, and compare what the model would report under other conditions.
 uses your {term}`fitted model <Fitted model>` and separate labelled
 {term}`calibration data <Calibration data>` to provide calibrated prediction
 information, factual explanations and alternative explanations with reported ranges.
-Start with the comparison below, choose your question, then try one example.
+Start with the numbered workflow below, choose your question, then try one example.
 Optional capabilities are introduced afterward.
 
+(ce-wrapper-workflow-map)=
 ## From a conventional prediction to CE
 
-Read the two panels together. **(a)** shows a basic model-only workflow.
-**(b)** shows what CE adds around the same fitted predictive model. Both separate
-**preparation** from **querying** a test case or a new observation.
+The fitted predictive ML model remains the starting point. CE adds calibration
+and explanation capabilities around it. The public wrapper,
+{term}`WrapCalibratedExplainer`, provides one interface across these activities.
+It is not another predictive model or a calibration method.
 
-<figure id="ce-core-comparison">
-<a href="../_static/figures/ce-core-comparison.png" aria-label="Open the full-size comparison of basic ML and CE workflows">
-<picture>
-<source media="(max-width: 600px)" srcset="../_static/figures/ce-core-comparison-mobile.png">
-<img src="../_static/figures/ce-core-comparison.png" width="1585" height="992" alt="Panel a: training data fit a predictive model, then that model and query features produce a model prediction. Panel b: the same fitted model and separate labelled calibration data prepare CE calibration. The model with CE calibration and query features support prediction information, factual explanations and alternatives. Query features can describe a held-out test case or a new observation; the target is not supplied.">
-</picture>
+<span id="ce-core-comparison"></span>
+
+<figure id="ce-wrapper-workflow">
+<a href="../_static/figures/ce-wrapper-workflow.png" aria-label="Open the full-size core wrapper workflow">
+<img src="../_static/figures/ce-wrapper-workflow.png" width="1254" height="1254" alt="One wrapper coordinates step 1 wrapping, step 2 fitting with Training data, step 3 preparing CE calibration with separate Calibration data, step 4 obtaining prediction information from Test data / New case features only, and steps 5a factual or 5b alternative explanations. The predictive model is not retrained by calibration; explanation calls obtain their prediction information internally.">
 </a>
-<figcaption>Blue: basic ML steps. Orange: CE additions. Dashed arrows reuse prepared resources. Output branches are capabilities, not a required sequence of API calls.</figcaption>
+<figcaption>Blue: basic ML and inputs. Orange: CE additions. Prediction and explanation are separate concepts; the branches are not compulsory separate API calls.</figcaption>
 </figure>
 
-[Open the full-size comparison](../_static/figures/ce-core-comparison.png)
-or [the stacked mobile figure](../_static/figures/ce-core-comparison-mobile.png).
+[Open the full-size figure](../_static/figures/ce-wrapper-workflow.png).
 
-1. **Prepare: train, then calibrate.** Training features and known targets fit
-   the predictive model. CE additionally uses separate labelled calibration cases.
-   Calibration can fit internal calibrators and retain reference information;
-   it does not refit the underlying predictive model. An already fitted model
-   can be reused instead of training it again.
-2. **Query: supply the case's features.** Both routes reuse their prepared
-   resources. The model-only route returns a class, numerical value or score.
-   CE can report prediction information with a mode-specific range, factual
-   conditions with comparison weights and ranges, or alternative conditions
-   with predictions and ranges. The case's target is not required.
-3. **Test: keep the target aside until evaluation.** A held-out test observation
-   can be a query. Supply only its features to prediction or explanation calls,
-   then use its known target to assess predictive results. A new observation
-   uses the same calls, but its target may not yet be known. Target agreement
-   alone does not validate an explanation.
+The figure separates **Training data**, **Calibration data**, and **Test data /
+New case**. Training and calibration use known targets for different purposes.
+At prediction or explanation time, the last input supplies **features only**.
+Test data have known targets available afterward for evaluation; a new case's
+target may be unknown. These are different data roles, not interchangeable sets.
+
+```{include} ../_shared/wrapper-lifecycle.md
+```
 
 The calibration method follows the task and output question: classification uses
 Venn–Abers; numerical-value intervals use a **conformal predictive system (CPS)**;
@@ -127,9 +120,10 @@ For local numerical targets, follow the {doc}`regression tutorial <quickstart_re
 For package and environment options, use {doc}`installation <installation>`.
 You can also {ref}`read one Iris result without running code <classification-one-case>`.
 
+(ce-optional-capability-map)=
 ## When you need more than the basic workflow
 
-[Return to the workflow figure](#from-a-conventional-prediction-to-ce).
+{ref}`Return to the numbered wrapper workflow <ce-wrapper-workflow-map>`.
 Follow one housing case through it: a fitted model estimates an area’s median
 housing value; CE uses separate labelled calibration cases and can explain the
 result. You may ask either for a **value and interval** or for the **probability
@@ -139,15 +133,22 @@ The options below address different needs within this same flow. They are not
 extra predictive tasks or settings everyone must enable.
 
 <figure>
-<picture>
-<source media="(max-width: 600px)" srcset="../_static/figures/ce-optional-features-mobile.svg">
-<img src="../_static/figures/ce-optional-features.svg" width="1100" height="770" alt="Optional features have different jobs: Mondrian uses calibration groups; guarding checks representatives during explanation construction; conjunctions combine conditions; filters select generated alternatives; rejection handles cases under a configured criterion.">
-</picture>
-<figcaption>Separate options for separate needs. Check supported tasks, modes, prerequisites and conditions in each guide.</figcaption>
+<a href="../_static/figures/ce-optional-capabilities.png" aria-label="Open the full-size optional capability map">
+<img src="../_static/figures/ce-optional-capabilities.png" width="1448" height="1086" alt="Optional functions attach to the same numbered wrapper workflow: Mondrian calibration at step 3 and group-aware use; guarded explanations during 5a or 5b; conjunctions on explanation rules; alternative filtering after 5b; rejection in case handling at steps 4 or 5. Dashed orange boxes indicate optional capabilities.">
+</a>
+<figcaption>Dashed orange boxes: optional CE capabilities. Solid arrows show conceptual relationships within each independent row, not one mandatory processing sequence.</figcaption>
 </figure>
 
-[Open the full-size optional-feature figure](../_static/figures/ce-optional-features.svg).
+[Open the full-size figure](../_static/figures/ce-optional-capabilities.png).
 
+The step labels refer to the core wrapper figure above. Each row introduces a
+concept and its software entry point. **Rejection** concerns cases;
+**alternative filtering** selects rules; **guarded explanations** check
+candidates during explanation construction. They are different operations.
+
+For the complete concept-to-function map, use
+{ref}`Optional capabilities in Quick API <optional-capability-api-map>`.
+The walkthrough below explains when and why these options may be useful.
 
 **Combining conditions:** the figure also shows conjunctions, which combine
 feature conditions into a rule. See {doc}`interpreting explanations <../foundations/how-to/interpret_explanations>`
@@ -156,7 +157,7 @@ alternative selection and rejection through one housing example.
 
 ### At calibration: should regions be treated separately?
 
-In the core comparison above, find **Calibration data** entering **Calibrate with CE**. The calibration procedure
+In step 3 of the core workflow, find **Calibration data** entering **Prepare CE calibration**. The calibration procedure
 uses these cases’ known outcomes to construct prediction information.
 
 Suppose your application defines Region A and Region B. With
@@ -176,7 +177,7 @@ For a numerical target, keep the selected {doc}`value or event question <../foun
 
 ### While building explanations: are candidate conditions supported?
 
-Return to the core comparison’s **factual and alternative explanation outputs**.
+Return to the core workflow’s **factual and alternative explanation outputs**.
 To construct them, CE considers feature conditions. A **candidate** is a condition
 being considered for a rule, before it appears in the returned explanation.
 
@@ -196,7 +197,7 @@ certificate for the prediction.
 
 ### After generating alternatives: which ones should I inspect?
 
-Look at the **Alternative explanations** output in the core comparison. One case can have several rules,
+Look at the **Alternative explanations** output in the core workflow. One case can have several rules,
 each reporting a prediction under a different condition. You can inspect them
 all or select a subset for a stated purpose, whether or not you used a guard.
 
@@ -217,7 +218,7 @@ range improves predictive accuracy.
 
 ### When using the prediction: should some cases be flagged or set aside?
 
-Return to **Prediction information** in the core comparison. Your application may
+Return to **Prediction information** in the core workflow. Your application may
 need to treat some cases differently rather than use every result in the same way.
 {term}`Rejection <Rejection>` identifies cases under a supported, task-specific
 rejection procedure. A **reject policy** controls how that status affects handling—for example,

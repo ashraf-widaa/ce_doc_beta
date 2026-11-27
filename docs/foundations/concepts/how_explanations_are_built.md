@@ -28,7 +28,7 @@ identify it before reading any weights.
 <div class="ce-workflow-lane"><p class="ce-workflow-heading">Alternative explanation</p><ol><li>Keep the same baseline and task.</li><li>Consider a different feature condition.</li><li>Obtain the prediction information under that condition.</li><li>Compare the alternative prediction and its range with the baseline.</li></ol></div>
 </div>
 
-A **comparison response** is what the calibrated model reports under the
+A **comparison response** is what the fitted model with CE calibration reports under the
 feature scenarios used by the explanation method. A factual weight compares
 the original response with those comparison responses. An alternative reports
 the response under a different condition. Conditions describe the model query,

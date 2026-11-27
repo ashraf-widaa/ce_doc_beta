@@ -5,6 +5,8 @@
 
 ### Documentation
 
+- Publish a square numbered wrapper workflow and optional capability map, with shared concept/API tables and aligned calibration, explanation and rejection terminology.
+
 - Place a core-only, two-panel ML/CE comparison at the start of Quick Start, add a stacked mobile version, and separate optional features after the first-example choices.
 
 - Clarify development, held-out evaluation and inference in the Beta workflow figures; distinguish data roles, task/mode choices and optional CE capabilities.

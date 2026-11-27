@@ -1,8 +1,14 @@
 # Reject Policy Guide
 
-Reject policies control how the calibrated explanations runtime handles rejection
-decisions when confidence or uncertainty thresholds no longer support the
-requested output. The policy-driven API introduced around ADR-029 keeps the
+**Rejection** identifies cases under a supported, task-specific procedure.
+A **reject policy** controls processing and returned rejection information;
+the application determines follow-up, such as proceeding or reviewing a case.
+This is distinct from selecting alternative rules or guarding candidate conditions.
+A wide interval alone is not a universal rejection procedure. The reviewed
+regression construction requires an event threshold; check the task-specific
+setup before enabling a policy.
+
+The policy-driven API introduced around ADR-029 keeps the
 legacy `reject=False` behaviour while optionally enabling reject orchestration.
 For prediction entrypoints, reject-enabled calls return a structured
 `RejectResult` envelope. For explanation entrypoints, reject-enabled calls

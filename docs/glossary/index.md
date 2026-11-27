@@ -42,7 +42,7 @@ Conditional calibration
 
 Rejection
 Reject option
-    Identifying cases under a task-specific rejection procedure. A reject policy controls their handling. The reviewed regression procedure requires an event threshold; selecting explanation rules is a different operation.
+    Identifying cases under a task-specific rejection procedure. A reject policy controls processing and returned rejection information; the application determines follow-up. The reviewed regression procedure requires an event threshold; selecting explanation rules is a different operation.
 
     Learn more: {doc}`Understand reject procedures and policies <../practitioner/advanced/reject-policy>`.
 
@@ -82,6 +82,12 @@ Calibration
 
     Learn more: {doc}`Learn how CE calibrates <../foundations/concepts/calibration_background>`.
 
+CE calibration information
+Calibration state
+    Method-specific information constructed using the fitted predictive model and separate labelled calibration cases. The prepared CE workflow also retains reference information used by its methods; the predictive model itself is not retrained by calibration.
+
+    Learn more: {doc}`Follow the wrapper lifecycle <../get-started/quick_api>`.
+
 Calibration data
 Calibration set
 Calibration split
@@ -112,7 +118,7 @@ CPS
 
 Conjunctive rule
 Conjunction
-    A rule combining more than one feature condition. Combining conditions does not establish that a real-world change is feasible or causal.
+    A rule combining more than one feature condition. Assess the combined rule rather than simply adding individual weights. Combining conditions does not establish that a real-world change is feasible or causal.
 
     Learn more: {doc}`Read conjunctions and alternatives <../foundations/concepts/alternatives>`.
 
@@ -471,7 +477,9 @@ WrapCalibratedExplainer
 Public wrapper
     The public wrapper used in the tutorials to coordinate fitting, calibration, prediction and explanation with a compatible learner. Start here before lower-level implementation classes.
 
-    Learn more: {doc}`Run the public workflow <../get-started/first-python-explanation>`.
+    It is an interface to the same predictive model and CE calibration, not a second predictive model.
+
+    Learn more: {doc}`Run the public workflow <../get-started/first-python-explanation>` and {ref}`numbered software map <ce-wrapper-workflow-map>`.
 
 ```
 

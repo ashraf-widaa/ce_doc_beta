@@ -16,8 +16,13 @@ to a call. Use {doc}`Installation <../get-started/installation>` for package opt
 
 The public wrapper, `WrapCalibratedExplainer`, coordinates the lifecycle: use a
 fitted predictive model, calibrate with separate labelled data, then predict or
-explain a new case. Prediction and explanation are operations on the calibrated
-system; a separate prediction call is not required before an explanation.
+explain a new case. Prediction and explanation use the fitted model with CE calibration; a separate prediction call is not required before an explanation.
+
+For both the concept and the call, use the
+{ref}`numbered core workflow <ce-wrapper-workflow-map>` and
+{ref}`optional capability API map <optional-capability-api-map>`. The figures,
+glossary and API guide use the same distinction between a prediction, a factual
+comparison weight and an alternative prediction.
 
 ## Follow the integration sequence
 

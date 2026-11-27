@@ -1,8 +1,10 @@
 # Configure Conditional Calibration
 
 Conditional, or Mondrian, calibration partitions calibration data by category
-label and fits separate calibrators per category. Use it when uncertainty must be
-reported by subgroup or segment.
+label and fits separate calibrators per category. Use it when defined groups need separate calibration treatment and the selected
+method, group data and sampling conditions support that use. Grouping alone
+does not establish fairness or guarantee better predictions. Group labels are
+not the target labels used for supervised learning.
 
 ## Before choosing a group-label channel
 

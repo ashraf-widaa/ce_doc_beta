@@ -13,6 +13,15 @@ as the fitting and calibration features. `X_query` and `X_sample` below are quer
 feature arrays; their targets are not inputs to explanation calls. The snippets
 assume an already-created explainer and the named data arrays.
 
+## Numbered wrapper lifecycle
+
+The {ref}`core workflow figure <ce-wrapper-workflow-map>` connects each concept
+to its software entry point. The same wrapper coordinates fitting, calibration,
+prediction and explanation.
+
+```{include} ../_shared/wrapper-lifecycle.md
+```
+
 ## Choose a call by the question
 
 - **Which class?** Use `predict`; for class probabilities use `predict_proba`.
@@ -135,3 +144,20 @@ target-value endpoints. Use the same threshold for its explanation calls.
 - **Check a result on your data:** {doc}`Checking results <../practitioner/check_results>`.
 
 Entry-point tier: Tier 2.
+
+(optional-capability-api-map)=
+## Optional capabilities: concept to software
+
+Start with ordinary fitted/calibrated calls. Enable an option only for a stated
+need and after reading its supported setup. The {ref}`optional workflow figure
+<ce-optional-capability-map>` shows where these choices fit.
+
+```{include} ../_shared/optional-capabilities.md
+```
+
+The public types are imported as follows; this is a lookup, not a complete
+example or an instruction to enable both options together:
+
+Import `GuardedOptions` from
+`calibrated_explanations.explanations.guarded_options`, and `RejectPolicy` from
+`calibrated_explanations.core.reject.policy`.

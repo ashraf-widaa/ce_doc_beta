@@ -20,40 +20,26 @@ read code and output from one Iris session, and distinguish the quantities it re
 
 ## Follow the same model through the workflow
 
-First separate preparing the system from querying it. The same fitted model
-and CE calibration state serve both held-out evaluation and later new cases.
+Follow the same fitted predictive model through calibration, prediction and
+explanation. One public wrapper coordinates the software calls; it does not
+introduce a second predictive model. Keep the data roles separate.
 
 <figure>
-<picture>
-<source media="(max-width: 600px)" srcset="../_static/figures/ce-reference-workflow-mobile.svg">
-<img src="../_static/figures/ce-reference-workflow.svg" width="1100" height="1110" alt="Prepare: training data fit the model; separate labelled calibration data configure CE. Evaluate: test features query the same system; test targets are used only to check outputs. Use: new-case features query the same fitted model and CE state without its target or refitting the predictive model.">
-</picture>
-<figcaption>Test targets enter evaluation only. New-case targets are not inputs to prediction or explanation.</figcaption>
+<a href="../_static/figures/ce-wrapper-workflow.png" aria-label="Open the full-size core wrapper workflow">
+<img src="../_static/figures/ce-wrapper-workflow.png" width="1254" height="1254" alt="One wrapper coordinates step 1 wrapping, step 2 fitting with Training data, step 3 preparing CE calibration with separate Calibration data, step 4 obtaining prediction information from Test data / New case features only, and steps 5a factual or 5b alternative explanations. The predictive model is not retrained by calibration; explanation calls obtain their prediction information internally.">
+</a>
+<figcaption>Blue: basic ML and inputs. Orange: CE additions. Prediction and explanation are separate concepts; the branches are not compulsory separate API calls.</figcaption>
 </figure>
 
-[Open the full-size figure](../_static/figures/ce-reference-workflow.svg).
+[Open the full-size figure](../_static/figures/ce-wrapper-workflow.png).
 
-White boxes describe conventional ML inputs and activities; orange boxes identify
-CE additions. Training, calibration and test data have separate roles. The
-three-way split is a teaching workflow, not a universal split ratio or a claim
-that every deployment uses the same data-management design.
+```{include} ../_shared/wrapper-lifecycle.md
+```
 
-1. **Fit the predictive model.** Training examples contain features and known
-   targets. Fitting learns the predictive model. If your model is already fitted,
-   CE can use it without requiring you to train it again.
-2. **Calibrate with separate labelled data.** CE uses that fitted model and
-   calibration examples not used to fit it. Calibration constructs method-specific
-   state, including fitted calibrators where applicable, while keeping the
-   predictive model fixed. Keep evaluation data separate to check the resulting system.
-3. **Read prediction information for a new case.** Supply its features and choose
-   the question: a class probability, a numerical value with an interval, or the
-   probability of an event on a numerical target. Identify the quantity and units
-   before reading its range.
-4. **Inspect factual or alternative explanations.** A factual explanation reports
-   conditions holding for the case and their weights with ranges. Alternatives
-   report the model's predictions under different conditions. An explanation call
-   can obtain the prediction information it needs; a separate prediction call is
-   not a prerequisite. Neither explanation establishes a real-world causal effect.
+The method construction comes next; the diagram is not a claim that every range
+has the same guarantee or that a separate prediction call must precede an
+explanation. Read a held-out test observation using its features first, then
+use its known target only for evaluation.
 
 For the inputs to these stages, read the shared
 {doc}`data-role definitions <../foundations/concepts/predictive_tasks>`.
@@ -78,14 +64,19 @@ The arrows below identify that relationship; they do not make the options a
 sequence that every application must run.
 
 <figure>
-<picture>
-<source media="(max-width: 600px)" srcset="../_static/figures/ce-optional-features-mobile.svg">
-<img src="../_static/figures/ce-optional-features.svg" width="1100" height="770" alt="Mondrian belongs to calibration and group-aware queries. Guarding checks candidates during explanation construction. Conjunctions combine conditions. Alternative filters select generated rules. Rejection handles cases under a configured rule.">
-</picture>
-<figcaption>Guarding candidates and rejecting cases are separate operations. Support and conditions depend on task, mode and configuration.</figcaption>
+<a href="../_static/figures/ce-optional-capabilities.png" aria-label="Open the full-size optional capability map">
+<img src="../_static/figures/ce-optional-capabilities.png" width="1448" height="1086" alt="Optional functions attach to the same numbered wrapper workflow: Mondrian calibration at step 3 and group-aware use; guarded explanations during 5a or 5b; conjunctions on explanation rules; alternative filtering after 5b; rejection in case handling at steps 4 or 5. Dashed orange boxes indicate optional capabilities.">
+</a>
+<figcaption>Dashed orange boxes: optional CE capabilities. Solid arrows show conceptual relationships within each independent row, not one mandatory processing sequence.</figcaption>
 </figure>
 
-[Open the full-size figure](../_static/figures/ce-optional-features.svg).
+[Open the full-size figure](../_static/figures/ce-optional-capabilities.png).
+
+The concept and software names match the shared glossary and the
+{ref}`Quick API option map <optional-capability-api-map>`. The numbers refer to
+the wrapper workflow above. Read the appropriate detailed guide before enabling
+an option; grouping is not a fairness guarantee, and guarding is not a universal
+certificate that a case or hypothetical change is realistic.
 
 - **Mondrian calibration:** supply consistent group information at calibration
   and query time; see {doc}`conditional calibration <../foundations/how-to/conditional_calibration>`.
