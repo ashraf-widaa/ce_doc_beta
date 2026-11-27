@@ -24,14 +24,8 @@ Follow the same fitted predictive model through calibration, prediction and
 explanation. One public wrapper coordinates the software calls; it does not
 introduce a second predictive model. Keep the data roles separate.
 
-<figure>
-<a href="../_static/figures/ce-wrapper-workflow.png" aria-label="Open the full-size core wrapper workflow">
-<img src="../_static/figures/ce-wrapper-workflow.png" width="1254" height="1254" alt="One wrapper coordinates step 1 wrapping, step 2 fitting with Training data, step 3 preparing CE calibration with separate Calibration data, step 4 obtaining prediction information from Test data / New case features only, and steps 5a factual or 5b alternative explanations. The predictive model is not retrained by calibration; explanation calls obtain their prediction information internally.">
-</a>
-<figcaption>Blue: basic ML and inputs. Orange: CE additions. Prediction and explanation are separate concepts; the branches are not compulsory separate API calls.</figcaption>
-</figure>
-
-[Open the full-size figure](../_static/figures/ce-wrapper-workflow.png).
+```{include} ../_shared/wrapper-figure.md
+```
 
 ```{include} ../_shared/wrapper-lifecycle.md
 ```
@@ -63,14 +57,8 @@ Once the core workflow is familiar, attach each option to the activity it change
 The arrows below identify that relationship; they do not make the options a
 sequence that every application must run.
 
-<figure>
-<a href="../_static/figures/ce-optional-capabilities.png" aria-label="Open the full-size optional capability map">
-<img src="../_static/figures/ce-optional-capabilities.png" width="1448" height="1086" alt="Optional functions attach to the same numbered wrapper workflow: Mondrian calibration at step 3 and group-aware use; guarded explanations during 5a or 5b; conjunctions on explanation rules; alternative filtering after 5b; rejection in case handling at steps 4 or 5. Dashed orange boxes indicate optional capabilities.">
-</a>
-<figcaption>Dashed orange boxes: optional CE capabilities. Solid arrows show conceptual relationships within each independent row, not one mandatory processing sequence.</figcaption>
-</figure>
-
-[Open the full-size figure](../_static/figures/ce-optional-capabilities.png).
+```{include} ../_shared/optional-figure.md
+```
 
 The concept and software names match the shared glossary and the
 {ref}`Quick API option map <optional-capability-api-map>`. The numbers refer to
