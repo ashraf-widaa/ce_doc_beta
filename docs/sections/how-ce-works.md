@@ -99,12 +99,12 @@ That is the bridge from understanding the construction to applying it.
 
 ## Continue through the shared chapters
 
-Read these in order for a method tutorial, or enter at the question you have now:
+**Next:** {doc}`Calibration and statistical background <../foundations/concepts/calibration_background>`.
+Then follow its next-chapter link to explanation construction and interpretation.
 
-1. {doc}`Tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>` — choose the prediction question before the operation.
-2. {doc}`Calibration and statistical background <../foundations/concepts/calibration_background>` — understand the methods, then run calibration.
-3. {doc}`How explanations are built <../foundations/concepts/how_explanations_are_built>` — connect comparisons to weights and alternatives.
-4. {doc}`Interpret explanations <../foundations/how-to/interpret_explanations>` — read the same case's rules and plot.
+If you want the whole sequence before starting, use the
+{ref}`shared reading map <guided-reading-route>`. If you already have a result,
+you can enter directly at {doc}`interpretation <../foundations/how-to/interpret_explanations>`.
 
 For numerical targets, continue to
 {doc}`Regression: values and events <../foundations/concepts/probabilistic_regression>`.

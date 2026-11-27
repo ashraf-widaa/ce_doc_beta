@@ -134,6 +134,16 @@ reading of factual weights and alternative predictions, use
 
 <span id="choose-a-route"></span>
 
+## Check your understanding
+
+Does asking for the probability of a housing value below a budget turn the model into a classifier?
+
+<details><summary>Read the answer</summary>
+
+No. The target remains numerical and the fitted model remains a regressor. The output question concerns an event on that target; the returned probability is not a housing-value interval.
+
+</details>
+
 ## Continue the guided introduction
 
 **Previous chapter:** {doc}`predictive_tasks`.

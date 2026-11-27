@@ -7,8 +7,8 @@
 <div class="ce-home-intro">
 <p class="ce-home-lead">Understand predictions with Calibrated Explanations.</p>
 <p>Calibrated Explanations (CE) works with a trained machine-learning model and separate calibration data to provide calibrated prediction information and feature explanations. It supports classification and regression; the meaning of its reported ranges depends on the task and method.</p>
-<div class="ce-home-actions"><a class="ce-home-primary" href="get-started/index.html">Start with Quickstart <span aria-hidden="true">→</span></a><a class="ce-home-secondary" href="sections/what-and-why.html">New to CE? Understand the ideas</a></div>
-<p>No installation needed for the browser Quickstart. Python remains an optional route.</p>
+<div class="ce-home-actions"><a class="ce-home-primary" href="get-started/index.html">Start with Quick Start <span aria-hidden="true">→</span></a><a class="ce-home-secondary" href="sections/what-and-why.html">New to CE? Understand the ideas</a></div>
+<p>Read a result without running code, then choose the browser or Python route.</p>
 </div>
 
 ## Documentation
@@ -25,6 +25,8 @@ routes below help you understand, apply or integrate it at the depth you need.
 
 Each route links to the same shared concept and interpretation pages. You can
 switch routes when your question changes; you do not need to complete them all.
+For a continuous concept tutorial, use the {ref}`shared reading map <guided-reading-route>`.
+Already familiar with SHAP or LIME? {doc}`Compare the questions and outputs <compare>`.
 
 ## Project & Resources
 
@@ -85,7 +87,7 @@ These services are separate from the open-source library and its license.
 :hidden:
 
 Home <self>
-Quickstart <get-started/index>
+Quick Start <get-started/index>
 CE: What & Why <sections/what-and-why>
 How CE Works <sections/how-ce-works>
 CE in Practice <sections/in-practice>

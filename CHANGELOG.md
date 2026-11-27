@@ -5,6 +5,8 @@
 
 ### Documentation
 
+- Compare the earlier Learn CE review with current entry paths; consolidate the shared reading map, separate integration and extension goals, add concept checks and repair a glossary destination.
+
 - Clarify task, output-mode and capability choices with responsive concept figures, linked worked examples and a shared stage map separating core operations from optional capabilities.
 
 - Clarify vertical workflow transitions and conventional machine learning labels; expand Calibrated Explanations in Quick Start headings and page contents.

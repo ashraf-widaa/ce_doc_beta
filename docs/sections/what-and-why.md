@@ -125,12 +125,9 @@ Python is also useful. If your main question is how the method is constructed,
 the {doc}`How CE Works overview <how-ce-works>` introduces the workflow before
 these same chapters. You will not need to repeat a different set of definitions.
 
-1. {doc}`Features, targets and separate data roles <../foundations/concepts/predictive_tasks>`.
-2. {doc}`Choose a task, output question and operation <../foundations/concepts/tasks_modes_capabilities>`.
-3. {doc}`Understand calibration and run it <../foundations/concepts/calibration_background>`.
-4. {doc}`Construct and inspect an explanation <../foundations/concepts/how_explanations_are_built>`.
-5. {doc}`Read the resulting rules and plots <../foundations/how-to/interpret_explanations>`.
-6. {doc}`Evaluate held-out results <../practitioner/check_results>`.
+The {ref}`shared reading map <guided-reading-route>` shows the chapter order and
+what each page teaches. Keep it as your contents page; the chapters themselves
+supply the definitions, code, outputs and next-page links.
 
 The {doc}`complete plotted Python example <../get-started/first-python-explanation>`
 is an alternative hands-on entry using the same Iris case. You do not need to

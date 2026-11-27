@@ -124,6 +124,16 @@ explains how to read records and figures without assuming they prove causation.
 
 <span id="continue-with-a-concrete-result"></span>
 
+## Check your understanding
+
+Is a factual weight the probability of the outcome under another condition?
+
+<details><summary>Read the answer</summary>
+
+No. A factual weight describes a comparison of model responses; an alternative reports prediction information under another condition. Identify the explained quantity and its units before reading either range.
+
+</details>
+
 ## Continue the guided introduction
 
 **Previous chapter:** {doc}`calibration_background`.

@@ -228,6 +228,16 @@ remain author-review topics in this independent documentation work.
 
 <span id="from-understanding-to-checking"></span>
 
+## Check your understanding
+
+Why keep calibration data separate from model-fitting data?
+
+<details><summary>Read the answer</summary>
+
+The calibration construction uses labelled cases in a different role from fitting the predictive model. Reusing data without a supported construction does not preserve the documented assumptions. A successful call alone does not verify those assumptions.
+
+</details>
+
 ## Continue the guided introduction
 
 **Previous chapter:** {doc}`tasks_modes_capabilities`.

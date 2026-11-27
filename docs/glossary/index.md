@@ -32,7 +32,7 @@ Alternative filter
 Filtering
     Selecting items according to a criterion. In CE, identify whether the items are alternative rules, candidate conditions or cases: alternative filters, guarded checks and reject policies perform different jobs.
 
-    Learn more: {doc}`Place each option in the workflow <../get-started/index>`.
+    Learn more: {doc}`Place each option in the workflow <../foundations/concepts/optional_capabilities>`.
 
 Mondrian calibration
 Conditional calibration

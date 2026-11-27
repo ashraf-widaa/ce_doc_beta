@@ -7,9 +7,20 @@ outputs as they move through your system. Start with the public interface;
 internal architecture and plugin contracts become relevant when you need to
 understand or extend the implementation.
 
-**Your reading route:** {doc}`one Python example <../get-started/first-python-explanation>` →
-{doc}`Quick API <../get-started/quick_api>` →
-{doc}`pipeline integration <../foundations/how-to/integrate_with_pipelines>`.
+## Choose your software goal
+
+- **Integrate CE into an application:** start with
+  {doc}`one Python example <../get-started/first-python-explanation>`, use
+  {doc}`Quick API <../get-started/quick_api>` to select calls, then follow
+  {doc}`pipeline integration <../foundations/how-to/integrate_with_pipelines>`.
+- **Understand or extend the codebase:** start with
+  {doc}`architecture and execution flow <../foundations/concepts/architecture>`,
+  then use the {doc}`Contributor Hub <../contributor/index>` for design records,
+  extension contracts and the contribution process. You can skip the first-run
+  material below if you already know the public workflow.
+
+These are different goals, not two compulsory stages. The statistical definitions
+remain in {doc}`How CE Works <how-ce-works>` and its shared chapters.
 
 ## First, run the public workflow
 
@@ -77,6 +88,19 @@ those results to export, configuration and runtime behavior. A correctly shaped
 array does not by itself establish statistical validity; evaluate using
 {doc}`Checking results <../practitioner/check_results>` and the
 {doc}`mode-specific conditions <../foundations/concepts/calibrated_interval_semantics>`.
+
+## Find the exact interface or output contract
+
+| What you need now | Shared reference |
+| --- | --- |
+| Class, method, inputs and returns | {doc}`API reference <../api/index>` |
+| Parameter meaning and default | {doc}`Parameter reference <../foundations/concepts/parameter-reference>` |
+| Saved output structure | {doc}`Explanation schema <../schema_v1>` |
+| Exception and validation behavior | {doc}`Errors and validation <../foundations/concepts/error_handling>` |
+
+Use the reference for an exact contract after the worked example has shown what
+the returned quantity means. The schema describes structure; it does not establish
+statistical validity or prescribe an application decision.
 
 ## Handle errors and version changes
 
