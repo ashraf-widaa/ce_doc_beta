@@ -26,7 +26,8 @@
 - Place a core-only, two-panel ML/CE comparison at the start of Quick Start, add a stacked mobile version, and separate optional features after the first-example choices.
 
 - Clarify development, held-out evaluation and inference in the Beta workflow figures; distinguish data roles, task/mode choices and optional CE capabilities.
-- Add a conventional-ML-versus-CE comparison figure (SVG, desktop and mobile) to CE: What & Why, separating preparation, inference and held-out evaluation; rewrite that page for readability; use "page" instead of "chapter" across the reading route; align the lifecycle figures' conventional-route label.
+- Align task, mode and capability definitions (figure, concept page, glossary and What & Why mode table) with the beginner tutorial: task is what the model predicts, mode is the question and answer shape (classification, interval, thresholded regression), capability is an operation requested from the wrapper; add a Refine / decide step and the application's decision policy to the capability map.
+- Use the Learn CE "What CE adds to supervised machine learning" figure (SVG, desktop and narrow) on CE: What & Why, with the instance labelled as test data or a new case; rewrite that page for readability; use "page" instead of "chapter" across the reading route; align the lifecycle figures' conventional-route label.
 
 [Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.2...main)
 

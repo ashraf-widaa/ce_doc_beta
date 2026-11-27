@@ -5,11 +5,16 @@
 In Calibrated Explanations (CE), what your model predicts, the question you ask
 about it, and the operation you request are three separate choices.
 
-A **task** describes the target; a **mode** describes the output question; a
-**capability** describes the operation you request. For example, predicting flower
-species is classification, asking for species probabilities selects that output,
-and inspecting factual conditions requests an explanation. Changing the operation
-does not change the target the model learned.
+- A **task** is what the model predicts: classification or regression. It is
+  fixed when you choose the estimator and the target.
+- A **mode** is the question you ask and the shape of the answer: classification
+  probabilities, interval regression, or thresholded (probabilistic) regression.
+- A **capability** is an operation you request from the calibrated wrapper, such
+  as predicting with uncertainty or explaining factually.
+
+For example, predicting flower species is classification; asking for species
+probabilities is the classification mode; inspecting factual conditions is a
+capability. Changing the operation does not change the target the model learned.
 
 ```{include} ../../_shared/task-mode-definitions.md
 ```
@@ -35,6 +40,10 @@ The classification branch covers **binary** targets (two categories) and
 **multiclass** targets (three or more). Integer-encoded species remain categories;
 numeric codes alone do not make a task regression.
 
+The two regression modes are **interval regression** (a value with an
+interval in target units) and **thresholded regression**, also called
+probabilistic regression (the probability of an event such as a value at most
+a threshold). The same regressor can serve both modes, depending on the call.
 A regression model can support both value and event questions. For example,
 asking for a housing value interval and asking for the probability that value
 is at most a budget concern the same target, but return different quantities.
@@ -59,18 +68,25 @@ or {doc}`event example <../../get-started/example-event>` for browser and local 
 
 ## Capability: the operation you need
 
-After choosing the output, ask whether you need its prediction information,
-a factual explanation, or alternatives. A factual explanation describes conditions
-holding for this case; an alternative reports what the model would return under
-another condition. Neither establishes a causal effect.
+A capability is an operation you request from the calibrated wrapper. Three
+are core: predict with uncertainty, explain factually and explore alternatives.
+The others are optional and serve a specific need. A factual explanation
+describes conditions holding for this case; an alternative reports what the
+model would return under another condition. Neither establishes a causal effect.
 
+| Capability | Core or optional | Question it helps answer | What it is not |
+| --- | --- | --- | --- |
+| Predict with uncertainty | Core | What prediction information and range are reported for this instance? | Proof that the case will have that outcome. |
+| Explain factually | Core | Which conditions holding for this case are associated with the model response? | A causal explanation of the world. |
+| Explore alternatives | Core | What would the model report under another feature condition? | A guaranteed feasible, minimal or effective real-world intervention. |
+| Add conjunctions | Optional | How does a combination of feature conditions behave as one rule? | The sum of the individual weights. |
+| Filter alternatives | Optional | Which generated alternatives meet a stated criterion, such as an interval no wider than the original? | Evidence of a beneficial intervention. |
+| Guard explanations | Optional | Which explanation candidates meet the configured support filter? | A guarantee that the whole query or deployment is valid. |
+| Flag predictions for review (rejection) | Optional | Which cases should be flagged under the configured rejection procedure? | A universal test of correctness or distribution shift. |
 
-| Capability | Question it helps answer | What it is not |
-| --- | --- | --- |
-| Calibrated prediction | What prediction information is reported for this query? | Proof that the case will have that outcome. |
-| Factual explanation | Which conditions holding for this case are associated with the model response? | A causal explanation of the world. |
-| Alternative explanation | What would the model report under another feature condition? | A guaranteed feasible, minimal or effective real-world intervention. |
-| Guarded explanations | Which explanation candidates meet the configured support filter? | A guarantee that the whole query or deployment is valid. |
+The {doc}`capabilities manifest <../../tasks/capabilities>` groups capabilities
+by mode and notes that semantics are mode-specific: a bound means something
+different in each mode.
 
 To locate calibration, prediction, explanation and the optional operations, use
 {doc}`the capability map and walkthrough <optional_capabilities>`. It explains
@@ -78,8 +94,8 @@ Mondrian calibration, rejection, guarding, conjunctions and alternative filterin
 in their workflow positions; the {ref}`shared Quick API map <optional-capability-api-map>`
 provides the corresponding software entry points.
 
-The last row is an option during explanation construction, not a later rejection of the case; see
-{doc}`guarded_explanations`. Alternative filtering and plotting are described in
+Guarding is an option during explanation construction, not a later rejection
+of the case; see {doc}`guarded_explanations`. Alternative filtering and plotting are described in
 {doc}`alternatives`. Capabilities and APIs vary with version and browser route:
 Python library support does not prove that a browser app exposes the same feature.
 

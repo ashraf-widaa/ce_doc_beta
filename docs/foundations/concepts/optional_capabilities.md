@@ -15,7 +15,9 @@ extra predictive tasks or settings everyone must enable.
 ```
 
 The stages correspond to the {ref}`shared wrapper figure <ce-wrapper-workflow-map>`
-(calibration at step 3, prediction at step 4, explanations at steps 5a/5b). Each
+(calibration at step 3, prediction at step 4, explanations at steps 5a/5b). The
+fourth column, **Refine / decide**, refines explanation results; the final
+decision policy belongs to your application, not to CE. Each
 column introduces an operation and its software entry point. **Rejection** concerns cases;
 **alternative filtering** selects rules; **guarded explanations** check
 candidates during explanation construction. They are different operations.

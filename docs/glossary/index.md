@@ -96,12 +96,12 @@ Calibration split
     Learn more: {doc}`Keep data roles separate <../foundations/concepts/predictive_tasks>`.
 
 Capability
-    An operation CE offers, such as calibrated prediction, factual explanation or alternative exploration. Choosing an explanation capability does not change the target the model learned.
+    An operation you request from the calibrated wrapper. Core: predict with uncertainty, explain factually, explore alternatives. Optional: add conjunctions, filter alternatives, guard explanations, flag predictions for review (rejection). Choosing a capability does not change the target the model learned.
 
     Learn more: {doc}`Separate task, mode and capability <../foundations/concepts/tasks_modes_capabilities>`.
 
 CE mode
-    The output question in these guides: class-probability information, a numerical value with an interval, or the probability of an event on a numerical target.
+    The question you ask and the shape of the answer: classification probabilities, interval regression (a value with an interval), or thresholded (probabilistic) regression (the probability of an event on a numerical target). The same regressor can serve both regression modes, depending on the call.
 
     Learn more: {doc}`Choose an output question <../foundations/concepts/tasks_modes_capabilities>`.
 
@@ -231,7 +231,7 @@ Prediction interval
 
 Predictive task
 Task
-    What kind of target the model is trained to predict. These guides cover classification for categories and regression for numerical quantities.
+    What the model predicts: classification for categories or regression for numerical quantities. Fixed when you choose the estimator and the target.
 
     Learn more: {doc}`Choose a task and mode <../foundations/concepts/tasks_modes_capabilities>`.
 

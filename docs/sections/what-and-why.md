@@ -44,34 +44,36 @@ It does not, by itself, tell you what to do.
 (what-ce-adds-to-a-conventional-workflow)=
 ## What CE adds to a conventional workflow
 
-The figure compares a basic machine-learning workflow, **Conventional ML**,
-with the same workflow when CE is added, **With CE**.
+The figure shows supervised machine learning (blue, top) and what
+Calibrated Explanations adds to it (orange, below).
 
 <figure>
 <picture>
-<source media="(max-width: 600px)" srcset="../_static/figures/ce-adds-comparison-mobile.svg">
-<img src="../_static/figures/ce-adds-comparison.svg" width="1100" height="1470" alt="Two lanes. Conventional ML: training data fit a predictive model; an instance (test data or a new case, features only) goes to that model, which returns a class, numerical value or score. With CE: the same fitted model, not retrained, and separate labelled calibration data configure a CE system whose method is set by task and mode; the same instance goes to that system, which returns prediction information with a mode-specific range, a factual explanation with feature weights and ranges, and alternative explanations with predictions and ranges. Held-out evaluation: test features obtain outputs; test targets are used only to check them and never enter prediction or explanation.">
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-adds-to-workflow-narrow.svg">
+<img src="../_static/figures/ce-adds-to-workflow.svg" width="920" height="470" alt="Top row, supervised machine learning, in blue: labelled training data train an ML model, which becomes a fitted predictive model; given an instance (test data or a new case, features only) it returns a prediction, a class or a value. Below, Calibrated Explanations, in orange: CE uses the same fitted model, not retrained, with separate labelled calibration data not used for training, and the same instance. It returns four things: 1, the prediction; 2, uncertainty by task, shown as probability bounds on a 0 to 1 scale or an interval in the target's units; 3, a factual explanation (why?); 4, alternative explanations (what if?). Each explanation reports its own ranges.">
 </picture>
-<figcaption>White boxes are the conventional workflow; orange boxes are what CE adds. The fitted model and the instance are the same in both lanes.</figcaption>
+<figcaption><strong>What CE adds to supervised machine learning.</strong> CE reuses the same fitted model and the same instance. It adds separate calibration data and returns four outputs.</figcaption>
 </figure>
 
-[Download the comparison figure (SVG)](../_static/figures/ce-adds-comparison.svg).
+[Download the figure (SVG)](../_static/figures/ce-adds-to-workflow.svg).
 
-**Preparation, done once.** In conventional ML, training data (features plus known
-targets) fit a predictive model. With CE you keep that same fitted model and
-add one step: separate labelled calibration data, which the model was not
-trained on, configure a CE system around it. Calibration does not retrain the model.
+**Supervised machine learning (blue).** Labelled training data (features plus
+known targets) train a model. Given an **instance**, the fitted model returns
+a prediction: a class or a value. An instance is one case to predict or
+explain: a row of test data or a new case, given as features only. Its target
+is not needed.
 
-**Inference, for each instance.** An instance is one case to predict or
-explain: a row of test data or a new case. Both sides receive the same
-instance, as features only; its target is not needed. The conventional model returns a class, a number
-or a score. The CE system returns:
+**With Calibrated Explanations (orange).** CE keeps that same fitted model and
+does not retrain it. It adds **separate labelled calibration data** that were
+not used for training. For the same instance, CE returns four outputs:
 
-- **prediction information** with a range;
-- a **factual explanation**: which conditions in this case contribute, as
-  feature weights with ranges;
-- **alternative explanations**: what the model would report under other
-  feature conditions, as predictions with ranges.
+1. **Prediction**: the calibrated prediction for the instance.
+2. **Uncertainty, by task**: probability bounds on a 0–1 scale, or an interval
+   in the target's units.
+3. **Factual explanation** (*why?*): which conditions in this case contribute,
+   as feature weights with ranges.
+4. **Alternative explanations** (*what if?*): what the model would report under
+   other feature conditions, as predictions with ranges.
 
 **Held-out evaluation, before relying on either side.** Test features go to the
 model or the CE system to obtain outputs. The test targets are kept aside and
@@ -80,17 +82,21 @@ used only to check those outputs. They never enter a prediction or explanation.
 What the range means depends on the question you ask, called the
 {term}`mode <CE mode>`:
 
-| Your question | CE reports | Calibration method |
-| --- | --- | --- |
-| Which class, and how probable? | Class probability with bounds | Venn–Abers |
-| What numerical value? | Value with an interval in target units | Conformal predictive system |
-| How probable is a numerical event, such as a value at most a budget? | Event probability with bounds | Conformal predictive system scores, calibrated with Venn–Abers |
+| Your question | Mode | CE reports | Calibration method |
+| --- | --- | --- | --- |
+| Which class, and how probable? | Classification | Class probability with bounds | Venn–Abers |
+| What numerical value? | Interval regression | Value with an interval in target units | Conformal predictive system |
+| How probable is a numerical event, such as a value at most a budget? | Thresholded (probabilistic) regression | Event probability with bounds | Conformal predictive system scores, calibrated with Venn–Abers |
+
+The same regressor can serve both regression modes; the call decides which.
+The {doc}`task, mode and capability guide <../foundations/concepts/tasks_modes_capabilities>`
+explains the three words.
 
 In code, the same steps are `fit(X_train, y_train)`, then
 `calibrate(X_cal, y_cal)`, then `predict(X)`, `explain_factual(X)` or
 `explore_alternatives(X)`. The last three take features only.
 
-The figure compares CE with a *basic* workflow. Real systems can add their own
+The figure compares CE with *basic* supervised learning. Real systems can add their own
 calibration or explanation tools. CE's contribution is to provide calibrated
 prediction information and both kinds of explanation together, around one model.
 
