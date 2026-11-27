@@ -5,6 +5,8 @@
 
 ### Documentation
 
+- Documentation: restore the approved numbered wrapper figure to Quick Start, with the short Calibration label and full-size access.
+
 - Shorten Quick Start to a concept overview, one example and interpretation; reuse deeper wrapper and optional-capability material on shared pages, with explicit reading routes and preserved anchors.
 
 - Distinguish known test targets from unknown new-case targets in the workflow figure, and spell out Calibrated Explanations and machine learning in its labels.
