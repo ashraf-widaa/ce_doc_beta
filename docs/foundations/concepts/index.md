@@ -1,4 +1,4 @@
-# Concepts & architecture
+# More concepts
 
 Understand the theory powering calibrated explanations across binary and
 multiclass classification plus probabilistic and interval regression.
@@ -9,33 +9,20 @@ For proofs, benchmarks, and citations that underpin these concepts,
 visit the {doc}`../../researcher/index` hub before diving into individual
 guides.
 
-| Concept | Why it matters |
-| --- | --- |
-| [Interpret explanations](../how-to/interpret_explanations.md) | Reuses notebook screenshots and walks through dual uncertainty plus the triangular plot. |
-| [Probabilistic & interval regression](probabilistic_regression.md) | Shows how calibrated probabilities and interval regression stay in lockstep across quickstarts and notebooks. |
-| [Alternatives & triangular plots](alternatives.md) | Explains how the triangular view pairs with rule tables for calibrated alternatives. |
-| [Architecture overview](architecture.md) | Connects runtime components, caching, and plugin guardrails. |
-| [Error handling](error_handling.md) | Summarises runtime safeguards and expected exceptions. |
-| [Explanation structures](explanation_structures.md) | Documents the internal data structures used by CalibratedExplanation classes. |
-| [Guarded explanations](guarded_explanations.md) | In-distribution filtering via conformal anomaly detection for trustworthy rules. |
-| [Calibrated interval semantics](calibrated_interval_semantics.md) | Canonical semantics, assumptions, and non-guarantees for all three modes. |
-| [Terminology standardization](terminology.md) | Summarises the shift to probabilistic regression terminology and compatibility guarantees. |
-| [Terminology: thresholded vs probabilistic regression](terminology_thresholded_vs_probabilistic_regression.md) | Clarifies language used across ADR-021 and user-facing regression docs. |
-| [Parameter reference](parameter-reference.md) | Canonical definitions and disambiguation table for `threshold`, `confidence`, `significance`, `confidence_level`, and `low_high_percentiles`. |
+Short definitions of the terms used in these guides are in the {doc}`Scientific & Theoretical Glossary <../../glossary/science>`.
+
+Use the sidebar to select a concept. The
+{doc}`CE workflow <ce_workflow>` connects calibration to predictions and
+explanations; {doc}`calibrated_interval_semantics` distinguishes the
+quantities being reported and their assumptions. Keep that distinction in
+view when moving from a practical example to the implementation references.
 
 ```{toctree}
+:hidden:
 :maxdepth: 1
 
-probabilistic_regression
-alternatives
-architecture
-error_handling
 explanation_structures
 guarded_explanations
-calibrated_interval_semantics
-terminology
+probabilistic_regression
 terminology_thresholded_vs_probabilistic_regression
-parameter-reference
 ```
-
-Entry-point tier: Tier 3.

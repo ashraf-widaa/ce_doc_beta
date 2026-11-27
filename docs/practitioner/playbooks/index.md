@@ -1,4 +1,11 @@
+---
+orphan: true
+---
+
 # Practitioner playbooks
+
+These pages are now listed by goal in the {doc}`How-to guides <../../foundations/how-to/index>`, under *CE in Practice*. This page is kept for existing links.
+
 
 These playbooks assemble the shared foundations that practitioners reach for
 when promoting calibrated explanations into production pipelines.
@@ -34,18 +41,3 @@ when promoting calibrated explanations into production pipelines.
   explanations release gates and documentation updates.
 * {doc}`../../foundations/governance/section_owners` – Ownership map for runtime
   and documentation components.
-
-```{toctree}
-:maxdepth: 1
-:hidden:
-
-mondrian-calibration
-ensured-explanations
-decision-policies
-eu-ai-act-compliance
-eu-data-liability-compliance
-../../foundations/how-to/integrate_with_pipelines
-../../foundations/how-to/export_explanations
-../../foundations/governance/release_checklist
-../../foundations/governance/section_owners
-```

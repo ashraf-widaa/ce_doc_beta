@@ -5,6 +5,48 @@
 
 [Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.2...main)
 
+### Documentation
+
+- Label the instance in the "What CE adds" figure as test data or a new case, and correct its range note for alternatives; align task, mode and capability definitions with the beginner tutorial; add a capability map showing where each core and optional capability applies.
+
+### Added
+
+- **Narrative semantic contract (ADR-041, #227-#230):** `to_json()` and
+  `to_json_stream()` now add `metadata.narrative_context` to each explanation
+  (problem type, the class a probability refers to, threshold, requested
+  percentiles and reject/defer state, each only when CE has established it).
+  The extension is additive: no existing key changes, and payloads without it
+  still load. New `calibrated_explanations.explanations.build_narrative_spec`
+  returns an immutable, versioned `NarrativeSpec` with the prediction, every
+  rule's intervals, source references and qualifiers, in ADR-042 order. It
+  copies values without rounding, marks open one-sided interval endpoints as
+  unbounded (ADR-021), raises `ValidationError` on invalid or contradictory
+  data, and gives identical canonical JSON for identical input. It adds no
+  dependency and makes no network calls.
+
+### Changed
+
+- Added a no-installation browser Quick Start with parallel classification and
+  regression examples and Decision Lab exercises. Clarified the reading order
+  in each of the four documentation sections.
+
+- **Experimental source-faithful documentation refinement:** correct binary and
+  threshold-bound indexing, opt-in difficulty estimation and unsupported payload
+  calls. Reconcile regulatory references and review questions, shorten ML
+  prerequisites, and clarify the roles of existing learning and reference pages.
+  Public URLs, navigation and previously published candidates are preserved.
+
+- **Experimental documentation:** distinguish prediction calibration, interval
+  coverage and explanation ranges; correct API descriptions and regulatory
+  references while retaining unresolved scientific and legal review questions.
+  Shorten peripheral ML background and connect the existing worked case from
+  substituted feature values to factual weights and alternative predictions.
+
+- **Narrative provider plans withdrawn (#231, #233, #234):** the narrative
+  provider plugin family, provider API and provider verification chain are not
+  planned. `to_narrative()`, `to_dataframe()`, `narrate()` and
+  `plot(style="narrative")` are unchanged and keep working offline (#232).
+
 ## [v1.0.2](https://github.com/Moffran/calibrated_explanations/releases/tag/v1.0.2) - 2026-10-20
 
 [Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.1...v1.0.2)

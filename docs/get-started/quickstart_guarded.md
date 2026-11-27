@@ -1,18 +1,29 @@
-# Guarded explanations quickstart
+# Guarded explanations tutorial
 
-Run in-distribution guarded explanations for classification.
+**One of the {doc}`Python tutorials <../tutorials/index>`.** Guarded explanations are an **explanation
+configuration**, not a separate prediction task: you add
+`guarded_options=GuardedOptions()` to an explanation call in any mode
+(classification, interval or probabilistic regression). CE then drops
+candidate rules whose substituted feature values look unusual compared with
+the calibration data, so explanations stay closer to the data the model was
+calibrated on. Predictions and their ranges are unchanged. The example below
+uses binary classification.
 
 ## Prerequisites
 
 ```bash
-pip install calibrated-explanations scikit-learn
+pip install "calibrated-explanations[viz]" scikit-learn
 ```
+
+The `viz` extra installs Matplotlib for the plots on this page. You need a
+calibrated explainer, as in {doc}`quickstart_classification` or
+{doc}`quickstart_regression`.
 
 ## Classification guarded semantics note
 
 - **Calibration prerequisites**: fit on proper split and calibrate on held-out calibration split.
 - **Mode-specific guarantees**: guarded outputs are schema-compatible with CE helpers while filtering interval candidates through the shipped mixed guard rule.
-- **Assumptions**: exchangeability or calibration-deployment distribution match.
+- **Assumptions**: exchangeability under the method-specific calibration protocol; the alternative distribution-match wording remains under author review (SR-01).
 - **Explicit non-guarantees**: no whole-interval guard certification, no metric identity with standard CE, no guarantee under drift, and no causal guarantee for suggested changes.
 - **Explanation-envelope limits**: rule intervals remain model-response summaries.
 - **Formal semantics**: {doc}`../foundations/concepts/calibrated_interval_semantics` and
@@ -70,21 +81,104 @@ explainer.calibrate(x_cal, y_cal, feature_names=dataset.feature_names)
 from calibrated_explanations.explanations.guarded_options import GuardedOptions
 guarded_factual = explainer.explain_factual(x_test[:5], guarded_options=GuardedOptions(confidence=0.9))
 guarded_alts = explainer.explore_alternatives(x_test[:2], guarded_options=GuardedOptions(confidence=0.9))
+for i in range(5):
+    print(f"case {i}: {len(guarded_factual[i].get_rules()['rule'])} guarded rules")
 ```
+
+```text
+case 0: 25 guarded rules
+case 1: 0 guarded rules
+case 2: 28 guarded rules
+case 3: 24 guarded rules
+case 4: 24 guarded rules
+```
+
+`confidence=0.9` is the default; higher values are more inclusive and remove
+fewer candidates. Case 1 has no rules: the guard removed every candidate
+interval, and CE says so in a `UserWarning` ("All interval candidates were
+removed by the guard ..."). That is a signal to look at the case, not an
+error. Guarded and standard explanations are not computed identically, so
+do not compare their rule counts or weights one to one.
+
+The guarded explanation of case 0 as a chart, with its six strongest rules:
+
+```python
+guarded_factual.plot(0, uncertainty=True, filter_top=6)
+```
+
+```{figure} quickstart_assets/guarded-factual-case0.png
+:alt: Guarded factual explanation plot for case 0: calibrated probability of benign about 0.08; six rules, each a range of feature values such as 0.06233 < mean concave points <= 0.08508, all with weights below 0 and most with ranges that cross 0.
+
+Guarded explanation of case 0, as drawn by `guarded_factual.plot(0, uncertainty=True, filter_top=6)`.
+```
+
+The plot reads like a standard factual plot (see the
+{doc}`walkthrough, section 7 <quickstart_walkthrough>`). Guarded rules are often
+bounded on both sides, such as `0.06233 < mean concave points <= 0.08508`,
+because the guard works on ranges of feature values that it has checked
+against the calibration data.
+
+The upper axis is probability: `P(y=1)` is *benign* and `P(y!=1)` is
+*malignant*, with short vertical marks for the estimates and shaded
+extensions for the bounds. The lower axis is feature weight, centered on
+the black zero line. The `mean concave points` rule has a range wholly below
+zero; the other five displayed ranges cross zero, so their direction is
+unsettled by those ranges. The right axis lists the observed feature values.
+The grey band represents the prediction bounds shifted around zero. These
+comparisons describe the model's response, not causal effects. The bounded
+feature conditions show which rules were retained; they do not certify every
+value in each condition as in distribution. The audit below reports what
+the guard tested and removed.
 
 ## 4. Audit guarded filtering
 
 ```python
 audit = guarded_factual.get_guarded_audit()
+for key, value in audit["summary"].items():
+    print(f"{key}: {value}")
 ```
+
+```text
+n_instances: 5
+intervals_tested: 945
+intervals_conforming: 743
+intervals_removed_guard: 202
+intervals_emitted: 101
+instances_with_any_removed_guard: 5
+instances_all_intervals_removed_guard: 1
+instances_with_zero_emitted: 1
+```
+
+Across the five cases, the guard tested 945 candidate intervals, accepted
+743 and removed 202; 101 rules were emitted in the explanations. Every case
+lost at least one candidate, and for one case (case 1) all were removed.
+`audit["instances"]` gives the same figures per case, down to each tested
+interval.
 
 Key audit fields:
 - `intervals_conforming`: candidate intervals accepted by the shipped guard rule.
 - `intervals_removed_guard`: candidate intervals rejected by the shipped guard rule.
 
-Next steps:
-- {doc}`../foundations/concepts/guarded_explanations`
-- {doc}`../foundations/concepts/alternatives`
-- {doc}`../foundations/how-to/interpret_explanations`
+## Common mistakes
 
-Entry-point tier: Tier 2.
+- Treating guarded explanations as a different task or a different model:
+  only the explanation call changes.
+- Reading a guarded explanation as a certificate that every value in a rule's
+  interval is typical; the guard checks representative values, not the whole
+  interval.
+- Expecting the guard to detect that the case itself is unusual; it checks
+  the substituted values (see the limitations in
+  {doc}`../foundations/concepts/guarded_explanations`).
+- Using a fast explainer, which guarded mode does not support.
+
+## Continue
+
+- **Next:** {doc}`apply-to-your-data`, the next Python tutorial.
+- **Go deeper:** {doc}`../foundations/concepts/guarded_explanations` (how the
+  guard works and its limitations) and
+  {doc}`../foundations/concepts/calibrated_interval_semantics`.
+- **See also:** {doc}`../foundations/concepts/alternatives` and
+  {doc}`../foundations/how-to/interpret_explanations`.
+- **Before this:** {doc}`quickstart_classification` or
+  {doc}`quickstart_regression`, and {doc}`ce-tasks-and-modes` (guarded
+  explanations are an optional capability, not a task).

@@ -1,0 +1,52 @@
+# Python tutorials
+
+Executable, step-by-step tutorials for the CE Python library. Every code block
+on these pages runs as shown, and every printed output is the real output,
+checked by the documentation tests.
+
+**Versions.** The outputs shown were verified with the current release,
+CE 1.0.2 (`pip install calibrated-explanations`), and with the 1.1.0
+development version that these pages are built from; both print the same
+numbers.
+
+**Before these tutorials.** For the ideas, start with the
+{doc}`Quick Start <../get-started/try-in-browser>`; the first complete Python example is
+{doc}`Your First CE Explanation in Python <../get-started/first-explanation-python>`. Then
+{doc}`../get-started/why-ce`,
+{doc}`CE by example <../get-started/ce-by-example>`,
+{doc}`../get-started/ce-tasks-and-modes` and
+{doc}`../get-started/apply-overview`.
+
+| Tutorial | Who it is for | You will be able to |
+|---|---|---|
+| {doc}`Python walkthrough <../get-started/quickstart_walkthrough>` | Anyone learning CE with code, step by step | Follow one binary-classification case from data to calibrated probabilities, explanations and alternatives, and know what you can and cannot conclude; a notebook is available |
+| {doc}`Classification tutorial <../get-started/quickstart_classification>` | Practitioners with a classifier | Calibrate a classifier and read calibrated probabilities, their ranges, factual explanations and alternatives (multiclass example) |
+| {doc}`Regression tutorial <../get-started/quickstart_regression>` | Practitioners with a regression model | Get prediction intervals (interval regression) and threshold probabilities (probabilistic regression) from one calibrated model |
+| {doc}`Guarded explanations tutorial <../get-started/quickstart_guarded>` | Users who need explanations restricted to typical feature values | Add guarded options to an explanation call and read the guard's audit |
+| {doc}`Apply CE to your own data <../get-started/apply-to-your-data>` | Practitioners integrating CE into their own work | Wrap an existing model, calibrate, explain, check on a test set, save and reload; includes a reviewable prompt for AI coding assistants |
+
+**Suggested order.** Start with the Python walkthrough, which follows one
+binary case from data to explanation. Then take the tutorial for your task:
+the classification tutorial for multiclass problems, the regression tutorial
+for intervals and threshold probabilities. Add the guarded tutorial if
+explanations should stay within typical feature values. Finish with
+*Apply CE to your own data*. Install the package with the `viz` extra first
+({doc}`../get-started/installation`), because most tutorials draw plots.
+
+Guarantees are mode-specific; the canonical statement is
+{doc}`../foundations/concepts/calibrated_interval_semantics`.
+
+**After the tutorials:** {doc}`../practitioner/evaluate_ce` (check
+probabilities, intervals, threshold events and subgroups on your own held-out
+data), {doc}`../foundations/how-to/integrate_with_pipelines` and the
+{doc}`Quick API <../get-started/quick_api>`.
+
+```{toctree}
+:hidden:
+:maxdepth: 1
+
+Python walkthrough <../get-started/quickstart_walkthrough>
+Classification Tutorial <../get-started/quickstart_classification>
+Regression and Thresholded Regression <../get-started/quickstart_regression>
+Guarded explanations tutorial <../get-started/quickstart_guarded>
+```

@@ -1,0 +1,261 @@
+# Scientific & Theoretical Glossary
+
+Short definitions of the machine-learning, explainability, probability,
+calibration and uncertainty terms behind CE. Each entry links to the page under
+*How CE Works* that teaches the idea. For library objects and parameters, see
+the {doc}`software`. For all terms in one list, see the {doc}`Glossary <index>`.
+
+Each entry gives a short definition, other names for the same idea, and one
+page to read next. Entries marked *wording under review* or *name under review*
+are not yet confirmed by the CE authors.
+
+## Machine learning and data
+
+```{glossary}
+:sorted:
+
+Calibration set
+Calibration data
+Calibration split
+  Labelled data held out from training and used only to calibrate CE. Because
+  the model has not seen these cases, CE can measure how the model's outputs
+  relate to real outcomes. Keep it separate from the
+  {term}`proper training set <Proper training set>` and from the test data.
+
+  **Learn more:** {doc}`../get-started/ml-foundations` (section A5)
+
+Proper training set
+Proper training split
+  The part of the labelled data used to fit the underlying model. CE requires
+  it to be separate from the {term}`calibration set <Calibration set>`: fit the
+  model on the proper training set, then calibrate on the held-out data.
+
+  **Learn more:** {doc}`../get-started/ml-foundations` (section A5)
+```
+
+## Explainability
+
+```{glossary}
+:sorted:
+
+Feature attribution
+Feature importance
+  A number per feature that describes how much that feature moved a
+  prediction. LIME and SHAP are widely used attribution methods. CE reports
+  rules with weights, and an uncertainty range for each weight.
+
+  **Learn more:** {doc}`../get-started/ml-foundations` (section A7)
+
+Local explanation
+Global explanation
+  A local explanation describes one prediction; a global explanation
+  describes the model as a whole. CE's factual and alternative explanations
+  are local.
+
+  **Learn more:** {doc}`../get-started/ml-foundations` (section A7)
+
+Alternative explanation
+  An explanation that proposes changes to feature values that would give a
+  different calibrated outcome. Each rule pairs the changed condition with the
+  calibrated prediction and uncertainty interval for that scenario.
+  Alternatives describe how the model responds to changed inputs; they are not
+  causal claims about the real world.
+
+  **Learn more:** {doc}`../foundations/concepts/alternatives`
+
+Conjunctive rule
+Conjunction
+  A {term}`rule <Rule>` whose condition combines more than one feature. CE adds
+  conjunctive rules to existing explanations on request.
+
+  **Learn more:** {doc}`../foundations/concepts/alternatives`
+
+Ensured explanation
+  An {term}`alternative explanation <Alternative explanation>` kept by the
+  ensured filter because its uncertainty interval is not wider than the
+  interval of the original prediction. This is a comparison of reported widths,
+  not a guarantee of stronger evidence or a beneficial intervention.
+  *Wording under review.*
+
+  **Learn more:** {doc}`../practitioner/playbooks/ensured-explanations`
+
+Explanation envelope
+  The uncertainty interval attached to a rule or feature weight inside an
+  explanation. It summarises how the model's calibrated output responds when
+  that feature is perturbed. It is not a causal guarantee and should not be
+  read as a formal per-feature coverage guarantee.
+
+  **Learn more:** {doc}`../foundations/concepts/calibrated_interval_semantics`
+
+Factual explanation
+  An explanation of one prediction as it is. It pairs the calibrated prediction
+  and its uncertainty interval with factual rules: each rule binds the observed
+  feature value to a condition and gives a calibrated
+  {term}`feature weight <Feature weight>` with its own uncertainty interval.
+
+  **Learn more:** {doc}`../foundations/how-to/interpret_explanations`
+
+Feature weight
+  The calibrated contribution of one feature rule to the prediction, reported
+  with its own uncertainty interval. A positive weight raises the calibrated
+  output being explained relative to the substituted values; a negative weight
+  lowers that output. Identify the class, numeric target or threshold event
+  before interpreting the sign or units.
+
+  **Learn more:** {doc}`../foundations/how-to/interpret_explanations`
+
+Guarded explanation
+  An experimental kind of CE explanation that removes candidate rule intervals
+  rejected by an in-distribution guard. The guard checks whether the perturbed
+  value behind each interval is plausible; it does not certify every point in
+  an interval and does not test whether the explained instance itself is out
+  of distribution.
+
+  **Learn more:** {doc}`../foundations/concepts/guarded_explanations`
+
+Rule
+  The building block of a CE explanation. In a factual explanation, a rule is
+  a feature condition with a calibrated weight; in an alternative explanation,
+  it is a changed condition with the calibrated prediction for that scenario.
+  Rules are listed by absolute weight, largest first.
+
+  **Learn more:** {doc}`../foundations/how-to/interpret_explanations`
+```
+
+## Probability and calibration
+
+```{glossary}
+:sorted:
+
+Brier score
+  The mean squared difference between predicted probabilities and observed
+  outcomes (1 or 0). Lower is better and 0 is perfect. It scores the
+  probabilities themselves, not only the predicted labels.
+
+  **Learn more:** {doc}`../practitioner/evaluate_ce` (section 2)
+
+Reliability diagram
+Reliability table
+  A bin-by-bin comparison of the average predicted probability with the
+  observed share of positive outcomes on held-out data. For calibrated
+  probabilities the two are close; with few cases per bin they vary by
+  chance.
+
+  **Learn more:** {doc}`../foundations/concepts/calibration_methods` (section 1)
+
+Calibration
+  In CE, the step that adjusts a trained model's outputs on held-out
+  {term}`calibration data <Calibration set>` before anything is explained:
+  Venn-Abers predictors for classification and conformal predictive systems
+  for regression. Explanations are then computed from the calibrated outputs,
+  not from raw model scores.
+
+  **Learn more:** {doc}`../foundations/concepts/calibration_methods`
+
+Venn-Abers predictor
+Venn–Abers predictor
+  CE's classification calibration method. It produces a probability pair and
+  a merged estimate from model scores; the pair's exact calibration property
+  does not transfer to the merge. In probabilistic regression it calibrates
+  CPS event scores. Multiclass normalization changes how the returned bounds
+  should be read; exact validity wording remains under author review.
+
+  **Learn more:** {doc}`../foundations/concepts/calibration_methods` (section 2)
+```
+
+## Uncertainty
+
+```{glossary}
+:sorted:
+
+Uncertainty interval
+  In classification and probabilistic regression, reported lower and upper
+  values associated with a probability estimate; multiclass rescaling needs
+  separate interpretation. They are not conventional confidence limits for an
+  individual's unknown probability. In interval regression, a CPS percentile
+  interval for the target value. Explanation-weight ranges are derived
+  quantities with different qualifications. See the mode-specific semantics.
+
+  **Learn more:** {doc}`../foundations/concepts/calibrated_interval_semantics`
+```
+
+## Conformal and Venn–Abers methods
+
+```{glossary}
+:sorted:
+
+Conformal predictive system
+CPS
+  The conformal method CE uses for regression. Calibrated on held-out data, it
+  gives predictive intervals for requested percentiles in interval regression
+  and, combined with Venn-Abers, calibrated event probabilities in
+  probabilistic regression.
+
+  **Learn more:** {doc}`../foundations/concepts/calibration_methods` (section 3)
+
+Difficulty estimation
+  For regression: scaling the conformal intervals by how hard each instance is
+  to predict, as estimated by a separate difficulty estimator from the `crepes`
+  library. Harder instances get wider intervals and easier ones narrower
+  intervals, instead of one width for all.
+
+  **Learn more:** {doc}`../practitioner/advanced/normalization-guide`
+
+Interval regression
+Percentile regression
+  A regression query that returns a numeric prediction with a CPS percentile
+  interval, whose width is set by {term}`low_high_percentiles`. It answers
+  "where will y fall?", while {term}`probabilistic regression <Probabilistic regression>`
+  answers "how likely is an event on y?". *Name under review.*
+
+  **Learn more:** {doc}`../foundations/concepts/probabilistic_regression`
+
+Mondrian calibration
+Conditional calibration
+  Calibration that partitions the calibration data by a category label and fits
+  a separate calibrator per category, so uncertainty can be reported by
+  subgroup or segment. Categories are passed with {term}`bins` or derived by a
+  stored categorizer ({term}`mc`).
+
+  **Learn more:** {doc}`../foundations/how-to/conditional_calibration`
+
+Probabilistic regression
+Thresholded regression
+  A regression query for an event such as P(y ≤ t), selected with a
+  {term}`threshold`. CPS scores are calibrated with Venn–Abers; CE returns a
+  merged event-probability estimate and reported bounds, rather than a target-value
+  interval. Exact validity wording remains under author review. "Thresholded
+  regression" names the same mode in implementation documents.
+
+  **Learn more:** {doc}`../foundations/concepts/calibrated_interval_semantics`
+
+Reject option
+  In CE classification, withholding a prediction based on the instance's
+  conformal prediction set: a single class is accepted, an empty set is a
+  novelty reject, and a set of two or more classes is an ambiguity reject. How
+  rejected instances are handled is set by a {term}`reject policy <Reject policy>`.
+
+  **Learn more:** {doc}`../practitioner/advanced/reject-policy`
+```
+
+## Assumptions, guarantees and limits
+
+```{glossary}
+:sorted:
+
+Distribution shift
+Drift
+  A change between the data CE was calibrated on and the data it is applied
+  to, for example over time or between populations. CE gives no calibration
+  guarantee under distribution drift, regime shift or adversarial change.
+
+  **Learn more:** {doc}`../foundations/concepts/calibrated_interval_semantics`
+
+Exchangeability
+  Reordering the calibration and new cases leaves their joint distribution
+  unchanged. CE's calibration statements depend on this assumption and the
+  method's protocol. Whether "distribution-matched" is an adequate alternative
+  description remains under author review. *Wording under review.*
+
+  **Learn more:** {doc}`../foundations/concepts/calibrated_interval_semantics`
+```

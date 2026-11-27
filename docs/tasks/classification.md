@@ -5,11 +5,12 @@ Calibrated Explanations wraps standard scikit-learn classifiers to produce uncer
 ## Classification semantics note
 
 - **Calibration prerequisites**: fit on `x_proper, y_proper` and calibrate on held-out `x_cal, y_cal`.
-- **Mode-specific guarantees**: Venn-Abers provides calibrated class probabilities with interval bounds.
-- **Assumptions**: calibration and deployment data are exchangeable or distribution-matched.
+- **Mode-specific guarantees**: CE returns a Venn-Abers pair and a merged class probability; the exact pair/merged-probability validity wording remains under author review (SR-03).
+- **Assumptions**: exchangeability under the method-specific calibration protocol; the alternative distribution-match wording remains under author review (SR-01).
 - **Explicit non-guarantees**: no guarantee under drift or regime shift.
 - **Explanation-envelope limits**: rule and feature-level intervals summarize model behavior, not causal effects.
 - **Formal semantics**: {doc}`../foundations/concepts/calibrated_interval_semantics`.
+- **How CE computes these outputs**: {doc}`../foundations/concepts/calibration_methods`.
 
 ## Supported signatures
 
@@ -19,7 +20,7 @@ Calibrated Explanations wraps standard scikit-learn classifiers to produce uncer
 | `predict_proba(x)` | Calibrated probabilities (n_samples, n_classes) |
 | `predict_proba(x, uq_interval=True)` | Calibrated probabilities **plus** uncertainty intervals |
 | `explain_factual(x)` | Factual explanation (rules + uncertainty) |
-| `explore_alternatives(x)` | Alternative explanations (counterfactuals) |
+| `explore_alternatives(x)` | Alternative explanations: the calibrated prediction if one feature had a value in another range |
 
 > ℹ️ **Note:** `predict()` and `predict_proba()` match the scikit-learn API but return **calibrated** values.
 
@@ -28,15 +29,22 @@ Calibrated Explanations wraps standard scikit-learn classifiers to produce uncer
 ### 1. Calibrated probabilities with uncertainty
 
 ```python
-# Predict probabilities for the positive class (binary) or all classes (multiclass)
+# Binary classification: probs has shape (n_samples, 2), one column per class.
+# low and high bound the positive-class (column 1) probability: shape (n_samples,).
 probs, (low, high) = explainer.predict_proba(x_test, uq_interval=True)
 
-print(f"Probability: {probs[0, 1]:.3f} (Interval: {low[0, 1]:.3f} – {high[0, 1]:.3f})")
+print(f"Probability: {probs[0, 1]:.3f} (Interval: {low[0]:.3f} – {high[0]:.3f})")
 ```
+
+For multiclass models, `low` and `high` have one column per class, shape
+`(n_samples, n_classes)`; see the multiclass section below.
 
 ### 2. Factual explanation
 
-Returns the rules explaining *why* the model made this prediction, with epistemic and aleatoric explanation envelopes on the feature weights.
+Returns the conditions that hold for each case, with a weight per condition and a
+range for each weight. The ranges are derived by comparing calibrated predictions
+after substituting feature values; no formal guarantee is claimed for them. *Whether these ranges should be
+described as epistemic or aleatoric uncertainty is under review by the CE authors.*
 
 ```python
 explanation = explainer.explain_factual(x_test)
@@ -44,7 +52,9 @@ explanation = explainer.explain_factual(x_test)
 
 ### 3. Explore alternatives
 
-Finds what feature changes would be necessary to flip the prediction or increase confidence.
+Shows what the calibrated prediction would be if one feature had a value in a
+different range, each scenario with its own range. Alternatives describe how the
+model responds; they are not recommendations and make no causal claim.
 
 ```python
 alternatives = explainer.explore_alternatives(x_test)
@@ -67,7 +77,7 @@ probs, (low, high) = explainer.predict_proba(x_test, uq_interval=True)
 factual = explainer.explain_factual(x_test)
 ```
 
-Set `multi_labels_enabled=True` to generate a **true multiclass explanation** that returns one explanation per class (all-classes view):
+Set `multi_labels_enabled=True` to generate **one explanation per class** for each instance (all-classes view):
 
 ```python
 multi_factual = explainer.explain_factual(x_test, multi_labels_enabled=True)
@@ -75,6 +85,11 @@ multi_alternative = explainer.explore_alternatives(x_test, multi_labels_enabled=
 ```
 
 ### Multi-label mode support matrix (`multi_labels_enabled=True`)
+
+The all-classes view is experimental, as noted in
+{doc}`../get-started/ce-tasks-and-modes`. "Supported" below describes the
+available API operations; it does not establish statistical validity or
+graduate the feature from experimental status.
 
 | Capability | Status | Notes |
 | :--- | :--- | :--- |
@@ -97,4 +112,9 @@ multi_alternative = explainer.explore_alternatives(x_test, multi_labels_enabled=
   [](../foundations/how-to/conditional_calibration.md).
 * **`uq_interval`**: Set to `True` to receive uncertainty intervals (tuples of lower/upper bounds).
 
-Entry-point tier: Tier 2.
+## Go further
+
+- Executable demo: [demo_binary_classification.ipynb](https://github.com/Moffran/calibrated_explanations/blob/main/notebooks/core_demos/demo_binary_classification.ipynb) (ran without errors with CE 1.1.0.dev0, this Beta's source, on 2026-11-16)
+- Executable demo: [demo_multiclass_glass.ipynb](https://github.com/Moffran/calibrated_explanations/blob/main/notebooks/core_demos/demo_multiclass_glass.ipynb) (ran without errors with CE 1.1.0.dev0, this Beta's source, on 2026-11-16; takes several minutes)
+- Full signatures: {doc}`WrapCalibratedExplainer API reference <../_autosummary/calibrated_explanations.core.WrapCalibratedExplainer>`
+- Check CE on your own data: {doc}`../practitioner/evaluate_ce`

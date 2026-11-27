@@ -9,19 +9,22 @@ Regression in Calibrated Explanations is **conformal interval regression** imple
 
 - **Calibration prerequisites**: fit on `x_proper, y_proper` and calibrate on held-out `x_cal, y_cal`.
 - **Mode-specific guarantees**: CPS returns calibrated percentile intervals for requested `low_high_percentiles`.
-- **Assumptions**: calibration and deployment data are exchangeable or distribution-matched.
+- **Assumptions**: exchangeability under the method-specific calibration protocol; the alternative distribution-match wording remains under author review (SR-01).
 - **Explicit non-guarantees**: no guarantee under drift or fixed interval width across subpopulations.
 - **Explanation-envelope limits**: feature-level interval effects summarize model behavior under perturbation.
 - **Formal semantics**: {doc}`../foundations/concepts/calibrated_interval_semantics`.
+- **How CE computes these outputs**: {doc}`../foundations/concepts/calibration_methods`.
 
 ## Supported signatures
 
 | Method | Description |
 | :--- | :--- |
-| `predict(x)` | Point regression estimate |
+| `predict(x)` | Calibrated point estimate: the CPS median (50th percentile), which can differ from the model's own prediction |
 | `predict(x, uq_interval=True, ...)` | Point estimate + CPS parameterised interval |
 | `explain_factual(x, ...)` | Factual explanation with CPS intervals |
 | `explore_alternatives(x, ...)` | Alternative explanations with CPS intervals |
+
+`predict(x, calibrated=False)` returns the underlying model's prediction instead.
 
 ## Controlling the interval: `low_high_percentiles`
 
@@ -29,6 +32,27 @@ The `low_high_percentiles` parameter (tuple `(low, high)`) governs the CPS inter
 
 * Default: `(5, 95)` → 90% central interval.
 * One-sided: `(-np.inf, 95)` or `(5, np.inf)`.
+
+For a one-sided interval, the open side is not a calibrated bound: treat that
+side of the interval as open. Reporting depends on the source revision as
+well as the package version:
+
+* **This Beta's source at `2bc637bc`** reports the open side as the smallest
+  target for a `-np.inf` request or the largest target for a `np.inf` request.
+  That finite value is a placeholder only, not a coverage endpoint.
+* **The official source at `371bd806`** returns `-inf` or `inf` itself. Its
+  JSON export encodes infinities as the strings `"-inf"` and `"inf"`; plots may
+  still clip them to the observed target range for display. See the
+  [pinned official implementation](https://github.com/Moffran/calibrated_explanations/blob/371bd8060bd279fbfd41f7509097617561ac1ae4/src/calibrated_explanations/calibration/interval_regressor.py)
+  and the release notes for issue #237.
+
+Both source revisions identify as `1.1.0-dev`; that label alone cannot select
+the endpoint behavior. This documentation clarification does not reconcile
+the implementations or decide which behavior should ship.
+
+Code that consumes intervals should handle an unbounded side explicitly.
+Because the point prediction is the median, a one-sided interval whose finite
+percentile is below 50, such as `(-np.inf, 40)`, does not contain it.
 
 ## Examples
 
@@ -46,7 +70,9 @@ print(f"Prediction: {prediction[0]} Interval: {low[0]} – {high[0]}")
 
 ### 2. Explanation with specific interval settings
 
-You can request explanations with arbitrary confidence levels by strictly passing the percentiles:
+You can request explanations with another interval by passing its percentiles. The
+percentiles set the interval's target coverage (here 50%), which holds on average
+over many cases, not for each case:
 
 ```python
 # Explain with a 50% central interval (25th - 75th percentiles)
@@ -61,4 +87,15 @@ explanation = explainer.explain_factual(
 * **Prediction Interval:** The interval returned by `predict(..., uq_interval=True)` is the conformal interval derived from the CPS.
 * **Rule Intervals:** The explanation envelopes on feature weights in `explain_factual` rules are also derived from the underlying CPS calibration.
 
-Entry-point tier: Tier 2.
+## Adaptive and per-group intervals
+
+* Intervals whose width depends on how difficult each instance is to predict:
+  {doc}`../practitioner/advanced/normalization-guide`.
+* Separate calibration for each group (Mondrian `bins`):
+  {doc}`../foundations/how-to/conditional_calibration`.
+
+## Go further
+
+- Executable demo: [demo_regression.ipynb](https://github.com/Moffran/calibrated_explanations/blob/main/notebooks/core_demos/demo_regression.ipynb) (ran without errors with CE 1.1.0.dev0, this Beta's source, on 2026-11-16)
+- Full signatures: {doc}`WrapCalibratedExplainer API reference <../_autosummary/calibrated_explanations.core.WrapCalibratedExplainer>`
+- Check CE on your own data: {doc}`../practitioner/evaluate_ce`

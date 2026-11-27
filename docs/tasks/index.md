@@ -13,10 +13,8 @@ For guarantees, assumptions, and non-guarantees, use
 ```{toctree}
 :maxdepth: 1
 
-capabilities
 classification
 regression
 probabilistic_regression
+capabilities
 ```
-
-Entry-point tier: Tier 1.

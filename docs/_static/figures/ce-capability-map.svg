@@ -1,0 +1,55 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 470" role="img" aria-labelledby="cm-title cm-desc" font-family="system-ui, -apple-system, &#x27;Segoe UI&#x27;, Roboto, sans-serif">
+  <title id="cm-title">Capability map: where each feature applies in the workflow</title>
+  <desc id="cm-desc">Four workflow steps: 1 Calibrate, 2 Predict, 3 Explain, 4 Refine or decide. Core operations: calibration with calibrate(); prediction with uncertainty with predict or predict_proba and uq_interval=True; factual explanations with explain_factual(); alternative explanations with explore_alternatives(). Optional: conjunctions with add_conjunctions(); alternative filtering with counter_explanations() or ensured_explanations(); Mondrian (grouped) calibration with calibrate(bins=...); rejection, flagging predictions for review, with reject_policy=...; guarded explanations with guarded_options=.... The final decision policy, such as cutoffs or abstaining, belongs to your application and is not a CE call. Availability depends on task, mode, configuration and version.</desc>
+  <defs><marker id="cm-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0,0 L10,5 L0,10 z" fill="#64748b"/></marker></defs>
+  <rect x="0" y="0" width="920" height="470" rx="14" fill="#ffffff"/>
+  <rect x="20" y="20" width="202" height="44" rx="10" fill="#334155"/>
+  <text x="121.0" y="48.0" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">1 · Calibrate</text>
+  <path d="M225 42 H243" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#cm-arrow)"/>
+  <rect x="246" y="20" width="202" height="44" rx="10" fill="#334155"/>
+  <text x="347.0" y="48.0" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">2 · Predict</text>
+  <path d="M451 42 H469" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#cm-arrow)"/>
+  <rect x="472" y="20" width="202" height="44" rx="10" fill="#334155"/>
+  <text x="573.0" y="48.0" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">3 · Explain</text>
+  <path d="M677 42 H695" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#cm-arrow)"/>
+  <rect x="698" y="20" width="202" height="44" rx="10" fill="#334155"/>
+  <text x="799.0" y="48.0" text-anchor="middle" font-size="16" font-weight="700" fill="#ffffff">4 · Refine / decide</text>
+  <text x="20" y="92" text-anchor="start" font-size="12" font-weight="700" fill="#475569">CORE</text>
+  <rect x="20" y="102" width="202" height="84" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="121.0" y="140.5" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Calibration</text>
+  <text x="121.0" y="157.5" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">calibrate()</text>
+  <rect x="246" y="102" width="202" height="84" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="347.0" y="132.0" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Prediction + uncertainty</text>
+  <text x="347.0" y="149.0" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">predict / predict_proba</text>
+  <text x="347.0" y="166.0" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">(uq_interval=True)</text>
+  <rect x="472" y="102" width="202" height="84" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="573.0" y="140.5" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Factual explanations</text>
+  <text x="573.0" y="157.5" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">explain_factual()</text>
+  <rect x="472" y="198" width="202" height="84" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
+  <text x="573.0" y="236.5" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Alternative explanations</text>
+  <text x="573.0" y="253.5" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">explore_alternatives()</text>
+  <rect x="698" y="102" width="202" height="84" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="799.0" y="140.5" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Conjunctions</text>
+  <text x="799.0" y="157.5" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">.add_conjunctions()</text>
+  <rect x="698" y="198" width="202" height="84" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="799.0" y="228.0" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Alternative filtering</text>
+  <text x="799.0" y="245.0" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">.counter_explanations()</text>
+  <text x="799.0" y="262.0" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">.ensured_explanations()</text>
+  <text x="20" y="312" text-anchor="start" font-size="12" font-weight="700" fill="#475569">OPTIONAL</text>
+  <rect x="20" y="322" width="202" height="84" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="121.0" y="360.5" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Mondrian (grouped)</text>
+  <text x="121.0" y="377.5" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">calibrate(bins=...)</text>
+  <rect x="246" y="322" width="202" height="84" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="347.0" y="352.0" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Rejection</text>
+  <text x="347.0" y="369.0" text-anchor="middle" font-size="12" font-weight="400" fill="#334155">flag for review</text>
+  <text x="347.0" y="386.0" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">reject_policy=...</text>
+  <rect x="472" y="322" width="202" height="84" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="573.0" y="360.5" text-anchor="middle" font-size="14" font-weight="700" fill="#7c2d12">Guarded explanations</text>
+  <text x="573.0" y="377.5" text-anchor="middle" font-size="12" font-weight="400" fill="#7c2d12" font-family="ui-monospace, SFMono-Regular, Menlo, Consolas, monospace">guarded_options=...</text>
+  <rect x="698" y="322" width="202" height="84" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2" stroke-dasharray="6 4"/>
+  <text x="799.0" y="352.0" text-anchor="middle" font-size="14" font-weight="700" fill="#1e3a8a">Your decision policy</text>
+  <text x="799.0" y="369.0" text-anchor="middle" font-size="12" font-weight="400" fill="#334155">cutoffs, abstain</text>
+  <text x="799.0" y="386.0" text-anchor="middle" font-size="12" font-weight="400" fill="#334155">not a CE call</text>
+  <text x="460.0" y="434" text-anchor="middle" font-size="13" font-weight="400" fill="#475569">Solid: core · Dashed: optional · Blue: your application, not a CE call</text>
+  <text x="460.0" y="454" text-anchor="middle" font-size="12" font-weight="400" fill="#64748b">Availability depends on task, mode, configuration and version.</text>
+</svg>

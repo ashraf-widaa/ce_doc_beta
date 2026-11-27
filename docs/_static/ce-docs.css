@@ -1,0 +1,318 @@
+/* Documentation-page figures (Quick Start and concept pages). The homepage has its own ce-home.css. */
+
+/* The native version picker shares the existing mobile navigation drawer.
+   Keep RTD's default widget unless the picker has valid version data. */
+.ce-rtd-version-picker {
+  display: none;
+}
+
+@media (max-width: 67em) {
+  .ce-rtd-version-picker {
+    display: block;
+    padding: 1rem;
+  }
+
+  .ce-rtd-version-picker label {
+    display: block;
+    margin-bottom: 0.4rem;
+    font-weight: 600;
+  }
+
+  .ce-rtd-version-picker select {
+    box-sizing: border-box;
+    width: 100%;
+    max-width: 100%;
+    padding: 0.4rem;
+    color: var(--color-foreground-primary);
+    background: var(--color-background-primary);
+    border: 1px solid var(--color-background-border);
+    border-radius: 0.2rem;
+    font: inherit;
+  }
+
+  body.ce-rtd-versions-ready readthedocs-flyout {
+    display: none;
+  }
+}
+
+.ce-figure {
+  margin: 1.5rem auto 1.75rem;
+  text-align: center;
+}
+
+.ce-figure > a {
+  display: block;
+  border: 0;
+}
+
+.ce-figure img {
+  display: block;
+  width: 100%;
+  max-width: 760px;
+  height: auto;
+  margin: 0 auto;
+}
+
+.ce-figure--compact img {
+  max-width: 480px;
+}
+
+.ce-figure figcaption {
+  margin-top: 0.6rem;
+  font-size: 0.9em;
+  line-height: 1.45;
+  color: var(--color-foreground-secondary);
+}
+
+/* Phone layout for wide reference tables (WP-18): smaller text, tighter cells, wrapping headers. */
+@media (max-width: 600px) {
+  .ce-table-compact table {
+    font-size: 0.8em;
+  }
+  .ce-table-compact th,
+  .ce-table-compact td {
+    padding: 0.3em 0.35em;
+    overflow-wrap: break-word;
+    -webkit-hyphens: auto;
+    hyphens: auto;
+  }
+  .ce-table-compact code {
+    white-space: normal;
+    overflow-wrap: anywhere;
+  }
+}
+
+/* Learning-journey progress bar (2026-11-18 DevEx review, V7). */
+.ce-journey ol {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  list-style: none;
+  margin: 0.5rem 0 1rem;
+  padding: 0;
+}
+.ce-journey li {
+  margin: 0;
+}
+.ce-journey a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  padding: 0.2rem 0.65rem 0.2rem 0.25rem;
+  border: 1px solid var(--color-background-border);
+  border-radius: 999px;
+  font-size: 0.85em;
+  text-decoration: none;
+  color: var(--color-foreground-secondary);
+}
+.ce-journey .ce-journey-n {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5em;
+  height: 1.5em;
+  border-radius: 50%;
+  background: var(--color-background-secondary);
+  font-weight: 600;
+}
+.ce-journey li[aria-current="step"] a {
+  border-color: var(--color-brand-primary);
+  color: var(--color-foreground-primary);
+  font-weight: 600;
+}
+.ce-journey li[aria-current="step"] .ce-journey-n {
+  background: var(--color-brand-primary);
+  color: var(--color-background-primary);
+}
+
+/* Three data roles bar on the Quickstart (V2). */
+.ce-roles {
+  display: flex;
+  gap: 3px;
+  margin: 0.75rem 0 1rem;
+  font-size: 0.85em;
+}
+.ce-role {
+  display: flex;
+  flex-direction: column;
+  flex-basis: 0;
+  min-width: 0;
+  padding: 0.45rem 0.55rem;
+  border-radius: 4px;
+  color: var(--color-foreground-primary);
+  overflow-wrap: anywhere;
+}
+.ce-role code {
+  background: transparent;
+  border: 0;
+  padding: 0;
+  font-size: 0.95em;
+}
+.ce-role-train { background: color-mix(in srgb, #2b6cb0 22%, transparent); }
+.ce-role-cal { background: color-mix(in srgb, #dd6b20 26%, transparent); }
+.ce-role-test { background: color-mix(in srgb, #718096 24%, transparent); }
+@media (max-width: 600px) {
+  .ce-roles { flex-direction: column; }
+}
+
+/* Quick Start: try CE in your browser (2026-11-19). */
+.ce-flow {
+  counter-reset: ce-flow;
+  display: grid;
+  gap: 0.5rem;
+  grid-template-columns: repeat(auto-fit, minmax(9.5rem, 1fr));
+  list-style: none;
+  margin: 0.75rem 0 1.25rem;
+  padding: 0;
+}
+.ce-flow li {
+  border: 1px solid var(--color-background-border);
+  border-radius: 10px;
+  counter-increment: ce-flow;
+  margin: 0;
+  padding: 0.6rem 0.75rem;
+}
+.ce-flow li strong {
+  display: block;
+  font-size: 1.02em;
+}
+.ce-flow li strong::before {
+  color: var(--color-brand-primary);
+  content: counter(ce-flow) ". ";
+}
+.ce-flow li span {
+  color: var(--color-foreground-secondary);
+  display: block;
+  font-size: 0.86em;
+  line-height: 1.4;
+  margin-top: 0.2rem;
+}
+/* Parallel classification / regression columns: two columns on wide screens,
+   stacked by step (classification, then regression) on narrow ones. */
+.ce-parallel .ce-par {
+  border-top: 3px solid var(--color-background-border);
+  min-width: 0;
+  padding-top: 0.4rem;
+}
+.ce-parallel .ce-par-cls { border-top-color: #6d28d9; }
+.ce-parallel .ce-par-reg { border-top-color: #0f766e; }
+.ce-parallel .ce-par div.highlight pre,
+.ce-parallel .ce-par pre {
+  font-size: 0.74em;
+}
+.ce-parallel .ce-par figure img,
+.ce-parallel .ce-par img {
+  height: auto;
+  max-width: 100%;
+}
+.ce-parallel .ce-par ol {
+  font-size: 0.92em;
+}
+
+/* 2026-11-19 two-path Quick Start: real application screenshots with numbered,
+   editable HTML callouts (the images themselves are not altered). */
+.ce-shot-figure {
+  margin: 1.25rem auto 1.5rem;
+}
+
+.ce-shot {
+  position: relative;
+  max-width: 820px;
+  margin: 0 auto;
+}
+
+.ce-shot--narrow {
+  max-width: 380px;
+}
+
+.ce-shot img {
+  display: block;
+  width: 100%;
+  height: auto;
+  border: 1px solid var(--color-background-border);
+  border-radius: 8px;
+}
+
+.ce-mark {
+  position: absolute;
+  transform: translate(-50%, -50%);
+  width: 1.7rem;
+  height: 1.7rem;
+  border-radius: 50%;
+  background: #6d28d9;
+  color: #ffffff;
+  font-size: 0.9rem;
+  font-weight: 800;
+  line-height: 1.7rem;
+  text-align: center;
+  box-shadow: 0 0 0 3px #ffffff;
+}
+
+.ce-markbox {
+  position: absolute;
+  border: 3px solid #dc2626;
+  border-radius: 6px;
+}
+
+.ce-shot-figure figcaption .ce-shot-date {
+  display: block;
+  font-size: 0.85em;
+  margin-top: 0.25rem;
+}
+
+.ce-shot-key {
+  max-width: 820px;
+  margin: 0 auto 1.5rem;
+}
+
+/* Two-path and task cards on the Quick Start (HTML, not images). */
+.ce-path-card .sd-card-title {
+  font-size: 1.1rem;
+}
+
+.ce-shot-figure figcaption {
+  text-align: left;
+  max-width: 820px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.ce-shot-figure figcaption ol.ce-shot-key {
+  margin: 0.4rem 0 0.4rem;
+  padding-left: 1.5rem;
+}
+
+.ce-shot-figure figcaption p {
+  margin: 0.3rem 0;
+}
+
+/* Two-path Quick Start: compact "Start here" navigation in the first screen. */
+.ce-start-here {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.4rem 0.75rem;
+  margin: 0.75rem 0 1rem;
+  padding: 0.6rem 0.9rem;
+  border: 2px solid var(--color-brand-primary);
+  border-radius: 10px;
+  font-weight: 600;
+}
+
+.ce-start-here a {
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+
+.ce-start-here a:focus-visible {
+  outline: 3px solid var(--color-brand-primary);
+  outline-offset: 2px;
+}
+
+/* Owner decision 2026-11-20: hide the Read the Docs sidebar ad placement
+   (EthicalAds) on the beta documentation site. */
+[id^="readthedocs-ea"],
+[data-ea-publisher],
+.ethical-sidebar {
+  display: none !important;
+}

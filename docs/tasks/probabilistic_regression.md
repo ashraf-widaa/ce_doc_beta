@@ -7,11 +7,17 @@ This is technically implemented as **Thresholded Regression**: you supply a `thr
 ## Probabilistic or thresholded regression semantics note
 
 - **Calibration prerequisites**: fit on `x_proper, y_proper` and calibrate on held-out `x_cal, y_cal`.
-- **Mode-specific guarantees**: threshold queries use CPS with Venn-Abers calibrated event probabilities.
-- **Assumptions**: calibration and deployment data are exchangeable or distribution-matched.
+- **Mode-specific guarantees**: threshold queries return event probabilities and ranges from CPS scores followed by Venn-Abers; the exact validity statement remains under author review (SR-15).
+- **Calibration split**: threshold queries randomly split the calibration set into two
+  halves (seeded). One half fits the CPS that scores the threshold event; the other half
+  calibrates those scores with Venn-Abers. Each step therefore uses about half of the
+  calibration cases, and with Mondrian `bins` each group's cases are divided at random
+  between the two halves. Interval regression uses the full calibration set.
+- **Assumptions**: exchangeability under the method-specific calibration protocol; the alternative distribution-match wording remains under author review (SR-01).
 - **Explicit non-guarantees**: no guarantee under drift or causal actionability from threshold probabilities.
 - **Explanation-envelope limits**: feature-level probability shifts summarize model behavior under perturbation.
 - **Formal semantics**: {doc}`../foundations/concepts/calibrated_interval_semantics`.
+- **How CE computes these outputs**: {doc}`../foundations/concepts/calibration_methods`.
 
 ## Supported signatures
 
@@ -70,8 +76,14 @@ explanation = explainer.explain_factual(
 ## Key parameters
 
 - **`threshold`**:
-  - Scalar `t`: treated as a binary classification boundary.
+  - Scalar `t`: the event *y ≤ t*; its calibrated probability is in column 1 of the result.
   - Tuple `(low, high)`: treated as an interval containment query.
-- **`uq_interval`**: Returns the uncertainty bound on the **probability estimate** itself (aleatoric + epistemic uncertainty on the score).
+- **`uq_interval`**: Also returns lower and upper bounds for the calibrated event
+  probability. *How to describe the source of this uncertainty (aleatoric or
+  epistemic) is under review by the CE authors.*
 
-Entry-point tier: Tier 2.
+## Go further
+
+- Executable demo: [demo_probabilistic_regression.ipynb](https://github.com/Moffran/calibrated_explanations/blob/main/notebooks/core_demos/demo_probabilistic_regression.ipynb) (ran without errors with CE 1.1.0.dev0, this Beta's source, on 2026-11-16)
+- Full signatures: {doc}`WrapCalibratedExplainer API reference <../_autosummary/calibrated_explanations.core.WrapCalibratedExplainer>`
+- Check CE on your own data: {doc}`../practitioner/evaluate_ce`

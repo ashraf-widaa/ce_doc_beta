@@ -74,6 +74,7 @@ extensions = [
     "numpydoc",
     "nbsphinx",
     "myst_parser",
+    "sphinx_design",
     "sphinxcontrib.mermaid",
 ]
 
@@ -157,9 +158,13 @@ linkcheck_ignore = [
 # Pygments style for syntax highlighting
 pygments_style = "sphinx"
 
+# Size mermaid diagrams to their content instead of the extension's fixed 500px box
+mermaid_height = "auto"
+
 # Enable extended MyST features for directive fences (e.g. mermaid diagrams)
 myst_enable_extensions = [
     "colon_fence",
+    "attrs_inline",
     # Linkify caused spurious detection of code/path fragments as external
     # links (e.g. `DESIGN.md` -> http://DESIGN.md). Disable it and rely
     # on explicit links in the docs instead.
@@ -198,6 +203,33 @@ html_theme_options = {
         }
     ],
 }
+
+# Show the Beta notice only on the independent Beta RTD project, or in a local
+# preview with CE_DOCS_BETA=true. Official documentation builds are unaffected.
+if (
+    os.environ.get("READTHEDOCS_PROJECT") == "calibrated-explanations-beta"
+    or os.environ.get("CE_DOCS_BETA", "").lower() == "true"
+):
+    html_theme_options["announcement"] = (
+        # Furo keeps announcements on one fixed-height line; let this one wrap.
+        "<style>.announcement{height:auto;min-height:var(--header-height)}"
+        ".announcement-content{white-space:normal;overflow-wrap:anywhere}</style>"
+        "<strong>Beta Documentation</strong> — This is an independent development "
+        "version of Calibrated Explanations documentation. Content is under review "
+        "and may change. For official documentation, visit "
+        '<a href="https://calibrated-explanations.readthedocs.io/">'
+        "https://calibrated-explanations.readthedocs.io/</a>."
+    )
+    # Lets pages show Beta-only content (for example the homepage footer marker)
+    # through the ``only`` directive; official builds never set this tag.
+    tags.add("ce_beta")  # noqa: F821 - ``tags`` is injected by Sphinx
+    # Integrate the version picker into the mobile sidebar on this candidate.
+    # Do not change project-wide RTD addon settings or older previews.
+    html_context = {"ce_beta_version_picker": True}
+
+# Homepage styles
+html_static_path = ["_static"]
+html_css_files = ["ce-home.css", "ce-docs.css"]
 
 # HTML title
 html_title = f"{project} v{release}"

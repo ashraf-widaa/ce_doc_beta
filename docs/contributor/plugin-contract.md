@@ -96,6 +96,7 @@ class HelloCalibratedPlugin:
         "dependencies": (),
         "modes": ("factual", "alternative"),
         "tasks": ("classification", "regression"),
+        "data_modalities": ("tabular",),
         "trusted": False,
     }
 
@@ -145,6 +146,7 @@ class HelloIntervalCalibratorPlugin(IntervalCalibratorPlugin):
         "capabilities": ["interval:classification", "interval:regression"],
         "modes": ("classification", "regression"),
         "dependencies": (),
+        "data_modalities": ("tabular",),
         "trusted": False,
         "trust": False,
         "confidence_source": "hello",
@@ -240,6 +242,7 @@ class HelloExplanationPlugin(ExplanationPlugin):
     """Minimal example that returns calibrated explanations for binary classification."""
 
     plugin_meta = {
+        "data_modalities": ("tabular",),
         "schema_version": 1,
         "name": "hello.explanation.plugin",
         "version": "0.1.0",
@@ -356,6 +359,7 @@ class HelloPlotBuilder(PlotBuilder):
     """Minimal plot builder that creates a simple PlotSpec payload."""
 
     plugin_meta = {
+        "data_modalities": ("tabular",),
         "schema_version": 1,
         "name": "hello.plot.builder",
         "version": "0.1.0",
@@ -385,6 +389,7 @@ class HelloPlotRenderer(PlotRenderer):
     """Minimal plot renderer that materializes PlotSpec payloads."""
 
     plugin_meta = {
+        "data_modalities": ("tabular",),
         "schema_version": 1,
         "name": "hello.plot.renderer",
         "version": "0.1.0",
@@ -427,6 +432,7 @@ from calibrated_explanations.plugins import (
 
 class HelloPlotBuilder(PlotBuilder):
     plugin_meta = {
+        "data_modalities": ("tabular",),
         "schema_version": 1,
         "name": "hello.plot.builder.test",
         "version": "0.1.0",
@@ -445,6 +451,7 @@ class HelloPlotBuilder(PlotBuilder):
 
 class HelloPlotRenderer(PlotRenderer):
     plugin_meta = {
+        "data_modalities": ("tabular",),
         "schema_version": 1,
         "name": "hello.plot.renderer.test",
         "version": "0.1.0",
@@ -726,6 +733,7 @@ plugin explicitly opts into via `explain_kwargs_schema`.
 ```python
 # Plugin declares the explain-time kwargs it actually reads:
 plugin_meta = {
+    "data_modalities": ("tabular",),
     ...,
     "explain_kwargs_schema": {
         "version": 1,
@@ -892,3 +900,8 @@ to simulate trust boundaries before promoting a plugin.
 If your plugin emits telemetry, document the signals and link back to
 {doc}`../foundations/governance/optional_telemetry`. Keep emission disabled by
 default so calibrated explanations remain privacy-preserving out of the box.
+
+## Related pages
+
+- {doc}`../plugins` – plugins overview and related guides.
+- {doc}`../api/plugins` – plugin registry reference.

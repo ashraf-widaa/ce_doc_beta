@@ -2,7 +2,15 @@
 
 ## 1. Executive summary (short)
 
-Calibrated Explanations (CE) provide **actionable explanations with calibrated uncertainty** for classification and regression. A **CE-First** workflow means you **always use the OSS `calibrated_explanations` library**, wrap your model with **`WrapCalibratedExplainer`**, **fit and calibrate** before explaining, and default to **calibrated outputs** for both humans and agents. This reduces hallucinated explanations, makes uncertainty explicit, and ensures standardized, auditable behavior.
+Calibrated Explanations (CE) describe model responses for classification and
+regression, with task-specific calibrated prediction information and ranges
+for explanation weights. A **CE-First** workflow uses the OSS
+`calibrated_explanations` library through **`WrapCalibratedExplainer`**:
+**fit and calibrate** before explaining, and default to **calibrated outputs**.
+The checks below make those operations inspectable; they do not establish
+causal actionability or guarantee that an agent's surrounding text is correct.
+Prediction bounds and explanation-weight ranges have different
+qualifications; see {doc}`../foundations/concepts/calibrated_interval_semantics`.
 
 ---
 
@@ -17,7 +25,7 @@ Calibrated Explanations (CE) provide **actionable explanations with calibrated u
 2. **Wrapper**: Use **`WrapCalibratedExplainer`** (or a subclass). Never invent a new wrapper.
 3. **Fit**: `explainer.fit(...)` → verify `explainer.fitted is True`.
 4. **Calibrate**: `explainer.calibrate(...)` → verify `explainer.calibrated is True`.
-5. **Explain**: Use **`explainer.explain_factual(...)`** or **`explorer.explore_alternatives(...)`**.
+5. **Explain**: Use **`explainer.explain_factual(...)`** or **`explainer.explore_alternatives(...)`**.
 6. **Conjunctions**: Use **`explanations.add_conjunctions(...)`** or **`explanations[idx].add_conjunctions(...)`**.
 7. **Narratives & plots**: Use `.to_narrative(output_format=..., expertise_level=...)` and `.plot(...)`.
 8. **Probabilistic regression**: Use `threshold=` for probabilistic intervals, or `low_high_percentiles=` for conformal.
@@ -201,8 +209,9 @@ print(explanations[0].to_narrative(output_format="text", expertise_level="beginn
 explanations.add_conjunctions(n_top_features=3, max_rule_size=2)
 explanations[0].add_conjunctions(n_top_features=2, max_rule_size=3)
 
-# Alternative explanations ranking (ensured / ensured-ranking)
-alt = explainer.explore_alternatives(x_test[:3], ensure_coverage=True, ensure_order=True)
+# Alternative explanations, then keep only the ensured ones (lower uncertainty)
+alt = explainer.explore_alternatives(x_test[:3])
+ensured = alt.ensured_explanations()
 ```
 
 ---
@@ -227,8 +236,8 @@ except ImportError as exc:
 # 2. Construct wrapper using the public API
 explainer = WrapCalibratedExplainer(model)
 
-# 3. Fit
-explainer.fit(x_proper, y_proper)
+# 3. Fit on the proper training data
+explainer.fit(x_train, y_train)
 
 # 4. Calibrate on held-out calibration data
 explainer.calibrate(x_cal, y_cal)
@@ -240,6 +249,7 @@ if not explainer.fitted or not explainer.calibrated:
     )
 
 # 6. Call public prediction / explanation APIs
+X_query = x_test[:3]  # the cases you want to explain
 explanations = explainer.explain_factual(X_query)
 alternatives = explainer.explore_alternatives(X_query)
 probabilities, interval = explainer.predict_proba(X_query, uq_interval=True)
@@ -324,7 +334,7 @@ explanations = explainer.explain_factual(x_test[:3])
 ```python
 from crepes.extras import DifficultyEstimator
 
-difficulty = DifficultyEstimator()
+difficulty = DifficultyEstimator().fit(X=x_train, y=y_train)  # fit before use
 explainer.calibrate(x_cal, y_cal, difficulty_estimator=difficulty)
 # Remove / disable by calibrating without it
 explainer.calibrate(x_cal, y_cal)
@@ -378,7 +388,7 @@ class MyPlotPlugin:
 The ReadTheDocs suite is comprehensive but may not yet be agent-optimized. Recommended additions:
 - A CE-first “agent” checklist page.
 - Agent-specific examples in quickstarts using the direct public CE API.
-- A glossary of CE terms mapped to the public `WrapCalibratedExplainer` API.
+- A glossary of CE terms mapped to the public API: see {doc}`../glossary/software`.
 
 ---
 

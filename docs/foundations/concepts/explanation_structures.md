@@ -1,6 +1,10 @@
 # Explanation Structures
 
-This document provides a comprehensive overview of the internal data structures used by the `CalibratedExplanation` classes and their subclasses. Understanding these structures is crucial for developers working with or extending the calibrated explanations framework.
+This reference is for developers inspecting or extending explanation internals.
+It describes storage and rule-generation structures, including private helpers;
+these are not a recommended interface for application code. To read returned
+explanations through public methods, use
+{doc}`../how-to/interpret_explanations` first.
 
 ## Overview
 
@@ -46,8 +50,8 @@ The `CalibratedExplanation` abstract base class defines the core interface and s
 - **`conditions`**: List of condition objects used in rule generation
 
 #### State Flags
-- **`_has_rules`**: Boolean indicating if rules have been computed
-- **`_has_conjunctive_rules`**: Boolean indicating if conjunctive rules exist
+- **`has_rules`**: Boolean indicating if rules have been computed
+- **`has_conjunctive_rules`**: Boolean indicating if conjunctive rules exist
 - **`focus_columns`**: Optional list of feature indices to focus explanations on
 
 #### Metadata
@@ -167,7 +171,7 @@ For categorical features, alternatives explore all other possible categories. Fo
 
 All explanation types implement `build_rules_payload()` which returns a structured dictionary separating core content from metadata:
 
-```python
+```text
 {
     "core": {
         "kind": "factual" | "alternative" | "fast",
