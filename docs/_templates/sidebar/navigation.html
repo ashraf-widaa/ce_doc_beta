@@ -2,14 +2,15 @@
 <nav class="ce-route-switcher" aria-label="Documentation routes">
   <a class="ce-nav-home" href="{{ pathto('index') }}"{% if pagename == 'index' %} aria-current="page"{% endif %}>Home</a>
   <a class="ce-nav-start" href="{{ pathto('get-started/index') }}"{% if pagename == 'get-started/index' %} aria-current="page"{% endif %}>Quick Start</a>
-  <p class="ce-nav-heading">Learning paths</p>
-    <ul>
-      <li><a href="{{ pathto('sections/what-and-why') }}">Understand CE: What &amp; Why</a></li>
-      <li><a href="{{ pathto('sections/how-ce-works') }}">Learn how CE works</a></li>
-      <li><a href="{{ pathto('sections/in-practice') }}">Apply CE in practice</a></li>
-      <li><a href="{{ pathto('sections/software-integration') }}">Use and integrate the software</a></li>
-      <li><a href="{{ pathto('sections/project-resources') }}">Research and contribute</a></li>
-    </ul>
+  <p class="ce-nav-heading">Learn and use</p>
+  <ul>
+    <li><a href="{{ pathto('sections/understand-ce') }}">Learn Calibrated Explanations</a></li>
+    <li><a href="{{ pathto('sections/what-and-why') }}">What &amp; Why</a></li>
+    <li><a href="{{ pathto('sections/how-ce-works') }}">How Calibrated Explanations works</a></li>
+    <li><a href="{{ pathto('sections/in-practice') }}">Use Calibrated Explanations</a></li>
+    <li><a href="{{ pathto('sections/software-integration') }}">Software Architecture &amp; Integration</a></li>
+    <li><a href="{{ pathto('sections/project-resources') }}">Project &amp; Resources</a></li>
+  </ul>
 </nav>
 {% if pagename != 'index' and (parents or pagename == 'get-started/index' or pagename.startswith('sections/')) %}
 <nav class="sidebar-tree ce-local-tree" aria-label="Current path chapters">

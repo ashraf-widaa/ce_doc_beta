@@ -52,11 +52,22 @@ Python routes. Read the figure together with its assumptions note.
 
 ## Use optional features when you have a specific need
 
-After reading an ordinary result, visit the shared
-{doc}`optional-capability overview <../foundations/concepts/optional_capabilities>`.
-It places grouping, guarding, conjunctions, alternative filtering and rejection
-within the core workflow, with the same terms used by the software guides.
-You do not need to enable them to follow the core chapters below.
+The core operations prepare calibration information, obtain prediction information,
+and construct factual or alternative explanations. Optional capabilities address
+specific needs at different points; they are not a compulsory fourth stage.
+
+```{include} ../_shared/capability-stage-map.md
+```
+
+**Read the map:** solid borders identify core operations; dashed borders identify
+optional capabilities. Mondrian calibration belongs to calibration, guarding to
+explanation construction, and alternative filtering to existing rules. Rejection
+handles cases under its configured procedure. Application decisions remain your
+responsibility.
+
+The shared {doc}`optional-capability walkthrough <../foundations/concepts/optional_capabilities>`
+explains each option with the same housing case and links to setup guides.
+For exact calls, use the {ref}`Quick API map <optional-capability-api-map>`.
 
 ## From calibration to a prediction
 

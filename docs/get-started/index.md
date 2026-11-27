@@ -14,8 +14,16 @@ A predictive model estimates a category or a number from a case's features.
 CE uses that fitted model and **separate labelled calibration data** to provide
 prediction information and explanations with reported ranges.
 
-```{include} ../_shared/quickstart-wrapper.md
-```
+<figure class="ce-preferred-workflow">
+<picture>
+<source media="(max-width: 600px)" srcset="../_static/figures/ce-adds-to-workflow-narrow.svg">
+<img src="../_static/figures/ce-adds-to-workflow.svg" width="920" height="470" alt="Conventional supervised prediction and the additions from Calibrated Explanations: the same fitted model, separate labelled calibration data, task-specific prediction information, factual explanations and alternatives.">
+</picture>
+<figcaption>The introductory workflow from the preferred review version. Read prediction ranges, factual-weight ranges and alternative predictions as different quantities.</figcaption>
+</figure>
+
+[Open the full-size workflow](../_static/figures/ce-adds-to-workflow.svg).
+The {ref}`software workflow <ce-wrapper-workflow-map>` maps these ideas to calls.
 
 First read the **prediction and its range**. Then ask:
 
@@ -29,7 +37,21 @@ new cases, prediction and explanation use **features only**. Test targets are
 known and kept aside for evaluation; a new case's target may be unknown.
 Ranges have method-specific assumptions, and explanations do not establish causal effects.
 
-## 2. Choose one worked example
+## 2. Choose a task, mode and capability
+
+- **Task — what the target represents:** classification predicts a category
+  (binary or multiclass); regression predicts a numerical quantity.
+- **Mode — the question and returned quantity:** class probabilities, a numerical
+  value and interval, or the probability of a defined numerical event.
+- **Capability — the operation:** obtain prediction information, inspect factual
+  conditions, or explore alternative conditions.
+
+The same regressor can answer a value question or an event question. These
+learning terms are not three constructor strings. The shared
+{doc}`task and mode guide <../foundations/concepts/tasks_modes_capabilities>`
+explains the distinction and the Python interface.
+
+## 3. Choose one worked example
 
 **Not sure where to begin? Start with the classification example.** Each page
 lets you read a captured result, try the browser workflow, or run Python locally.
@@ -46,7 +68,7 @@ two regression questions concern the same kind of target but return different
 quantities: target values or event probabilities. For more depth, use the shared
 {doc}`task and mode guide <../foundations/concepts/tasks_modes_capabilities>`.
 
-## 3. Read the result before adding options
+## 4. Read the result before adding options
 
 In your chosen example, identify the reported quantity and its units, read one
 factual condition and weight, then compare one alternative prediction with the
@@ -83,6 +105,8 @@ Decision practice: Decision Lab <decision-lab>
 ```
 
 <!-- Preserve links from previous Beta candidates. -->
+<span id="2-choose-one-worked-example"></span>
+<span id="3-read-the-result-before-adding-options"></span>
 <span id="ce-big-picture-in-60-seconds"></span>
 <span id="id1"></span>
 <span id="1-see-what-ce-adds"></span>

@@ -11,8 +11,7 @@ DOCS = ROOT / "docs"
 def test_top_level_toctree_targets_exist() -> None:
     expected = (
         "get-started/index",
-        "sections/what-and-why",
-        "sections/how-ce-works",
+        "sections/understand-ce",
         "sections/in-practice",
         "sections/software-integration",
         "sections/project-resources",
@@ -23,6 +22,11 @@ def test_top_level_toctree_targets_exist() -> None:
         assert slug in index, f"Missing toctree entry for {slug}"
         target = resolve_doc(slug)
         assert target.exists(), f"Document referenced by {slug} is missing"
+    # The Learn landing page owns both concept routes; keep their files and links.
+    learning = resolve_doc("sections/understand-ce").read_text()
+    for slug in ("what-and-why", "how-ce-works"):
+        assert f"<{slug}>" in learning
+        assert resolve_doc(f"sections/{slug}").exists()
 
 
 def test_maintenance_docs_exist() -> None:

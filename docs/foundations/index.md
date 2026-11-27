@@ -6,18 +6,10 @@ what you are reading; this collection is not a prerequisite course.
 (guided-reading-route)=
 ## Read as a guided tutorial
 
-Start with the first chapter if you are new to Calibrated Explanations (CE).
-These are existing shared pages, not a second course. Each chapter links to the
-next. The concept chapters use the same Iris session; read their captured outputs
-without Python, or run the linked shared lab once and continue in that session.
-Regression examples show how the output question changes for a numerical target.
-
-```{include} ../_shared/guided-reading-map.md
-```
-
-If you want a result before the theory, take {doc}`Quick Start <../get-started/index>`
-and one worked example first, then return at the chapter that answers your question.
-No route requires completing every browser exercise or repeating the Python setup.
+The {doc}`Learn Calibrated Explanations tutorial <../sections/understand-ce>`
+is the single reading map for the shared chapters. Start there for a continuous
+explanation of the concepts, theory and software examples. This page remains a
+topic index; you do not need to complete it before following an example.
 
 ## Look up one topic
 

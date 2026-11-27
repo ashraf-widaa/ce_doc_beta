@@ -5,6 +5,8 @@
 
 ### Documentation
 
+- Restore the preferred Learn/Use homepage structure and introductory SVG workflow; add brief task/mode/capability definitions and one shared core/optional capability map while retaining scientific corrections.
+
 - Compare the earlier Learn CE review with current entry paths; consolidate the shared reading map, separate integration and extension goals, add concept checks and repair a glossary destination.
 
 - Clarify task, output-mode and capability choices with responsive concept figures, linked worked examples and a shared stage map separating core operations from optional capabilities.

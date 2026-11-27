@@ -1,4 +1,6 @@
-# CE Software & Integration
+# Software Architecture & Integration
+
+<span id="ce-software-integration"></span>
 
 <span class="ce-choice-page" hidden></span>
 

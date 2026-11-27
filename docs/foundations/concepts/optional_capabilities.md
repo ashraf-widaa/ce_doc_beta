@@ -11,12 +11,12 @@ of a value at most a budget**. Keep that question fixed when reading an explanat
 The options below address different needs within this same flow. They are not
 extra predictive tasks or settings everyone must enable.
 
-```{include} ../../_shared/capability-stage-map.md
-```
+The {doc}`How CE Works capability map </sections/how-ce-works>` shows these
+operations together. This page continues with when to use each option and how
+to interpret it.
 
 The stages correspond to the {ref}`shared wrapper figure <ce-wrapper-workflow-map>`
-(calibration at step 3, prediction at step 4, explanations at steps 5a/5b). Each
-column introduces an operation and its software entry point. **Rejection** concerns cases;
+(calibration at step 3, prediction at step 4, explanations at steps 5a/5b). The map introduces the operations and their software entry points. **Rejection** concerns cases;
 **alternative filtering** selects rules; **guarded explanations** check
 candidates during explanation construction. They are different operations.
 

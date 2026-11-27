@@ -1,8 +1,9 @@
-# CE in Practice
+# Use Calibrated Explanations: the user guide
 
 <span class="ce-choice-page" hidden></span>
 
-Use this path to obtain an explanation, understand its output and check the
+This is the practical companion to {doc}`Learn Calibrated Explanations <understand-ce>`.
+Use it to obtain an explanation, understand its output and check the
 workflow before adapting it to your own data. Start with one case and one
 question; advanced filters and deployment settings can wait.
 
@@ -116,6 +117,8 @@ Guarded explanations (advanced) <../get-started/quickstart_guarded>
 Tasks and capabilities <../tasks/index>
 Practitioner hub <../practitioner/index>
 ```
+
+<span id="ce-in-practice"></span>
 
 <!-- Entry-point tier: Tier 1. -->
 
