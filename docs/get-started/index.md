@@ -1,4 +1,4 @@
-# CE big picture in 60 seconds
+# Calibrated Explanations: big picture in 60 seconds
 
 <span class="ce-choice-page" hidden></span>
 
@@ -7,7 +7,8 @@ worked result.** You can try the browser route without installing Python, or
 follow a complete local example. You do not need to learn the software interface
 or optional capabilities first.
 
-## 1. See what CE adds
+(see-what-ce-adds)=
+## 1. See what Calibrated Explanations adds
 
 A predictive model estimates a category or a number from a case's features.
 CE uses that fitted model and **separate labelled calibration data** to provide
@@ -82,6 +83,9 @@ Decision practice: Decision Lab <decision-lab>
 ```
 
 <!-- Preserve links from previous Beta candidates. -->
+<span id="ce-big-picture-in-60-seconds"></span>
+<span id="id1"></span>
+<span id="1-see-what-ce-adds"></span>
 <span id="from-a-conventional-prediction-to-ce"></span>
 <span id="ce-wrapper-workflow-map"></span>
 <span id="ce-core-comparison"></span>

@@ -5,6 +5,8 @@
 
 ### Documentation
 
+- Clarify vertical workflow transitions and conventional machine learning labels; expand Calibrated Explanations in Quick Start headings and page contents.
+
 - Match the detailed Quick Start workflow to the RTD theme using transparent page-native layout, inherited fonts and selectable responsive text.
 
 - Documentation: restore the approved numbered wrapper figure to Quick Start, with the short Calibration label and full-size access.

@@ -89,3 +89,7 @@ body[data-theme="dark"] .ce-native-figure { --ce-ml-fill: #142f4b; --ce-ml-ink: 
 .ce-quickstart-workflow .ce-stage-transition { padding-top: .25rem; }
 @container ce-figure (max-width: 620px) { .ce-query-row { grid-template-columns: minmax(0,1fr); } }
 @media (max-width: 650px) { .ce-query-row { grid-template-columns: minmax(0,1fr); } }
+
+/* Explicit vertical transitions keep the resource flow visible between stages. */
+.ce-stage-connector { display: flex; flex-direction: column; align-items: center; gap: .15rem; margin: .65rem 0 .25rem; text-align: center; font-size: .9375rem; color: var(--color-foreground-primary); }
+.ce-stage-connector .ce-vertical-arrow { font-family: sans-serif; font-size: 2.3rem; line-height: 1; }
