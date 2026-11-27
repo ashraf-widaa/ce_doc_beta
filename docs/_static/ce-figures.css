@@ -81,3 +81,11 @@ body[data-theme="dark"] .ce-native-figure { --ce-ml-fill: #142f4b; --ce-ml-ink: 
 @media (max-width: 650px) {
   .ce-intro-row { grid-template-columns: minmax(0,1fr); }
 }
+
+/* Quick Start uses selectable text and the site's actual font on a clear canvas. */
+.ce-query-row { display: grid; grid-template-columns: minmax(0,1fr) 1.1rem minmax(0,1.5fr); gap: .5rem; align-items: center; }
+.ce-quickstart-workflow { max-width: 48rem; margin-inline: auto; }
+.ce-quickstart-workflow .ce-flow-node { border-width: 1px; box-shadow: none; }
+.ce-quickstart-workflow .ce-stage-transition { padding-top: .25rem; }
+@container ce-figure (max-width: 620px) { .ce-query-row { grid-template-columns: minmax(0,1fr); } }
+@media (max-width: 650px) { .ce-query-row { grid-template-columns: minmax(0,1fr); } }

@@ -5,6 +5,8 @@
 
 ### Documentation
 
+- Match the detailed Quick Start workflow to the RTD theme using transparent page-native layout, inherited fonts and selectable responsive text.
+
 - Documentation: restore the approved numbered wrapper figure to Quick Start, with the short Calibration label and full-size access.
 
 - Shorten Quick Start to a concept overview, one example and interpretation; reuse deeper wrapper and optional-capability material on shared pages, with explicit reading routes and preserved anchors.

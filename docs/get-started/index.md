@@ -13,14 +13,7 @@ A predictive model estimates a category or a number from a case's features.
 CE uses that fitted model and **separate labelled calibration data** to provide
 prediction information and explanations with reported ranges.
 
-```{figure} ../_static/figures/ce-wrapper-quickstart.png
-:alt: Numbered Calibrated Explanations wrapper workflow: wrap and fit the predictive model using training data; prepare calibration using separate labelled data; predict from test or new-case features; choose factual or alternative explanations. Test targets are kept aside for evaluation. Blue denotes machine learning and inputs; orange denotes additions from Calibrated Explanations.
-:width: 100%
-:class: ce-quickstart-wrapper
-
-One wrapper connects training, calibration, prediction and explanation.
-[Open the full-size figure](../_static/figures/ce-wrapper-quickstart.png), or
-{ref}`read the accessible step-by-step description <ce-wrapper-workflow-map>`.
+```{include} ../_shared/quickstart-wrapper.md
 ```
 
 First read the **prediction and its range**. Then ask:
