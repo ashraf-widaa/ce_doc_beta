@@ -1,4 +1,6 @@
-# CE by example: one prediction, explained
+# Calibrated Explanations by example: one prediction, explained
+
+<span id="ce-by-example-one-prediction-explained"></span>
 
 This page follows one real prediction from a
 model's raw output to a calibrated explanation, **without code**. Every number,

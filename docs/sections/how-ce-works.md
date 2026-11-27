@@ -2,7 +2,9 @@
 orphan: true
 ---
 
-# How CE Works: The Theory Behind It
+# How Calibrated Explanations Works: The Theory Behind It
+
+<span id="how-ce-works-the-theory-behind-it"></span>
 
 <span id="the-chain-to-follow"></span><span id="calibration-methods-and-their-limits"></span><span id="from-calibrated-prediction-to-explanation"></span><span id="assumptions-and-guarantees"></span>
 

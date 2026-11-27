@@ -1,6 +1,8 @@
 (satisfying-eu-ai-act-requirements-with-calibrated-explanations)=
 
-# CE outputs in EU AI Act review
+# Calibrated Explanations outputs in EU AI Act review
+
+<span id="ce-outputs-in-eu-ai-act-review"></span>
 
 > [!WARNING]
 > **LEGAL DISCLAIMER — NO COMPLIANCE GUARANTEE**

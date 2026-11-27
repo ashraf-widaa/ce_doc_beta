@@ -40,7 +40,7 @@ contracts, and how to contribute: start with **Contribute in 4 steps**.
 <span id="install-and-troubleshoot"></span><span id="use-ce-with-your-model-and-calibration-data"></span><span id="integrate-with-pipelines"></span><span id="api-configuration-and-plugins"></span><span id="maintenance-support"></span>
 
 (integrate-ce)=
-## Integrate CE
+## Integrate Calibrated Explanations
 
 Use CE's public interfaces from your own software.
 
@@ -64,7 +64,9 @@ Use CE's public interfaces from your own software.
 | Look up a term | {doc}`Glossary <../glossary/index>` |
 
 (extend-ce)=
-## Understand and extend CE
+## Understand and extend Calibrated Explanations
+
+<span id="understand-and-extend-ce"></span>
 
 Understand how the codebase works, where it can be extended, and how to
 contribute a change.
@@ -87,7 +89,7 @@ The source (`src/calibrated_explanations`) and tests (`tests/`) are on
 :hidden:
 :maxdepth: 2
 
-Consume CE Output <../integrate/consume-output>
+Consume Calibrated Explanations Output <../integrate/consume-output>
 Quick API <../get-started/quick_api>
 API Reference <../api/index>
 Parameter Reference <../foundations/concepts/parameter-reference>

@@ -205,7 +205,9 @@ At runtime this appears in metadata as:
 These semantics are the same whether you use `default`, `ensured`, or an experimental
 reject scoring strategy.
 
-## Difficulty in CE reject flows
+## Difficulty in Calibrated Explanations reject flows
+
+<span id="difficulty-in-ce-reject-flows"></span>
 
 CE currently has two distinct difficulty paths for classification reject workflows:
 

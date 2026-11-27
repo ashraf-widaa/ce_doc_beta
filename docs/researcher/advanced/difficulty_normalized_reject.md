@@ -7,7 +7,9 @@ nonconformity function (NCF) beyond the stable `default` and `ensured` choices.
 
 The companion practitioner guide is {doc}`../../practitioner/advanced/reject-policy`.
 
-## What CE reject-option classification does
+## What Calibrated Explanations reject-option classification does
+
+<span id="what-ce-reject-option-classification-does"></span>
 
 For classification calls with reject enabled, CE builds conformal prediction
 sets from calibrated class probabilities. The prediction-set geometry determines

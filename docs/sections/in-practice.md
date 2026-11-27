@@ -1,4 +1,6 @@
-# Use CE: CE in Practice
+# Use Calibrated Explanations in Practice
+
+<span id="use-ce-ce-in-practice"></span>
 
 <span id="ce-in-practice-explore-apply"></span>
 

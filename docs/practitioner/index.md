@@ -64,6 +64,6 @@ Semantics and non-guarantees are documented in
 :hidden:
 
 Python Quickstart <../get-started/quickstart>
-Apply CE: The Practical Workflow <../get-started/apply-overview>
+Apply Calibrated Explanations: The Practical Workflow <../get-started/apply-overview>
 Task API Comparison <task_api_comparison>
 ```

@@ -2,7 +2,9 @@
 orphan: true
 ---
 
-# CE: What & Why
+# Calibrated Explanations: What & Why
+
+<span id="ce-what-why"></span>
 
 <span id="predictions-calibration-and-explanations"></span><span id="what-ce-adds-to-the-model-output"></span>
 

@@ -1,4 +1,6 @@
-# How CE Calibrates: Venn–Abers and Conformal Predictive Systems
+# How Calibrated Explanations Calibrates: Venn–Abers and Conformal Predictive Systems
+
+<span id="how-ce-calibrates-vennabers-and-conformal-predictive-systems"></span>
 
 :::{admonition} About this page
 :class: note
@@ -232,7 +234,9 @@ Whether the default multiclass normalisation is intended, and how its rescaled b
 should be read, is being confirmed by the CE authors.
 :::
 
-### Example with CE
+### Example with Calibrated Explanations
+
+<span id="example-with-ce"></span>
 
 ```python
 from sklearn.datasets import load_breast_cancer
@@ -563,7 +567,7 @@ case are used, the Venn–Abers validity of section 2 applies to the event
 described above; the formulation has not yet been confirmed by the CE authors.*
 :::
 
-### Example with CE
+### Example with Calibrated Explanations
 
 ```python
 from sklearn.datasets import load_diabetes

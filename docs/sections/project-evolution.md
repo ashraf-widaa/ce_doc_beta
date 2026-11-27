@@ -12,7 +12,9 @@ The {doc}`Research & Publications <../researcher/index>` hub collects the
 method papers, theory and literature, replication workflows and open
 research directions.
 
-## How to cite CE
+## How to cite Calibrated Explanations
+
+<span id="how-to-cite-ce"></span>
 
 {doc}`Citing CE <../citing>` gives the references for the method papers and
 the software, with BibTeX entries.
@@ -53,7 +55,7 @@ resources are listed under {doc}`Plugins <../plugins>`.
 :maxdepth: 2
 
 Research & Publications <../researcher/index>
-How to Cite CE <../citing>
+How to Cite Calibrated Explanations <../citing>
 Roadmap <../ROADMAP>
 Governance & Support <../foundations/governance/index>
 ```

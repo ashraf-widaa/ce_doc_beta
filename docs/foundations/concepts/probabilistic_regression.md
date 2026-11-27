@@ -135,7 +135,9 @@ For this case the strongest rule is `s5 <= 0.02` with a weight of about
 probability of a value at or below 150 would be about 0.29 lower. As always,
 this describes the model's response, not a cause.
 
-## How CE computes the probability
+## How Calibrated Explanations computes the probability
+
+<span id="how-ce-computes-the-probability"></span>
 
 The two modes use the calibration set differently. Interval mode fits the CPS
 on the full calibration set. Probabilistic mode randomly splits it into two

@@ -173,7 +173,9 @@ Löfström, Löfström, Johansson and Sönströd (2024),
 
 <span id="continue"></span>
 
-## From predictive models to CE
+## From predictive models to Calibrated Explanations
+
+<span id="from-predictive-models-to-ce"></span>
 
 The {doc}`CE workflow <why-ce>` adds calibration and explanation to these
 data and model roles. The {doc}`Python walkthrough <quickstart_walkthrough>`

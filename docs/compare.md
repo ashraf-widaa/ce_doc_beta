@@ -1,4 +1,6 @@
-# CE compared with SHAP, LIME, counterfactuals and conformal prediction
+# Calibrated Explanations compared with SHAP, LIME, counterfactuals and conformal prediction
+
+<span id="ce-compared-with-shap-lime-counterfactuals-and-conformal-prediction"></span>
 
 <span id="calibrated-explanations-comparisons-ce-first"></span>
 

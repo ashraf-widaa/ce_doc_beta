@@ -1,4 +1,6 @@
-# What CE is and what it adds
+# What Calibrated Explanations is and what it adds
+
+<span id="what-ce-is-and-what-it-adds"></span>
 
 ```{raw} html
 <nav class="ce-journey" aria-label="Get started, step 1 of 5"><ol><li aria-current="step"><a href="what-is-ce.html"><span class="ce-journey-n">1</span>What CE is</a></li><li><a href="get-started/try-in-browser.html"><span class="ce-journey-n">2</span>Quick Start</a></li><li><a href="get-started/installation.html"><span class="ce-journey-n">3</span>Install</a></li><li><a href="foundations/how-to/interpret_explanations.html"><span class="ce-journey-n">4</span>Read it</a></li><li><a href="get-started/apply-to-your-data.html"><span class="ce-journey-n">5</span>Your data</a></li></ol></nav>
@@ -64,7 +66,9 @@ qualifications. {doc}`How CE calibrates
 
 (wic-adds)=
 
-## What CE adds
+## What Calibrated Explanations adds
+
+<span id="what-ce-adds"></span>
 
 CE changes the order of the work: it **calibrates first, then explains the
 calibrated output**.
@@ -101,7 +105,9 @@ al. (2024) for classification and Löfström et al. (2025) for regression; the
 
 (wic-guarantees)=
 
-## What CE guarantees, and what it does not
+## What Calibrated Explanations guarantees, and what it does not
+
+<span id="what-ce-guarantees-and-what-it-does-not"></span>
 
 CE's guarantees are **statistical and depend on stated assumptions** and the
 method-specific calibration protocol. They differ by task and returned
@@ -134,7 +140,9 @@ is the canonical statement of all guarantees and non-guarantees.
 
 (wic-fit)=
 
-## When CE is a good fit
+## When Calibrated Explanations is a good fit
+
+<span id="when-ce-is-a-good-fit"></span>
 
 The list below describes situations where CE's outputs can be used. It is not
 a list of demonstrated benefits: the published evaluations are on the
@@ -167,7 +175,9 @@ Points to plan for:
 
 (wic-compare)=
 
-## How CE relates to other methods
+## How Calibrated Explanations relates to other methods
+
+<span id="how-ce-relates-to-other-methods"></span>
 
 The differences below are about **what each kind of method is designed to
 produce**, not about which performs better. Published comparisons are listed
@@ -185,7 +195,9 @@ A {doc}`short comparison page <compare>` gives more detail.
 
 <span id="where-to-go-next"></span>
 
-## Interpreting a concrete CE output
+## Interpreting a concrete Calibrated Explanations output
+
+<span id="interpreting-a-concrete-ce-output"></span>
 
 {doc}`get-started/ce-by-example` follows one prediction through calibration,
 factual rules and alternatives. The

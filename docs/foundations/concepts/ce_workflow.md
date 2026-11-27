@@ -1,6 +1,8 @@
 (the-ce-workflow-and-how-to-study-it)=
 
-# The CE workflow
+# The Calibrated Explanations workflow
+
+<span id="the-ce-workflow"></span>
 
 *New to the workflow? The {doc}`Quick Start <../../get-started/try-in-browser>`
 walks through it with two worked cases before this page develops it.*
@@ -50,7 +52,9 @@ These five steps are a teaching view of CE. They follow the calls you make
 
 (ce-workflow-methods)=
 
-## Which method CE uses for each task
+## Which method Calibrated Explanations uses for each task
+
+<span id="which-method-ce-uses-for-each-task"></span>
 
 Read each row from left to right: the task and question decide the CE mode,
 the mode decides the calibration method, and the method decides what the

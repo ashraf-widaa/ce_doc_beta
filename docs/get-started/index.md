@@ -59,7 +59,9 @@ explained.
 
 <span id="which-ce-task-am-i-doing"></span>
 
-## Which CE mode am I using?
+## Which Calibrated Explanations mode am I using?
+
+<span id="which-ce-mode-am-i-using"></span>
 
 | Your question | CE mode | Prediction call |
 |---|---|---|
@@ -106,12 +108,12 @@ guarantees differs by mode: see
 :hidden:
 :maxdepth: 1
 
-What CE Is <../what-is-ce>
+What Calibrated Explanations Is <../what-is-ce>
 Quick Start <try-in-browser>
-Your First CE Explanation in Python <first-explanation-python>
+Your First Explanation with Calibrated Explanations in Python <first-explanation-python>
 Installation <installation>
 Read Your First Explanation <../foundations/how-to/interpret_explanations>
-Apply CE to Your Own Data <apply-to-your-data>
+Apply Calibrated Explanations to Your Own Data <apply-to-your-data>
 Coming from SHAP or LIME <coming-from-shap-lime>
-CE by Example (No Code) <ce-by-example>
+Calibrated Explanations by Example (No Code) <ce-by-example>
 ```

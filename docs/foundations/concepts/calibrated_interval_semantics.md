@@ -150,7 +150,9 @@ the diagram does not add a guarantee for an individual case.
 
 (open-author-questions)=
 
-## Open questions for the CE authors
+## Open questions for the Calibrated Explanations authors
+
+<span id="open-questions-for-the-ce-authors"></span>
 
 The statements on this page are deliberately limited where the exact
 scientific wording has not yet been confirmed by the CE authors. The open

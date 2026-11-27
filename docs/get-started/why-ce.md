@@ -1,4 +1,6 @@
-# Why CE: from a conventional to a CE workflow
+# Why Calibrated Explanations: from a conventional workflow to Calibrated Explanations
+
+<span id="why-ce-from-a-conventional-to-a-ce-workflow"></span>
 
 *The {doc}`Quick Start <try-in-browser>` introduces this workflow in one minute,
 cases, starting from {ref}`one figure <qs-workflow>`.*
@@ -26,7 +28,9 @@ remain open:
   usually explain the model's raw output and give one number per feature,
   without saying how certain that number is.
 
-## The CE workflow
+## The Calibrated Explanations workflow
+
+<span id="the-ce-workflow"></span>
 
 ```{raw} html
 <figure class="ce-figure">
@@ -63,7 +67,9 @@ What changes:
    explanations are computed from calibrated outputs and have their own ranges.
    This does not transfer a prediction guarantee to a feature weight.
 
-## What CE gives you: one example
+## What Calibrated Explanations gives you: one example
+
+<span id="what-ce-gives-you-one-example"></span>
 
 A model flags breast-tumour samples as *malignant* or *benign* from 30
 measurements of cell nuclei. (This is an educational example on a public
@@ -114,7 +120,9 @@ effect or recommending an intervention.
 - **Alternative explanation.** What the calibrated prediction would be if one
   feature had a value in a different range (panel 3).
 
-## What CE needs from you
+## What Calibrated Explanations needs from you
+
+<span id="what-ce-needs-from-you"></span>
 
 | Requirement | Details |
 |---|---|
@@ -151,7 +159,9 @@ data leakage and how to avoid it.
 
 <span id="continue"></span>
 
-## CE outputs in a concrete case
+## Calibrated Explanations outputs in a concrete case
+
+<span id="ce-outputs-in-a-concrete-case"></span>
 
 {doc}`CE by example <ce-by-example>` follows a prediction through calibration,
 a factual rule and an alternative. The

@@ -1,4 +1,6 @@
-# Consume CE output from an application
+# Consume Calibrated Explanations output from an application
+
+<span id="consume-ce-output-from-an-application"></span>
 
 **Goal.** Pass CE's predictions and explanations from a Python service to
 another application (a dashboard, an audit store or a decision service) as

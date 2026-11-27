@@ -14,7 +14,9 @@ If terms such as *classification* or *calibration set* are new, start with
 
 ## Choosing your workflow
 
-### Step 1: check that CE fits
+### Step 1: check that Calibrated Explanations fits
+
+<span id="step-1-check-that-ce-fits"></span>
 
 1. **Is it a supported task?** CE explains **supervised** models that predict
    a class or a number for one case at a time, from a fixed set of features.

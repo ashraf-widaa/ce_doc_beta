@@ -1,4 +1,6 @@
-# Apply CE: the practical workflow
+# Apply Calibrated Explanations: the practical workflow
+
+<span id="apply-ce-the-practical-workflow"></span>
 
 This page shows, without code, what applying CE to your
 own problem involves: the steps, what each step produces, how to check it, and

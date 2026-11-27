@@ -40,7 +40,9 @@ uv pip install -e .[dev] -c constraints.txt
 
 ---
 
-## 2. How CE agent context is structured
+## 2. How Calibrated Explanations agent context is structured
+
+<span id="how-ce-agent-context-is-structured"></span>
 
 Every agent platform reads a two-layer set of files:
 
@@ -183,7 +185,9 @@ After each sprint or release:
 
 ---
 
-## 7. Common CE workflows (all platforms)
+## 7. Common Calibrated Explanations workflows (all platforms)
+
+<span id="common-ce-workflows-all-platforms"></span>
 
 ### Explain a prediction end-to-end
 

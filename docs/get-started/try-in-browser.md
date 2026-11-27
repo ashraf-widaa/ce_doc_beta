@@ -1,4 +1,6 @@
-# Quick Start: understand CE and create your first explanation
+# Quick Start: understand Calibrated Explanations and create your first explanation
+
+<span id="quick-start-understand-ce-and-create-your-first-explanation"></span>
 
 <span id="quick-start-try-ce-in-your-browser"></span>
 
@@ -23,7 +25,9 @@ New to CE? Sections 1 and 2 take about two minutes and help you choose.
 <span id="qs-in-60-seconds"></span><span id="qs-predictive-task"></span><span id="ce-in-four-steps-train-calibrate-explain-interpret"></span>
 
 (qs-workflow)=
-## 1. CE in 60 seconds
+## 1. Calibrated Explanations in 60 seconds
+
+<span id="ce-in-60-seconds"></span>
 
 **A supervised model makes a prediction.** It has learned from labelled examples (the
 *training data*) and now gives an output for a new instance: a class, such as *diabetes:
@@ -77,7 +81,9 @@ world, and its ranges are not guarantees for an individual case.
 <span id="task-mode-and-capability"></span>
 
 (qs-task-mode-capability)=
-## 2. Choose your predictive task and CE mode
+## 2. Choose your predictive task and Calibrated Explanations mode
+
+<span id="choose-your-predictive-task-and-ce-mode"></span>
 
 Three words the docs use help you choose:
 
@@ -197,7 +203,9 @@ Two browser applications, with different purposes. You need only one.
 <span id="experiment-with-ce-outputs-expert-lab"></span>
 
 (qs-expert-lab)=
-### Option 1: Expert Hub — explore the CE workflow
+### Option 1: Expert Hub — explore the Calibrated Explanations workflow
+
+<span id="option-1-expert-hub-explore-the-ce-workflow"></span>
 
 The [Expert Hub](https://calibrated-explanations-demo.ju.se/expert) lets you inspect and
 experiment with the CE engine. Its primary example is **binary classification** on the
@@ -385,7 +393,9 @@ The Decision Lab also offers **Port Authority** and **Uncertain Acres**; both ar
 <span id="two-worked-cases-step-by-step"></span><span id="step-1-task-and-data"></span><span id="step-2-model-and-calibration"></span><span id="step-3-prediction-and-uncertainty"></span><span id="step-4-factual-explanation"></span><span id="step-5-one-alternative"></span><span id="step-6-the-same-district-a-threshold-question"></span><span id="try-cls-factual-figure"></span><span id="try-reg-factual-figure"></span><span id="try-cls-alternatives-figure"></span><span id="try-reg-alternatives-figure"></span><span id="try-thr-factual-figure"></span><span id="run-the-examples-in-python-practitioner-hub"></span>
 
 (qs-python)=
-## 5. Path B — Install CE locally
+## 5. Path B — Install Calibrated Explanations locally
+
+<span id="path-b-install-ce-locally"></span>
 
 Install the open-source CE library and run a complete, tested example on your own
 computer. The tutorial **{doc}`Your First CE Explanation in Python <first-explanation-python>`**

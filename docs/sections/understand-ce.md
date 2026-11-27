@@ -1,4 +1,6 @@
-# Understand CE
+# Understand Calibrated Explanations
+
+<span id="understand-ce"></span>
 
 This section explains the methods, assumptions and guarantees behind
 Calibrated Explanations: what problem CE addresses and when it is useful,
@@ -11,7 +13,7 @@ Each concept has one main page in this section. Other pages summarize it and
 link here.
 
 (ce-what-why)=
-## CE: What & Why
+## Calibrated Explanations: What & Why
 
 *What problem does CE address, and when is it useful?*
 
@@ -39,7 +41,7 @@ of compliance, and its compliance wording remains under review.
    regression, and the question each answers.
 
 (how-ce-works)=
-## How CE Works
+## How Calibrated Explanations Works
 
 *How does the workflow produce calibrated outputs and explanations, and what
 assumptions matter?*
@@ -92,9 +94,9 @@ Software components and execution flow are described separately, under
 :hidden:
 :maxdepth: 2
 
-Why CE <../get-started/why-ce>
+Why Calibrated Explanations <../get-started/why-ce>
 Tasks, Modes and Capabilities <../get-started/ce-tasks-and-modes>
-The CE Workflow <../foundations/concepts/ce_workflow>
+The Calibrated Explanations Workflow <../foundations/concepts/ce_workflow>
 Calibration by Task <../foundations/concepts/calibration_methods>
 Guarantees and Limits by Mode <../foundations/concepts/calibrated_interval_semantics>
 Factual and Alternative Explanations <../foundations/concepts/alternatives>

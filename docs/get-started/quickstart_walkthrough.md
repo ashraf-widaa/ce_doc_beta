@@ -324,7 +324,9 @@ uncertainty range for every case. The
 and [How CE Calibrates](../foundations/concepts/calibration_methods.md) give
 the full statements and the mathematics.
 
-## 6. How CE builds an explanation
+## 6. How Calibrated Explanations builds an explanation
+
+<span id="how-ce-builds-an-explanation"></span>
 
 **Question.** Where do the numbers in an explanation come from?
 

@@ -1,4 +1,6 @@
-# Apply CE to your own data
+# Apply Calibrated Explanations to your own data
+
+<span id="apply-ce-to-your-own-data"></span>
 
 **One of the {doc}`Python tutorials <../tutorials/index>`.** This page takes you from your own data and model to
 calibrated predictions and explanations you can check. It assumes you have
@@ -232,7 +234,9 @@ when the population changes.
 
 Full list, with exact messages and reproduced fixes: {doc}`troubleshooting`.
 
-## Use an AI coding assistant to integrate CE (optional)
+## Use an AI coding assistant to integrate Calibrated Explanations (optional)
+
+<span id="use-an-ai-coding-assistant-to-integrate-ce-optional"></span>
 
 An AI coding assistant can adapt the steps above to your code base. It can also
 invent functions or claims that CE does not have, so treat its output as a

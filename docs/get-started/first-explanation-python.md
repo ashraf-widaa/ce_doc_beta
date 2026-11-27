@@ -1,4 +1,6 @@
-# Your First CE Explanation in Python
+# Your First Explanation with Calibrated Explanations in Python
+
+<span id="your-first-ce-explanation-in-python"></span>
 
 This is **Path B** of the {doc}`Quick Start <try-in-browser>`: install the open-source
 CE library and run a complete example on your own computer. You follow one patient
@@ -26,7 +28,9 @@ released CE 1.0.2 (installed from PyPI with scikit-learn 1.9.1 on Python 3.13.7)
 with the 1.1.0 development version these pages are built from. Other versions of
 scikit-learn can change the numbers slightly.
 
-## Step 2. Install CE
+## Step 2. Install Calibrated Explanations
+
+<span id="step-2-install-ce"></span>
 
 Create a virtual environment so that CE and its dependencies stay separate from other
 projects, then install CE with the `viz` extra, which adds the plots.

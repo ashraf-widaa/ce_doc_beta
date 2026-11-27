@@ -7,7 +7,9 @@ held-out data and then explains the calibrated output, with a range for every
 weight. This is a difference in purpose, not a performance ranking; see the
 {doc}`comparison of methods <../compare>`.
 
-## The same steps, in CE
+## The same steps, in Calibrated Explanations
+
+<span id="the-same-steps-in-ce"></span>
 
 | What you do with SHAP or LIME | In CE | What is different |
 |---|---|---|

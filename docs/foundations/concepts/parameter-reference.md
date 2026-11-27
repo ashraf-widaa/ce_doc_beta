@@ -1,4 +1,6 @@
-# CE Parameter Reference
+# Calibrated Explanations Parameter Reference
+
+<span id="ce-parameter-reference"></span>
 
 Canonical definitions for the five user-facing parameters where naming confusion
 is most likely. Read this page before filing a bug about unexpected behaviour

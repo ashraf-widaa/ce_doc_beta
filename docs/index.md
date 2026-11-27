@@ -59,8 +59,8 @@ The project, how to contribute, the terms and the source code.
 
 Home <self>
 Get Started <get-started/index>
-Understand CE <sections/understand-ce>
-Use CE <sections/in-practice>
+Understand Calibrated Explanations <sections/understand-ce>
+Use Calibrated Explanations <sections/in-practice>
 Software Architecture & Integration <sections/software-integration>
 Project <sections/project-evolution>
 ```
