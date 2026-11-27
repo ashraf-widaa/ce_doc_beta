@@ -30,7 +30,6 @@
 <div class="ce-flow-node ce-ce-node"><strong>5a · Factual explanation</strong><code>explain_factual(X_case)</code><span>Conditions + comparison weights + ranges</span></div>
 <div class="ce-flow-node ce-ce-node"><strong>5b · Alternative explanations</strong><code>explore_alternatives(X_case)</code><span>Other conditions + predictions + ranges</span></div>
 </div>
-<p class="ce-flow-note">5a and 5b are choices; explanation calls obtain prediction information internally.</p>
 <div class="ce-flow-key"><span><i class="ce-ml-key" aria-hidden="true"></i>Conventional machine learning / inputs</span><span><i class="ce-ce-key" aria-hidden="true"></i>Added by Calibrated Explanations</span></div>
 <figcaption>One wrapper connects training, calibration, prediction and explanation. The fitted model from step 2 is used during calibration; the prepared resources from step 3 are reused for prediction and explanation.</figcaption>
 </figure>
