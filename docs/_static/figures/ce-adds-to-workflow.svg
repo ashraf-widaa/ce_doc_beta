@@ -1,6 +1,6 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 470" role="img" aria-labelledby="ce-w-title ce-w-desc" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
   <title id="ce-w-title">What CE adds to supervised machine learning</title>
-  <desc id="ce-w-desc">Top row, supervised machine learning, in blue: training data is used to train an ML model, which becomes a fitted predictive model; given an instance it returns a prediction. Bottom row, Calibrated Explanations, in orange: CE uses the same fitted model, without retraining it, together with separate labelled calibration data and the instance (test data/new case) being explained. It returns four things: the prediction, task-specific uncertainty information (probability bounds for classification and threshold events, or a prediction interval in the target's units for interval regression), a factual explanation and alternative explanations.</desc>
+  <desc id="ce-w-desc">Top row, supervised machine learning, in blue: training data is used to train an ML model, which becomes a fitted predictive model; given an instance it returns a prediction. Bottom row, Calibrated Explanations, in orange: CE uses the same fitted model, without retraining it, together with separate labelled calibration data and the instance (Test Data / New use case) being explained. It returns four things: the prediction, task-specific uncertainty information (probability bounds for classification and threshold events, or a prediction interval in the target's units for interval regression), a factual explanation and alternative explanations.</desc>
   <style>@media (prefers-color-scheme: dark) { .ce-canvas-text { fill: #e2e8f0; } }</style>
   <defs>
     <marker id="w-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
@@ -29,11 +29,11 @@
   <path d="M560,77 H598" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#w-arrow)"/>
 
   <!-- Instance being explained -->
-  <rect x="210" y="150" width="150" height="54" rx="27" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
+  <rect x="190" y="150" width="190" height="54" rx="27" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
   <text x="285" y="173" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Instance</text>
-  <text x="285" y="192" text-anchor="middle" font-size="13" fill="#334155">(test data/new case)</text>
-  <path d="M340,152 L420,112" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#w-arrow)"/>
-  <path d="M340,202 L420,262" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#w-arrow)"/>
+  <text x="285" y="192" text-anchor="middle" font-size="12" fill="#334155">(Test Data / New use case)</text>
+  <path d="M360,152 L420,112" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#w-arrow)"/>
+  <path d="M360,202 L420,262" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#w-arrow)"/>
 
   <!-- Same fitted model into CE -->
   <path d="M480,110 V258" stroke="#64748b" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#w-arrow)"/>

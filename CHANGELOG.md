@@ -5,6 +5,8 @@
 
 ### Documentation
 
+- Restore the requested two-path Get Started overview, retain Quick Start as its child page and label the transparent workflow input Instance (Test Data / New use case).
+
 - Label the introductory workflow input as Instance (test data/new case), remove its outer background and adapt free-standing labels to the selected documentation theme.
 
 - Restore the preferred Learn/Use homepage structure and introductory SVG workflow; add brief task/mode/capability definitions and one shared core/optional capability map while retaining scientific corrections.

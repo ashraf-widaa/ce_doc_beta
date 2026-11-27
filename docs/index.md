@@ -16,7 +16,7 @@ reported ranges.
 
 :::{container} ce-hero-actions
 
-<a class="ce-home-primary" href="get-started/index.html">Quick Start →</a>
+<a class="ce-home-primary" href="get-started/quickstart.html">Quick Start →</a>
 
 :::
 
@@ -57,7 +57,7 @@ The project, how to contribute, the terms and the source code.
 :maxdepth: 2
 
 Home <self>
-Quick Start <get-started/index>
+Get Started <get-started/index>
 Learn CE <sections/understand-ce>
 Use CE <sections/in-practice>
 Software Architecture & Integration <sections/software-integration>

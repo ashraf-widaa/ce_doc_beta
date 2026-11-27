@@ -10,7 +10,7 @@ the outputs without installing Python. When you run the concept chapters, keep
 the same Iris session rather than repeating its setup. Numerical-target examples
 show how value questions differ from event questions.
 
-Prefer a result first? Use {doc}`Quick Start <../get-started/index>` and return
+Prefer a result first? Use {doc}`Quick Start <../get-started/quickstart>` and return
 here for the reasoning. The {doc}`Use CE guide <in-practice>` applies these ideas
 to examples, your own data and software workflows.
 

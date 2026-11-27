@@ -1,7 +1,8 @@
 {# Keep Sphinx's single-owner tree and Furo's accessible branch controls. #}
 <nav class="ce-route-switcher" aria-label="Documentation routes">
   <a class="ce-nav-home" href="{{ pathto('index') }}"{% if pagename == 'index' %} aria-current="page"{% endif %}>Home</a>
-  <a class="ce-nav-start" href="{{ pathto('get-started/index') }}"{% if pagename == 'get-started/index' %} aria-current="page"{% endif %}>Quick Start</a>
+  <a href="{{ pathto('get-started/index') }}">Get Started</a>
+  <a class="ce-nav-start" href="{{ pathto('get-started/quickstart') }}"{% if pagename == 'get-started/quickstart' %} aria-current="page"{% endif %}>Quick Start</a>
   <p class="ce-nav-heading">Learn and use</p>
   <ul>
     <li><a href="{{ pathto('sections/understand-ce') }}">Learn Calibrated Explanations</a></li>
