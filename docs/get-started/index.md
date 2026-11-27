@@ -17,7 +17,7 @@ prediction information and explanations with reported ranges.
 <figure class="ce-preferred-workflow">
 <picture>
 <source media="(max-width: 600px)" srcset="../_static/figures/ce-adds-to-workflow-narrow.svg">
-<img src="../_static/figures/ce-adds-to-workflow.svg" width="920" height="470" alt="Conventional supervised prediction and the additions from Calibrated Explanations: the same fitted model, separate labelled calibration data, task-specific prediction information, factual explanations and alternatives.">
+<img src="../_static/figures/ce-adds-to-workflow.svg" width="920" height="470" alt="Conventional supervised prediction and the additions from Calibrated Explanations: the same fitted model, separate labelled calibration data, an instance (test data/new case), task-specific prediction information, factual explanations and alternatives.">
 </picture>
 <figcaption>The introductory workflow from the preferred review version. Read prediction ranges, factual-weight ranges and alternative predictions as different quantities.</figcaption>
 </figure>

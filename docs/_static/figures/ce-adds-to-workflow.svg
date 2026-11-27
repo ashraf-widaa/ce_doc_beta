@@ -1,6 +1,7 @@
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 920 470" role="img" aria-labelledby="ce-w-title ce-w-desc" font-family="system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif">
   <title id="ce-w-title">What CE adds to supervised machine learning</title>
-  <desc id="ce-w-desc">Top row, supervised machine learning, in blue: training data is used to train an ML model, which becomes a fitted predictive model; given an instance it returns a prediction. Bottom row, Calibrated Explanations, in orange: CE uses the same fitted model, without retraining it, together with separate labelled calibration data and the instance being explained. It returns four things: the prediction, task-specific uncertainty information (probability bounds for classification and threshold events, or a prediction interval in the target's units for interval regression), a factual explanation and alternative explanations.</desc>
+  <desc id="ce-w-desc">Top row, supervised machine learning, in blue: training data is used to train an ML model, which becomes a fitted predictive model; given an instance it returns a prediction. Bottom row, Calibrated Explanations, in orange: CE uses the same fitted model, without retraining it, together with separate labelled calibration data and the instance (test data/new case) being explained. It returns four things: the prediction, task-specific uncertainty information (probability bounds for classification and threshold events, or a prediction interval in the target's units for interval regression), a factual explanation and alternative explanations.</desc>
+  <style>@media (prefers-color-scheme: dark) { .ce-canvas-text { fill: #e2e8f0; } }</style>
   <defs>
     <marker id="w-arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto-start-reverse">
       <path d="M0,0 L10,5 L0,10 z" fill="#64748b"/>
@@ -9,10 +10,9 @@
       <path d="M0,0 L10,5 L0,10 z" fill="#ea580c"/>
     </marker>
   </defs>
-  <rect x="0" y="0" width="920" height="470" rx="14" fill="#ffffff"/>
 
   <!-- Row 1: supervised machine learning -->
-  <text x="20" y="30" font-size="17" font-weight="700" fill="#1e3a8a">Supervised machine learning</text>
+  <text class="ce-canvas-text" x="20" y="30" font-size="17" font-weight="700" fill="#1e3a8a">Supervised machine learning</text>
   <rect x="20" y="44" width="150" height="66" rx="10" fill="#dbeafe" stroke="#2563eb" stroke-width="2"/>
   <text x="95" y="72" text-anchor="middle" font-size="16" font-weight="700" fill="#1e3a8a">Training data</text>
   <text x="95" y="94" text-anchor="middle" font-size="14" fill="#1e40af">labelled</text>
@@ -31,17 +31,17 @@
   <!-- Instance being explained -->
   <rect x="210" y="150" width="150" height="54" rx="27" fill="#f1f5f9" stroke="#475569" stroke-width="2"/>
   <text x="285" y="173" text-anchor="middle" font-size="15" font-weight="700" fill="#0f172a">Instance</text>
-  <text x="285" y="192" text-anchor="middle" font-size="13" fill="#334155">to predict and explain</text>
+  <text x="285" y="192" text-anchor="middle" font-size="13" fill="#334155">(test data/new case)</text>
   <path d="M340,152 L420,112" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#w-arrow)"/>
   <path d="M340,202 L420,262" stroke="#64748b" stroke-width="2" fill="none" marker-end="url(#w-arrow)"/>
 
   <!-- Same fitted model into CE -->
   <path d="M480,110 V258" stroke="#64748b" stroke-width="2" stroke-dasharray="5 4" fill="none" marker-end="url(#w-arrow)"/>
-  <text x="470" y="176" text-anchor="end" font-size="13" font-style="italic" fill="#334155">same fitted model,</text>
-  <text x="470" y="193" text-anchor="end" font-size="13" font-style="italic" fill="#334155">not retrained</text>
+  <text class="ce-canvas-text" x="470" y="176" text-anchor="end" font-size="13" font-style="italic" fill="#334155">same fitted model,</text>
+  <text class="ce-canvas-text" x="470" y="193" text-anchor="end" font-size="13" font-style="italic" fill="#334155">not retrained</text>
 
   <!-- Row 2: Calibrated Explanations -->
-  <text x="20" y="244" font-size="17" font-weight="700" fill="#7c2d12">With Calibrated Explanations</text>
+  <text class="ce-canvas-text" x="20" y="244" font-size="17" font-weight="700" fill="#7c2d12">With Calibrated Explanations</text>
   <rect x="20" y="262" width="190" height="86" rx="10" fill="#fff7ed" stroke="#ea580c" stroke-width="2" stroke-dasharray="6 4"/>
   <text x="115" y="290" text-anchor="middle" font-size="16" font-weight="700" fill="#7c2d12">Calibration data</text>
   <text x="115" y="312" text-anchor="middle" font-size="13" fill="#9a3412">separate and labelled,</text>
@@ -88,8 +88,8 @@
   <rect x="600" y="396" width="300" height="34" rx="10" fill="#ffedd5" stroke="#ea580c" stroke-width="2"/>
   <text x="616" y="419" font-size="15" font-weight="700" fill="#7c2d12">4 · Alternative explanations</text>
   <text x="884" y="419" text-anchor="end" font-size="13" fill="#9a3412">what if?</text>
-  <text x="600" y="382" font-size="12" fill="#9a3412">each explanation reports ranges for its weights</text>
+  <text class="ce-canvas-text" x="600" y="382" font-size="12" fill="#9a3412">each explanation reports ranges for its weights</text>
 
-  <text x="20" y="430" font-size="13" fill="#475569">CE does not retrain the model. Uncertainty depends on the task and</text>
-  <text x="20" y="448" font-size="13" fill="#475569">its assumptions; it is not a guarantee for an individual case.</text>
+  <text class="ce-canvas-text" x="20" y="430" font-size="13" fill="#475569">CE does not retrain the model. Uncertainty depends on the task and</text>
+  <text class="ce-canvas-text" x="20" y="448" font-size="13" fill="#475569">its assumptions; it is not a guarantee for an individual case.</text>
 </svg>

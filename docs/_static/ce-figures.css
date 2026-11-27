@@ -118,3 +118,7 @@ body[data-theme="dark"] .ce-native-figure { --ce-ml-fill: #142f4b; --ce-ml-ink: 
 .ce-choice-branches,.ce-numeric-questions,.ce-capability-stages { grid-template-columns: minmax(0,1fr); }
 .ce-definition-row { grid-template-columns: minmax(0,1fr); gap: .5rem; }
 }
+
+/* Propagate the selected RTD theme into the transparent embedded SVG. */
+body[data-theme="light"] .ce-preferred-workflow img { color-scheme: light; }
+body[data-theme="dark"] .ce-preferred-workflow img { color-scheme: dark; }
