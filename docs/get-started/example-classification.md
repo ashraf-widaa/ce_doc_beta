@@ -41,7 +41,7 @@ can differ. Keep its screenshot open while identifying the three quantities.
 The local example predicts a flower's **species** from four measurements. The
 possible targets are setosa, versicolor and virginica. We inspect the second
 held-out case, using its features without supplying its known species to CE.
-The same fitted model and row are used in the Python example and shared chapters.
+The same fitted model and row are used in the Python example and the shared concept pages.
 
 **First, read the prediction.** The raw random forest puts all its reported
 probability on versicolor. After calibration, CE reports the following values:

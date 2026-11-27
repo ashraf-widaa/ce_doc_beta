@@ -186,7 +186,7 @@ A single example does not evaluate your model or establish deployment validity.
 
 **Understand the plot:** {doc}`../foundations/how-to/interpret_explanations`.
 
-**Next chapter:** {doc}`Check results on held-out data <../practitioner/check_results>`. This complete plotted example is an alternative to running the shared chapter cells. You do not need to repeat both.
+**Next page:** {doc}`Check results on held-out data <../practitioner/check_results>`. This complete plotted example is an alternative to running the code cells on the shared concept pages. You do not need to repeat both.
 
 
 <span id="choose-your-next-step"></span>

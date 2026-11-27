@@ -29,7 +29,7 @@ different purposes.
 
 ## Complete the shared lab with held-out checks
 
-Continue the Iris session from {doc}`the explanation chapter <../foundations/concepts/how_explanations_are_built>`,
+Continue the Iris session from {doc}`the explanation page <../foundations/concepts/how_explanations_are_built>`,
 or run the {download}`complete shared lab <../_examples/learning_lab.py>` first.
 Only now use `y_test`, the held-out observed targets, to assess predictions.
 It was not an input to the preceding query or explanation calls.
@@ -88,7 +88,7 @@ for the actual method-specific assumptions and limits.
 
 ## Finish the guided introduction
 
-**Previous chapter:** {doc}`Interpret calibrated explanations <../foundations/how-to/interpret_explanations>`.
+**Previous page:** {doc}`Interpret calibrated explanations <../foundations/how-to/interpret_explanations>`.
 
 ## Choose where to continue
 

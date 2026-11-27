@@ -53,7 +53,7 @@ checking the resulting system after fitting and calibration decisions.
 
 The shared lab has already reserved proper training, calibration and evaluation
 rows. We now use the calibration rows; the evaluation outcomes remain for the
-final check. The {doc}`data-role chapter <predictive_tasks>` owns the full definitions
+final check. The {doc}`data-role page <predictive_tasks>` owns the full definitions
 and split code, so you do not need to prepare a second dataset here.
 
 Keep preprocessing and model selection from leaking evaluation information into
@@ -240,8 +240,8 @@ The calibration construction uses labelled cases in a different role from fittin
 
 ## Continue the guided introduction
 
-**Previous chapter:** {doc}`tasks_modes_capabilities`.
+**Previous page:** {doc}`tasks_modes_capabilities`.
 
-**Next chapter:** {doc}`From predictions to explanations <how_explanations_are_built>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+**Next page:** {doc}`From predictions to explanations <how_explanations_are_built>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
 
 <!-- Entry-point tier: Tier 3. -->

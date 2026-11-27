@@ -1,0 +1,123 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 360 2570" role="img" aria-labelledby="title desc"><title id="title">What CE adds to a basic conventional ML workflow</title><desc id="desc">Two lanes share the same fitted predictive model. Conventional ML: training data fit the model; at inference, new-case features go to that model, which returns a class, numerical value or score. With CE: the same fitted model, not retrained, plus separate labelled calibration data configure a CE system whose calibration method is set by the task and mode; at inference, the same new-case features go to that system, which returns prediction information with a mode-specific range, a factual explanation (which conditions in this case contribute: feature weights with ranges) and alternative explanations (what the model would report under other feature conditions: predictions with ranges). Held-out evaluation is separate: test features obtain outputs from the model or CE system; test targets are used only to check those outputs and never enter prediction or explanation. White marks conventional parts, orange marks CE additions. Conventional systems can also use other calibration or explanation tools; this compares CE with a basic model-only workflow. Arrows show information flow, not API calls.</desc><defs><marker id="arrow" viewBox="0 0 10 10" refX="9" refY="5" markerWidth="6" markerHeight="6" orient="auto"><path d="M0 0L10 5L0 10Z" fill="#64748b"/></marker></defs>
+<g class="node"><rect x="12" y="12" width="336" height="48" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="45.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Conventional ML</text>
+</g>
+<rect x="83.79" y="78" width="192.42" height="26" rx="5" fill="#ffffff"/>
+<text x="180" y="95" text-anchor="middle" font-family="sans-serif" font-size="17" font-weight="700" fill="#334155">Preparation · once</text>
+<path d="M180 185V210" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M180 420V445" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M180 525V550" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<g class="node"><rect x="22" y="105" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="142.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Training data</text>
+<text x="180.0" y="166.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Features + known targets</text>
+</g>
+<g class="node"><rect x="22" y="210" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="247.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Fitted predictive model</text>
+<text x="180.0" y="271.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Learns from training data</text>
+</g>
+<rect x="49.875" y="308" width="260.25" height="26" rx="5" fill="#ffffff"/>
+<text x="180" y="325" text-anchor="middle" font-family="sans-serif" font-size="17" font-weight="700" fill="#334155">Inference · each new case</text>
+<g class="node"><rect x="22" y="340" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="377.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">New-case features</text>
+<text x="180.0" y="401.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Target not needed</text>
+</g>
+<g class="node"><rect x="22" y="445" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="482.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Same fitted model</text>
+<text x="180.0" y="506.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">From preparation</text>
+</g>
+<g class="node"><rect x="22" y="550" width="316" height="90" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="580.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Model output</text>
+<text x="180.0" y="604.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Class, numerical value</text>
+<text x="180.0" y="628.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">or score</text>
+</g>
+<rect x="38.47500000000002" y="657" width="283.04999999999995" height="24" rx="5" fill="#ffffff"/>
+<text x="180" y="672" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="400" fill="#334155">Other tools can add calibration</text>
+<rect x="47.025000000000006" y="682" width="265.95" height="24" rx="5" fill="#ffffff"/>
+<text x="180" y="697" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="400" fill="#334155">or explanations to this lane.</text>
+<g class="node"><rect x="12" y="730" width="336" height="48" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="180.0" y="763.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">With CE</text>
+</g>
+<rect x="83.79" y="795" width="192.42" height="26" rx="5" fill="#ffffff"/>
+<text x="180" y="812" text-anchor="middle" font-family="sans-serif" font-size="17" font-weight="700" fill="#334155">Preparation · once</text>
+<path d="M180 1020V1050" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M180 1275V1300" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M180 1380V1405" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M22 865H10V1095H22" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M338 1340H350V1575H338" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M350 1575V1705H338" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<g class="node"><rect x="22" y="825" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="862.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Same fitted model</text>
+<text x="180.0" y="886.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Reused, not retrained</text>
+</g>
+<g class="node"><rect x="22" y="930" width="316" height="90" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="180.0" y="960.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Calibration data</text>
+<text x="180.0" y="984.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Separate labelled cases:</text>
+<text x="180.0" y="1008.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">features + targets</text>
+</g>
+<g class="node"><rect x="22" y="1050" width="316" height="90" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="180.0" y="1080.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Configured CE system</text>
+<text x="180.0" y="1104.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Same model + calibration state</text>
+<text x="180.0" y="1128.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Method set by task and mode</text>
+</g>
+<rect x="49.875" y="1163" width="260.25" height="26" rx="5" fill="#ffffff"/>
+<text x="180" y="1180" text-anchor="middle" font-family="sans-serif" font-size="17" font-weight="700" fill="#334155">Inference · each new case</text>
+<g class="node"><rect x="22" y="1195" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="1232.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Same new-case features</text>
+<text x="180.0" y="1256.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Target not needed</text>
+</g>
+<g class="node"><rect x="22" y="1300" width="316" height="80" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="180.0" y="1337.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Same CE system</text>
+<text x="180.0" y="1361.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Model + calibration state</text>
+</g>
+<g class="node"><rect x="22" y="1405" width="316" height="90" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="180.0" y="1435.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Prediction information</text>
+<text x="180.0" y="1459.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Probability or numerical value</text>
+<text x="180.0" y="1483.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">with a mode-specific range</text>
+</g>
+<g class="node"><rect x="22" y="1525" width="316" height="100" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="180.0" y="1560.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Factual explanation</text>
+<text x="180.0" y="1584.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Which conditions contribute?</text>
+<text x="180.0" y="1608.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Weights + ranges</text>
+</g>
+<g class="node"><rect x="22" y="1655" width="316" height="100" rx="12" fill="#ffedd5" stroke="#c2410c" stroke-width="2"/>
+<text x="180.0" y="1690.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#9a3412">Alternative explanations</text>
+<text x="180.0" y="1714.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">What if a condition differed?</text>
+<text x="180.0" y="1738.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Predictions + ranges</text>
+</g>
+<g class="node"><rect x="12" y="1820" width="336" height="48" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="1853.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Held-out evaluation</text>
+</g>
+<path d="M180 1970V1995" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M180 2085V2110" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M180 2190V2215" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<path d="M180 2325V2295" fill="none" stroke="#64748b" stroke-width="2.5" stroke-linejoin="round"  marker-end="url(#arrow)"/>
+<g class="node"><rect x="22" y="1890" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="1927.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Test features</text>
+<text x="180.0" y="1951.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Query inputs only</text>
+</g>
+<g class="node"><rect x="22" y="1995" width="316" height="90" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="2037.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Same model or CE system</text>
+<text x="180.0" y="2061.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Predict or explain</text>
+</g>
+<g class="node"><rect x="22" y="2110" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="2147.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Test outputs</text>
+<text x="180.0" y="2171.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Kept for checking</text>
+</g>
+<g class="node"><rect x="22" y="2215" width="316" height="80" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="2252.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Check results</text>
+<text x="180.0" y="2276.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Compare outputs with targets</text>
+</g>
+<g class="node"><rect x="22" y="2325" width="316" height="90" rx="12" fill="#ffffff" stroke="#64748b" stroke-width="2"/>
+<text x="180.0" y="2355.0" text-anchor="middle" font-family="sans-serif" font-size="21" font-weight="700" fill="#1e293b">Test targets</text>
+<text x="180.0" y="2379.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Known outcomes, kept aside</text>
+<text x="180.0" y="2403.0" text-anchor="middle" font-family="sans-serif" font-size="18" font-weight="400" fill="#334155">Used only in the check</text>
+</g>
+<rect x="61.56" y="2434" width="236.88" height="25" rx="5" fill="#ffffff"/>
+<text x="180" y="2450" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="700" fill="#334155">Test targets never enter</text>
+<rect x="52.44000000000001" y="2459" width="255.11999999999998" height="25" rx="5" fill="#ffffff"/>
+<text x="180" y="2475" text-anchor="middle" font-family="sans-serif" font-size="16" font-weight="700" fill="#334155">prediction or explanation.</text>
+<rect x="76.95" y="2500" width="206.1" height="24" rx="5" fill="#ffffff"/>
+<text x="180" y="2515" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="400" fill="#334155">White: conventional ML</text>
+<rect x="85.50000000000001" y="2525" width="188.99999999999997" height="24" rx="5" fill="#ffffff"/>
+<text x="180" y="2540" text-anchor="middle" font-family="sans-serif" font-size="15" font-weight="400" fill="#334155">Orange: what CE adds</text>
+</svg>

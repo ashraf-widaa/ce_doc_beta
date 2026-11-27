@@ -54,7 +54,7 @@
 .ce-route-card:focus-visible { outline: 3px solid var(--color-brand-primary); outline-offset: 3px; }
 @media (max-width: 700px) { .ce-mode-grid, .ce-route-grid { grid-template-columns: minmax(0,1fr); } }
 
-/* Guided chapters use their scoped course links instead of conflicting tree-order arrows. */
+/* Guided pages use their scoped course links instead of conflicting tree-order arrows. */
 body:has(article .ce-course-step) .related-pages,
 body:has(article .ce-choice-page) .related-pages { display: none; }
 

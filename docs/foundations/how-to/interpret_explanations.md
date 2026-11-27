@@ -264,7 +264,7 @@ After you absorb the tables and plots:
 3. Share this guide with auditors and stakeholders so everyone relies on the same vocabulary when discussing factual or alternative explanations.
 
 A readable explanation does not by itself establish a safe decision. The next
-chapter evaluates held-out results; use {doc}`Software & Integration <../../sections/software-integration>`
+page evaluates held-out results; use {doc}`Software & Integration <../../sections/software-integration>`
 when you need an application contract instead.
 
 Entry-point tier: Tier 3.
@@ -272,6 +272,6 @@ Entry-point tier: Tier 3.
 
 ## Continue the guided introduction
 
-**Previous chapter:** {doc}`../concepts/how_explanations_are_built`.
+**Previous page:** {doc}`../concepts/how_explanations_are_built`.
 
-**Next chapter:** {doc}`Evaluate held-out results <../../practitioner/check_results>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+**Next page:** {doc}`Evaluate held-out results <../../practitioner/check_results>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.

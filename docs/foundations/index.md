@@ -6,9 +6,9 @@ what you are reading; this collection is not a prerequisite course.
 (guided-reading-route)=
 ## Read as a guided tutorial
 
-Start with the first chapter if you are new to Calibrated Explanations (CE).
-These are existing shared pages, not a second course. Each chapter links to the
-next. The concept chapters use the same Iris session; read their captured outputs
+Start with the first page if you are new to Calibrated Explanations (CE).
+These are existing shared pages, not a second course. Each page links to the
+next. The concept pages use the same Iris session; read their captured outputs
 without Python, or run the linked shared lab once and continue in that session.
 Regression examples show how the output question changes for a numerical target.
 
@@ -16,7 +16,7 @@ Regression examples show how the output question changes for a numerical target.
 ```
 
 If you want a result before the theory, take {doc}`Quick Start <../get-started/index>`
-and one worked example first, then return at the chapter that answers your question.
+and one worked example first, then return at the page that answers your question.
 No route requires completing every browser exercise or repeating the Python setup.
 
 ## Look up one topic

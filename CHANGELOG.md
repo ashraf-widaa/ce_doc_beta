@@ -26,6 +26,7 @@
 - Place a core-only, two-panel ML/CE comparison at the start of Quick Start, add a stacked mobile version, and separate optional features after the first-example choices.
 
 - Clarify development, held-out evaluation and inference in the Beta workflow figures; distinguish data roles, task/mode choices and optional CE capabilities.
+- Add a conventional-ML-versus-CE comparison figure (SVG, desktop and mobile) to CE: What & Why, separating preparation, inference and held-out evaluation; rewrite that page for readability; use "page" instead of "chapter" across the reading route; align the lifecycle figures' conventional-route label.
 
 [Full changelog](https://github.com/Moffran/calibrated_explanations/compare/v1.0.2...main)
 

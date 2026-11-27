@@ -85,7 +85,7 @@ not an invented universal reproduction command. The researcher route links it.
 The review repository holds these independent documentation candidates.
 
 For a continuous first introduction, begin with {doc}`What & Why <what-and-why>`
-and follow its shared chapters. For a specific software task, enter the relevant
+and follow its shared concept pages. For a specific software task, enter the relevant
 hub directly; each guide states the context and prerequisites you need.
 
 ## Shared resources

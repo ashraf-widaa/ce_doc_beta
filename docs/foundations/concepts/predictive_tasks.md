@@ -2,7 +2,7 @@
 
 <span class="ce-course-step" hidden></span>
 
-This chapter introduces features, targets and data roles, then prepares one small
+This page introduces features, targets and data roles, then prepares one small
 example that continues through calibration, explanation and evaluation.
 
 ## Predictive tasks
@@ -98,10 +98,10 @@ python -m pip install calibrated-explanations scikit-learn
 ```
 
 Run the installation command in a terminal. Run the Python cell below in a script
-or notebook using that environment. Continue using the same session in later chapters so its
+or notebook using that environment. Continue using the same session on later pages so its
 arrays remain available. You can also
 {download}`download the complete shared lab <../../_examples/learning_lab.py>`
-and run it as a script. The source is reused by the later chapters; no custom
+and run it as a script. The source is reused by the later pages; no custom
 wrapper or unintroduced dataset is required.
 
 ```{literalinclude} ../../_examples/learning_lab.py
@@ -143,8 +143,8 @@ not to claim that one fixed proportion suits every dataset.
 
 ## Continue the guided introduction
 
-**Previous chapter:** {doc}`../../sections/what-and-why`.
+**Previous page:** {doc}`../../sections/what-and-why`.
 
-**Next chapter:** {doc}`Tasks, modes and capabilities <tasks_modes_capabilities>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+**Next page:** {doc}`Tasks, modes and capabilities <tasks_modes_capabilities>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
 
 <!-- Entry-point tier: Tier 3. -->

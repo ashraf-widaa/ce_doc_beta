@@ -16,7 +16,7 @@ The useful reading is “under this condition, the model reports this probabilit
 not “changing a real flower will cause this outcome”.
 
 The {doc}`code-free case <../../get-started/example-classification>` shows the
-captured output. The {doc}`explanation-construction chapter <how_explanations_are_built>`
+captured output. The {doc}`explanation-construction page <how_explanations_are_built>`
 explains comparisons and the same example's code without repeating its definitions here.
 
 ## Generate alternatives

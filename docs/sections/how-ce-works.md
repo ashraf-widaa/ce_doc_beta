@@ -56,7 +56,7 @@ After reading an ordinary result, visit the shared
 {doc}`optional-capability overview <../foundations/concepts/optional_capabilities>`.
 It places grouping, guarding, conjunctions, alternative filtering and rejection
 within the core workflow, with the same terms used by the software guides.
-You do not need to enable them to follow the core chapters below.
+You do not need to enable them to follow the core pages below.
 
 ## From calibration to a prediction
 
@@ -97,10 +97,10 @@ separate the output definition from its guarantee, and
 {doc}`Checking results <../practitioner/check_results>` to plan held-out evaluation.
 That is the bridge from understanding the construction to applying it.
 
-## Continue through the shared chapters
+## Continue through the shared concept pages
 
 **Next:** {doc}`Calibration and statistical background <../foundations/concepts/calibration_background>`.
-Then follow its next-chapter link to explanation construction and interpretation.
+Then follow its next-page link to explanation construction and interpretation.
 
 If you want the whole sequence before starting, use the
 {ref}`shared reading map <guided-reading-route>`. If you already have a result,
@@ -157,3 +157,4 @@ More shared topics <../foundations/index>
 <!-- Preserve section links from earlier review versions. -->
 <span id="read-this-path-as-a-tutorial"></span>
 <span id="find-the-explanation-you-need"></span>
+<span id="continue-through-the-shared-chapters"></span>

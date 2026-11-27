@@ -18,7 +18,7 @@ in each example without installing CE.
 ## 2. Calibration split
 
 CE needs separate labelled calibration examples. The shared
-{doc}`data-role chapter <foundations/concepts/predictive_tasks>` explains fitting,
+{doc}`data-role page <foundations/concepts/predictive_tasks>` explains fitting,
 calibration and held-out evaluation; keep those roles distinct.
 
 ## 3. Choose mode

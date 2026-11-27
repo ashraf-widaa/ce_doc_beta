@@ -77,7 +77,7 @@ You can follow either guide directly; you do not need to complete both. After
 an exercise, return to interpretation and evaluation rather than treating a
 successful game outcome as a calibration check. If you want the underlying
 construction, the {doc}`shared guided introduction <what-and-why>` provides concept,
-code and output chapters instead of a separate set of definitions.
+code and output pages instead of a separate set of definitions.
 
 ## 4. Extend the workflow when needed
 

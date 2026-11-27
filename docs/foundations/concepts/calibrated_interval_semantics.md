@@ -56,7 +56,7 @@ CE uses **Venn–Abers** constructions. In the binary construction, hypothetical
 labels lead to a pair of probability values; a reported point probability is
 derived from the construction. A property of the pair must not be transferred
 unchanged to a merged point or to multiclass handling. The
-{doc}`calibration chapter <calibration_background>` explains the mechanism.
+{doc}`calibration page <calibration_background>` explains the mechanism.
 Exact merged-probability and multiclass validity wording remains for author review.
 
 For multiclass outputs, check the class order and the return shapes before
@@ -189,7 +189,7 @@ simply be reused as a theorem about every feature-weight range.
 
 An alternative instead reports a prediction under another condition. Compare
 that prediction with the original on the same scale. Read the
-{doc}`explanation-construction chapter <how_explanations_are_built>` and
+{doc}`explanation-construction page <how_explanations_are_built>` and
 {doc}`interpretation guide <../how-to/interpret_explanations>` for the same case.
 
 ## Cross-mode non-guarantees

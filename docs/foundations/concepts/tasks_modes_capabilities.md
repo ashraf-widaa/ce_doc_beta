@@ -146,9 +146,9 @@ No. The target remains numerical and the fitted model remains a regressor. The o
 
 ## Continue the guided introduction
 
-**Previous chapter:** {doc}`predictive_tasks`.
+**Previous page:** {doc}`predictive_tasks`.
 
-**Next chapter:** {doc}`Calibration and its methods <calibration_background>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+**Next page:** {doc}`Calibration and its methods <calibration_background>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
 
 <!-- Entry-point tier: Tier 3. -->
 

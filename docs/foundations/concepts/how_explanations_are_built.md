@@ -8,7 +8,7 @@ alternative prediction.
 
 ## Keep the running case in view
 
-The preceding chapter reports 0.910 for the selected flower's versicolor
+The previous page reports 0.910 for the selected flower's versicolor
 probability. We now ask which feature conditions contribute to that response
 and what the model reports under different conditions. Keep the same flower and
 class so that a changed quantity does not get mistaken for a changed case.
@@ -136,9 +136,9 @@ No. A factual weight describes a comparison of model responses; an alternative r
 
 ## Continue the guided introduction
 
-**Previous chapter:** {doc}`calibration_background`.
+**Previous page:** {doc}`calibration_background`.
 
-**Next chapter:** {doc}`Read the results and figures <../how-to/interpret_explanations>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
+**Next page:** {doc}`Read the results and figures <../how-to/interpret_explanations>`. This sequence is for readers learning CE from the beginning; you can still use this page independently as a topic guide.
 
 For the method-specific conditions behind the ranges, use {doc}`calibrated_interval_semantics`.
 

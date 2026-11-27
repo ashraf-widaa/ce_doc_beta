@@ -20,7 +20,7 @@ understand or extend the implementation.
   material below if you already know the public workflow.
 
 These are different goals, not two compulsory stages. The statistical definitions
-remain in {doc}`How CE Works <how-ce-works>` and its shared chapters.
+remain in {doc}`How CE Works <how-ce-works>` and its shared concept pages.
 
 ## First, run the public workflow
 
@@ -58,7 +58,7 @@ start with ordinary calls before choosing an option.
 | Configure and maintain | {doc}`Runtime configuration <../foundations/how-to/configure_runtime>` and {doc}`Troubleshooting <../get-started/troubleshooting>` | Understand configuration and investigate failures. |
 
 Read the following sections alongside those guides. The shared
-{doc}`calibration chapter <../foundations/concepts/calibration_background>` explains
+{doc}`calibration page <../foundations/concepts/calibration_background>` explains
 the statistical mechanism when you need it; this route concentrates on using it in software.
 
 ## Connect your model and preprocessing
