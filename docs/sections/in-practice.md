@@ -6,6 +6,10 @@ Use this path to obtain an explanation, understand its output and check the
 workflow before adapting it to your own data. Start with one case and one
 question; advanced filters and deployment settings can wait.
 
+**Your reading route:** {doc}`one classification result <../get-started/example-classification>` →
+{doc}`interpretation <../foundations/how-to/interpret_explanations>` →
+{doc}`checking results <../practitioner/check_results>`. Then adapt the workflow.
+
 ## 1. Obtain one worked result
 
 If you are new to CE, follow the

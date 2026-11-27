@@ -22,6 +22,9 @@ The {doc}`How CE Works tutorial <../../sections/how-ce-works>` gives these pages
 
 ## Deepen a specific topic
 
+- {doc}`Optional capabilities <optional_capabilities>` explains when to add grouping, guarding, combined rules, alternative filtering or rejection after reading a core result.
+
+
 - {doc}`Regression: values and events <probabilistic_regression>` separates target-value intervals from event probabilities.
 - {doc}`Alternative explanations <alternatives>` introduces comparisons and triangular views.
 - {doc}`Guarded explanations <guarded_explanations>` explains support filtering and its limitations.
@@ -40,6 +43,7 @@ understanding calibration or an explanation.
 ```{toctree}
 :maxdepth: 1
 
+Optional capabilities: when and how <optional_capabilities>
 Alternative explanations and ensured filters <alternatives>
 Guarded explanations <guarded_explanations>
 Terminology: thresholded vs probabilistic regression <terminology_thresholded_vs_probabilistic_regression>

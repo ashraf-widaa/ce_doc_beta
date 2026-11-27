@@ -7,6 +7,10 @@ outputs as they move through your system. Start with the public interface;
 internal architecture and plugin contracts become relevant when you need to
 understand or extend the implementation.
 
+**Your reading route:** {doc}`one Python example <../get-started/first-python-explanation>` →
+{doc}`Quick API <../get-started/quick_api>` →
+{doc}`pipeline integration <../foundations/how-to/integrate_with_pipelines>`.
+
 ## First, run the public workflow
 
 Follow {doc}`First explanation in Python <../get-started/first-python-explanation>`
@@ -18,11 +22,19 @@ The public wrapper, `WrapCalibratedExplainer`, coordinates the lifecycle: use a
 fitted predictive model, calibrate with separate labelled data, then predict or
 explain a new case. Prediction and explanation use the fitted model with CE calibration; a separate prediction call is not required before an explanation.
 
-For both the concept and the call, use the
-{ref}`numbered core workflow <ce-wrapper-workflow-map>` and
-{ref}`optional capability API map <optional-capability-api-map>`. The figures,
-glossary and API guide use the same distinction between a prediction, a factual
-comparison weight and an alternative prediction.
+(ce-wrapper-workflow-map)=
+## Follow the numbered wrapper workflow
+
+The figure maps each activity to its software entry point. It distinguishes
+what is known in the data from what is supplied to a call: test targets are
+known but withheld for evaluation; a new case's target may be unknown.
+
+```{include} ../_shared/wrapper-figure.md
+```
+
+For exact calls and output questions, use {doc}`Quick API <../get-started/quick_api>`.
+Optional functions have a separate {ref}`concept-to-software map <optional-capability-api-map>`;
+start with ordinary calls before choosing an option.
 
 ## Follow the integration sequence
 

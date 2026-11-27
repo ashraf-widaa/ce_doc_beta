@@ -9,8 +9,9 @@
 
 `X_case` means the features of the selected test observations or new cases. Other
 pages may name the same role `X_query` or `x_test`; these are variable names, not
-different CE capabilities. Their targets are not supplied to prediction or
-explanation calls. Test targets are kept separately for evaluation.
+different CE capabilities. Test data have known features and targets; the targets are kept separately for
+evaluation. A new case has available features, but its target may be unknown.
+In both cases, only features are supplied to prediction or explanation calls.
 
 Steps 5a and 5b are complementary choices. An explanation call obtains the
 prediction information it needs internally; a separate step-4 call is not

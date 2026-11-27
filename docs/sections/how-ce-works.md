@@ -13,6 +13,12 @@ statistical conditions. You can stop at the depth needed for your question.
 
 ## Start here
 
+**Your reading route:** this overview →
+{doc}`calibration background <../foundations/concepts/calibration_background>` →
+{doc}`explanation construction <../foundations/concepts/how_explanations_are_built>` →
+{doc}`reading a result <../foundations/how-to/interpret_explanations>`.
+
+
 If features, targets or separate data roles are new, first read
 {doc}`Predictive tasks and data roles <../foundations/concepts/predictive_tasks>`.
 Otherwise, begin with the workflow below. You will learn what CE constructs,
@@ -20,26 +26,19 @@ read code and output from one Iris session, and distinguish the quantities it re
 
 ## Follow the same model through the workflow
 
-Follow the same fitted predictive model through calibration, prediction and
-explanation. One public wrapper coordinates the software calls; it does not
-introduce a second predictive model. Keep the data roles separate.
+Start with a fitted predictive model. Calibration uses separate labelled cases
+to construct prediction information for your question; explanations compare
+responses under feature conditions. The model itself stays fixed.
 
-```{include} ../_shared/wrapper-figure.md
+```{include} ../_shared/intro-figure.md
 ```
 
-```{include} ../_shared/wrapper-lifecycle.md
-```
-
-The method construction comes next; the diagram is not a claim that every range
-has the same guarantee or that a separate prediction call must precede an
-explanation. Read a held-out test observation using its features first, then
-use its known target only for evaluation.
-
-For the inputs to these stages, read the shared
-{doc}`data-role definitions <../foundations/concepts/predictive_tasks>`.
-For the calls, use {doc}`Quick API <../get-started/quick_api>`. A completed workflow
-alone does not verify the statistical assumptions: guarantees remain mode-specific
-as described in the {doc}`semantics reference <../foundations/concepts/calibrated_interval_semantics>`.
+Training data fit the model; calibration data have a separate role. A test case
+has a known target kept aside for evaluation. A new case's target may be unknown.
+Both supply only features to prediction and explanation calls. For a guided
+introduction to those roles, use {doc}`Predictive tasks <../foundations/concepts/predictive_tasks>`.
+For the corresponding software calls, use the
+{ref}`numbered wrapper workflow <ce-wrapper-workflow-map>`.
 
 ## Follow the workflow for your question
 
@@ -51,35 +50,13 @@ Python routes. Read the figure together with its assumptions note.
 - {doc}`Interval regression: value and target-value interval <../get-started/example-interval>`.
 - {doc}`Probabilistic regression: event probability and bounds <../get-started/example-event>`.
 
-## Place optional features by their job
+## Use optional features when you have a specific need
 
-Once the core workflow is familiar, attach each option to the activity it changes.
-The arrows below identify that relationship; they do not make the options a
-sequence that every application must run.
-
-```{include} ../_shared/optional-figure.md
-```
-
-The concept and software names match the shared glossary and the
-{ref}`Quick API option map <optional-capability-api-map>`. The numbers refer to
-the wrapper workflow above. Read the appropriate detailed guide before enabling
-an option; grouping is not a fairness guarantee, and guarding is not a universal
-certificate that a case or hypothetical change is realistic.
-
-- **Mondrian calibration:** supply consistent group information at calibration
-  and query time; see {doc}`conditional calibration <../foundations/how-to/conditional_calibration>`.
-- **Guarding:** check selected representatives of candidate conditions while
-  building explanations; see {doc}`guarded explanations <../foundations/concepts/guarded_explanations>`.
-- **Conjunctions:** combine feature conditions in rules; see
-  {doc}`interpreting explanations <../foundations/how-to/interpret_explanations>`.
-- **Alternative filtering:** select already generated alternative rules by a
-  stated criterion; see {doc}`alternatives <../foundations/concepts/alternatives>`.
-- **Rejection:** flag cases for separate handling under the configured rule;
-  follow the {doc}`rejection guide <../practitioner/advanced/reject-policy>`. Setup and support must be checked before use.
-
-These operations do not establish real-world causal effects or a universal
-prediction guarantee. The shared {doc}`task and mode guide <../foundations/concepts/tasks_modes_capabilities>`
-keeps the output quantities distinct.
+After reading an ordinary result, visit the shared
+{doc}`optional-capability overview <../foundations/concepts/optional_capabilities>`.
+It places grouping, guarding, conjunctions, alternative filtering and rejection
+within the core workflow, with the same terms used by the software guides.
+You do not need to enable them to follow the core chapters below.
 
 ## From calibration to a prediction
 

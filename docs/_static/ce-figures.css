@@ -68,3 +68,16 @@ body[data-theme="dark"] .ce-native-figure { --ce-ml-fill: #142f4b; --ce-ml-ink: 
   .ce-flow-node { padding: .7rem .8rem; text-align: left; }
   .ce-option-content { gap: .6rem; }
 }
+
+/* Availability of targets differs from the feature input to the calls. */
+.ce-case-data { display: grid; gap: .45rem; }
+.ce-native-figure .ce-case-features { margin: .15rem 0; font-size: .9375rem; }
+
+/* A compact concept overview belongs before the first worked example. */
+.ce-intro-row { display: grid; grid-template-columns: minmax(0,1fr) 1rem minmax(0,1fr) 1rem minmax(0,1fr) 1rem minmax(0,1fr); gap: .3rem; align-items: center; }
+@container ce-figure (max-width: 620px) {
+  .ce-intro-row { grid-template-columns: minmax(0,1fr); }
+}
+@media (max-width: 650px) {
+  .ce-intro-row { grid-template-columns: minmax(0,1fr); }
+}

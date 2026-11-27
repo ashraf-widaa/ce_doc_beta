@@ -157,6 +157,11 @@ For exact assumptions and limitations, use
 
 ## Continue from this result
 
+**Next: {doc}`read the interpretation guide <../foundations/how-to/interpret_explanations>`
+with this result open.** It explains predictions, weights and ranges using the
+same terminology. You do not need to run a second environment first.
+
+
 **Try another question:** return to {doc}`the big picture <index>`.
 **Understand the construction:** {doc}`How CE Works <../sections/how-ce-works>`.
 **Adapt to your data:** {doc}`Checking results <../practitioner/check_results>`.

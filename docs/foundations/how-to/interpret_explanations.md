@@ -30,7 +30,9 @@ information instead. {doc}`Calibrated interval semantics <../concepts/calibrated
 is the shared source for assumptions, guarantees and feature-level limitations.
 A range crossing zero does not establish a causal effect or a significance test.
 
-**Try a result:** {doc}`Quick Start <../../get-started/index>`.
+**Need a result to read?** Open the {doc}`classification example <../../get-started/example-classification>`;
+its captured results need no installation. If you already have a result, continue
+with it rather than restarting Quick Start.
 **Find the calls:** {doc}`Quick API <../../get-started/quick_api>`.
 
 ```{admonition} Terminology

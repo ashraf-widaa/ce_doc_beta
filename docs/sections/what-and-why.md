@@ -15,6 +15,11 @@ Start here to understand the ideas. You do not need to install CE or learn its
 API first. By the end, you should be able to explain what CE adds and decide
 which question to explore in an example.
 
+**Your reading route:** this introduction →
+{doc}`predictive tasks and data roles <../foundations/concepts/predictive_tasks>` →
+{doc}`tasks, modes and capabilities <../foundations/concepts/tasks_modes_capabilities>`.
+The shared chapters continue from there; no installation is needed to read them.
+
 ## Start with a familiar prediction
 
 Suppose a model estimates the median housing value in an area. It uses

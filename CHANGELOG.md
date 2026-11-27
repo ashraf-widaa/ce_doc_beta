@@ -5,6 +5,10 @@
 
 ### Documentation
 
+- Shorten Quick Start to a concept overview, one example and interpretation; reuse deeper wrapper and optional-capability material on shared pages, with explicit reading routes and preserved anchors.
+
+- Distinguish known test targets from unknown new-case targets in the workflow figure, and spell out Calibrated Explanations and machine learning in its labels.
+
 - Render workflow figures with responsive page-native typography, transparent backgrounds and full-size transparent image downloads.
 
 - Publish a square numbered wrapper workflow and optional capability map, with shared concept/API tables and aligned calibration, explanation and rejection terminology.

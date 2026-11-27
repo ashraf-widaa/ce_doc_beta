@@ -7,6 +7,11 @@ and contribution process. Use it to understand the project, reproduce research
 or find a focused way to participate. You do not need to complete it before
 trying an explanation.
 
+**For research:** {doc}`identify the papers <../citing>` →
+{doc}`follow a replication workflow <../researcher/replication/index>`.
+**For software contributions:** {doc}`understand the architecture <../foundations/concepts/architecture>` →
+{doc}`use the Contributor Hub <../contributor/index>`. Choose the route matching your goal.
+
 ## Choose a project route
 
 - **Investigate or reproduce a method:** start with the research section below,
