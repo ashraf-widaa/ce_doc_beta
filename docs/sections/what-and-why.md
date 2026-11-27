@@ -50,9 +50,9 @@ with the same workflow when CE is added, **With CE**.
 <figure>
 <picture>
 <source media="(max-width: 600px)" srcset="../_static/figures/ce-adds-comparison-mobile.svg">
-<img src="../_static/figures/ce-adds-comparison.svg" width="1100" height="1470" alt="Two lanes. Conventional ML: training data fit a predictive model; new-case features go to that model, which returns a class, numerical value or score. With CE: the same fitted model, not retrained, and separate labelled calibration data configure a CE system whose method is set by task and mode; the same new-case features go to that system, which returns prediction information with a mode-specific range, a factual explanation with feature weights and ranges, and alternative explanations with predictions and ranges. Held-out evaluation: test features obtain outputs; test targets are used only to check them and never enter prediction or explanation.">
+<img src="../_static/figures/ce-adds-comparison.svg" width="1100" height="1470" alt="Two lanes. Conventional ML: training data fit a predictive model; an instance (test data or a new case, features only) goes to that model, which returns a class, numerical value or score. With CE: the same fitted model, not retrained, and separate labelled calibration data configure a CE system whose method is set by task and mode; the same instance goes to that system, which returns prediction information with a mode-specific range, a factual explanation with feature weights and ranges, and alternative explanations with predictions and ranges. Held-out evaluation: test features obtain outputs; test targets are used only to check them and never enter prediction or explanation.">
 </picture>
-<figcaption>White boxes are the conventional workflow; orange boxes are what CE adds. The fitted model and the new-case features are the same in both lanes.</figcaption>
+<figcaption>White boxes are the conventional workflow; orange boxes are what CE adds. The fitted model and the instance are the same in both lanes.</figcaption>
 </figure>
 
 [Download the comparison figure (SVG)](../_static/figures/ce-adds-comparison.svg).
@@ -62,8 +62,9 @@ targets) fit a predictive model. With CE you keep that same fitted model and
 add one step: separate labelled calibration data, which the model was not
 trained on, configure a CE system around it. Calibration does not retrain the model.
 
-**Inference, for each new case.** Both sides receive the same features. The
-case's target is not needed. The conventional model returns a class, a number
+**Inference, for each instance.** An instance is one case to predict or
+explain: a row of test data or a new case. Both sides receive the same
+instance, as features only; its target is not needed. The conventional model returns a class, a number
 or a score. The CE system returns:
 
 - **prediction information** with a range;

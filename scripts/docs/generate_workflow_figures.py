@@ -541,7 +541,7 @@ def comparison(m=False):
         w,
         h,
         "What CE adds to a basic conventional ML workflow",
-        "Two lanes share the same fitted predictive model. Conventional ML: training data fit the model; at inference, new-case features go to that model, which returns a class, numerical value or score. With CE: the same fitted model, not retrained, plus separate labelled calibration data configure a CE system whose calibration method is set by the task and mode; at inference, the same new-case features go to that system, which returns prediction information with a mode-specific range, a factual explanation (which conditions in this case contribute: feature weights with ranges) and alternative explanations (what the model would report under other feature conditions: predictions with ranges). Held-out evaluation is separate: test features obtain outputs from the model or CE system; test targets are used only to check those outputs and never enter prediction or explanation. White marks conventional parts, orange marks CE additions. Conventional systems can also use other calibration or explanation tools; this compares CE with a basic model-only workflow. Arrows show information flow, not API calls.",
+        "Two lanes share the same fitted predictive model. Conventional ML: training data fit the model; at inference, an instance (test data or a new case; features only) goes to that model, which returns a class, numerical value or score. With CE: the same fitted model, not retrained, plus separate labelled calibration data configure a CE system whose calibration method is set by the task and mode; at inference, the same instance goes to that system, which returns prediction information with a mode-specific range, a factual explanation (which conditions in this case contribute: feature weights with ranges) and alternative explanations (what the model would report under other feature conditions: predictions with ranges). Held-out evaluation is separate: test features obtain outputs from the model or CE system; test targets are used only to check those outputs and never enter prediction or explanation. White marks conventional parts, orange marks CE additions. Conventional systems can also use other calibration or explanation tools; this compares CE with a basic model-only workflow. Arrows show information flow, not API calls.",
     )
     ce_outputs = ("Prediction information", ["Probability or numerical value", "with a mode-specific range"])
     system_lines = ["Same model + calibration state", "Method set by task and mode"]
@@ -549,12 +549,12 @@ def comparison(m=False):
         x, bw = 22, 316
         d.box(12, 12, w - 24, 48, "Conventional ML")
         d.text(180, 95, "Preparation · once", 17, True)
-        for p in ["M180 185V210", "M180 420V445", "M180 525V550"]:
+        for p in ["M180 185V210", "M180 425V445", "M180 525V550"]:
             d.arrow(p)
         d.box(x, 105, bw, 80, "Training data", ["Features + known targets"])
         d.box(x, 210, bw, 80, "Fitted predictive model", ["Learns from training data"])
-        d.text(180, 325, "Inference · each new case", 17, True)
-        d.box(x, 340, bw, 80, "New-case features", ["Target not needed"])
+        d.text(180, 325, "Inference · each instance", 17, True)
+        d.box(x, 335, bw, 90, "Instance", ["Test data / new case", "Features only, no target"])
         d.box(x, 445, bw, 80, "Same fitted model", ["From preparation"])
         d.box(x, 550, bw, 90, "Model output", ["Class, numerical value", "or score"])
         d.text(180, 672, "Other tools can add calibration", 15)
@@ -562,7 +562,7 @@ def comparison(m=False):
 
         d.box(12, 730, w - 24, 48, "With CE", ce=True)
         d.text(180, 812, "Preparation · once", 17, True)
-        for p in ["M180 1020V1050", "M180 1275V1300", "M180 1380V1405"]:
+        for p in ["M180 1020V1050", "M180 1280V1300", "M180 1380V1405"]:
             d.arrow(p)
         d.arrow("M22 865H10V1095H22")
         d.arrow("M338 1340H350V1575H338")
@@ -570,8 +570,8 @@ def comparison(m=False):
         d.box(x, 825, bw, 80, "Same fitted model", ["Reused, not retrained"])
         d.box(x, 930, bw, 90, "Calibration data", ["Separate labelled cases:", "features + targets"], True)
         d.box(x, 1050, bw, 90, "Configured CE system", system_lines, True)
-        d.text(180, 1180, "Inference · each new case", 17, True)
-        d.box(x, 1195, bw, 80, "Same new-case features", ["Target not needed"])
+        d.text(180, 1180, "Inference · each instance", 17, True)
+        d.box(x, 1190, bw, 90, "Same instance", ["Test data / new case", "Features only, no target"])
         d.box(x, 1300, bw, 80, "Same CE system", ["Model + calibration state"], True)
         d.box(x, 1405, bw, 90, *ce_outputs, True)
         d.box(x, 1525, bw, 100, "Factual explanation", ["Which conditions contribute?", "Weights + ranges"], True)
@@ -615,7 +615,7 @@ def comparison(m=False):
 
         # Inference band
         d.parts.append('<path d="M25 482H1075" stroke="#94a3b8" stroke-width="1.5" stroke-dasharray="4 6"/>')
-        d.text(550, 500, "INFERENCE · repeated for each new case", 18, True)
+        d.text(550, 500, "INFERENCE · repeated for each instance", 18, True)
         for p in ["M275 600V630", "M275 720V750", "M825 600V630", "M825 720V750"]:
             d.arrow(p)
         # Both explanation kinds come from the CE system, not from the prediction box.
@@ -624,8 +624,8 @@ def comparison(m=False):
         # Reuse connectors: preparation results are the same objects used at inference.
         d.arrow("M25 280H12V675H25", dashed=True)
         d.arrow("M1075 400H1088V675H1075", dashed=True)
-        d.box(ax, 520, lw, 80, "New-case features", ["The case's target is not needed"])
-        d.box(bx, 520, lw, 80, "Same new-case features", ["The case's target is not needed"])
+        d.box(ax, 520, lw, 80, "Instance (test data / new case)", ["Features only; the target is not needed"])
+        d.box(bx, 520, lw, 80, "Same instance (test data / new case)", ["Features only; the target is not needed"])
         d.box(ax, 630, lw, 90, "Same fitted model", ["Unchanged from preparation"])
         d.box(bx, 630, lw, 90, "Same configured CE system", ["Model + calibration state, reused"], True)
         d.box(ax, 750, lw, 90, "Model output", ["Class, numerical value or score"])
